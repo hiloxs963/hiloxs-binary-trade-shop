@@ -87,11 +87,20 @@ function TradingPage() {
   const rising = last.c >= prev.c;
   const remaining = openTrade ? Math.max(0, Math.ceil((openTrade.endsAt - now) / 1000)) : 0;
 
-  const place = (direction: "UP" | "DOWN") => {
+  const place = (direction: "UP" | "DOWN"): void => {
     const stakeUsd = Number(stake);
-    if (!stakeUsd || stakeUsd <= 0) return toast.error("Enter a stake above $0");
-    if (stakeUsd > state.demoBalanceUsd) return toast.error("Demo balance is too low");
-    if (openTrade) return toast.error("Wait for the open trade to expire");
+    if (!stakeUsd || stakeUsd <= 0) {
+      toast.error("Enter a stake above $0");
+      return;
+    }
+    if (stakeUsd > state.demoBalanceUsd) {
+      toast.error("Demo balance is too low");
+      return;
+    }
+    if (openTrade) {
+      toast.error("Wait for the open trade to expire");
+      return;
+    }
     const trade: Trade = {
       id: Math.random().toString(36).slice(2, 10),
       asset: asset.symbol,

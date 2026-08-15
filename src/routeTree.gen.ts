@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BinaryPlanRouteImport } from './routes/binary-plan'
 import { Route as ShopRouteImport } from './routes/shop'
+import { Route as TradingRouteImport } from './routes/trading'
 import { Route as TrainingRouteImport } from './routes/training'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const ShopRoute = ShopRouteImport.update({
   path: '/shop',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TradingRoute = TradingRouteImport.update({
+  id: '/trading',
+  path: '/trading',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainingRoute = TrainingRouteImport.update({
   id: '/training',
   path: '/training',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
   '/shop': typeof ShopRoute
+  '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
   '/shop': typeof ShopRoute
+  '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,22 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
   '/shop': typeof ShopRoute
+  '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/binary-plan' | '/shop' | '/training'
+  fullPaths: '/' | '/binary-plan' | '/shop' | '/trading' | '/training'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/binary-plan' | '/shop' | '/training'
-  id: '__root__' | '/' | '/binary-plan' | '/shop' | '/training'
+  to: '/' | '/binary-plan' | '/shop' | '/trading' | '/training'
+  id: '__root__' | '/' | '/binary-plan' | '/shop' | '/trading' | '/training'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BinaryPlanRoute: typeof BinaryPlanRoute
   ShopRoute: typeof ShopRoute
+  TradingRoute: typeof TradingRoute
   TrainingRoute: typeof TrainingRoute
 }
 
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShopRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trading': {
+      id: '/trading'
+      path: '/trading'
+      fullPath: '/trading'
+      preLoaderRoute: typeof TradingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/training': {
       id: '/training'
       path: '/training'
@@ -106,6 +123,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BinaryPlanRoute: BinaryPlanRoute,
   ShopRoute: ShopRoute,
+  TradingRoute: TradingRoute,
   TrainingRoute: TrainingRoute,
 }
 export const routeTree = rootRouteImport
