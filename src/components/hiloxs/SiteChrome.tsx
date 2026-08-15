@@ -26,12 +26,13 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
         <Link to="/" className="flex items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground shadow-[var(--shadow-glow)]">
-            <Zap className="size-5" />
-          </span>
-          <span className="font-display text-lg font-bold tracking-tight">
-            HILO<span className="text-gradient-brand">XS</span>
-          </span>
+          <img
+            src={logoAsset.url}
+            alt="HILOXS"
+            width={600}
+            height={211}
+            className="h-8 w-auto object-contain"
+          />
         </Link>
 
         <nav className="ml-auto hidden items-center gap-1 lg:flex">
@@ -99,9 +100,13 @@ export function SiteFooter() {
     <footer className="mt-20 border-t border-border bg-surface/60">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="font-display text-lg font-bold">
-            HILO<span className="text-gradient-brand">XS</span>
-          </p>
+          <img
+            src={logoAsset.url}
+            alt="HILOXS"
+            width={600}
+            height={211}
+            className="h-7 w-auto object-contain"
+          />
           <p className="mt-2 text-sm text-muted-foreground">
             Electronics marketplace, binary network marketing and a demo trading desk — one
             platform, one community.
