@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BinaryPlanRouteImport } from './routes/binary-plan'
+import { Route as SellWithUsRouteImport } from './routes/sell-with-us'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as TradingRouteImport } from './routes/trading'
 import { Route as TrainingRouteImport } from './routes/training'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const BinaryPlanRoute = BinaryPlanRouteImport.update({
   id: '/binary-plan',
   path: '/binary-plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellWithUsRoute = SellWithUsRouteImport.update({
+  id: '/sell-with-us',
+  path: '/sell-with-us',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -44,6 +50,7 @@ const TrainingRoute = TrainingRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
+  '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
+  '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
@@ -59,21 +67,32 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
+  '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/binary-plan' | '/shop' | '/trading' | '/training'
+  fullPaths:
+    '/' | '/binary-plan' | '/sell-with-us' | '/shop' | '/trading' | '/training'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/binary-plan' | '/shop' | '/trading' | '/training'
-  id: '__root__' | '/' | '/binary-plan' | '/shop' | '/trading' | '/training'
+  to:
+    '/' | '/binary-plan' | '/sell-with-us' | '/shop' | '/trading' | '/training'
+  id:
+    | '__root__'
+    | '/'
+    | '/binary-plan'
+    | '/sell-with-us'
+    | '/shop'
+    | '/trading'
+    | '/training'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BinaryPlanRoute: typeof BinaryPlanRoute
+  SellWithUsRoute: typeof SellWithUsRoute
   ShopRoute: typeof ShopRoute
   TradingRoute: typeof TradingRoute
   TrainingRoute: typeof TrainingRoute
@@ -93,6 +112,13 @@ declare module '@tanstack/react-router' {
       path: '/binary-plan'
       fullPath: '/binary-plan'
       preLoaderRoute: typeof BinaryPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sell-with-us': {
+      id: '/sell-with-us'
+      path: '/sell-with-us'
+      fullPath: '/sell-with-us'
+      preLoaderRoute: typeof SellWithUsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -122,6 +148,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BinaryPlanRoute: BinaryPlanRoute,
+  SellWithUsRoute: SellWithUsRoute,
   ShopRoute: ShopRoute,
   TradingRoute: TradingRoute,
   TrainingRoute: TrainingRoute,
