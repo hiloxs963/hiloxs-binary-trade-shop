@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Menu, ShoppingCart, X, Zap } from "lucide-react";
+import { Menu, ShoppingCart, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHiloxs } from "@/lib/hiloxs-store";
+import logoAsset from "@/assets/hiloxs-logo.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Home" },
