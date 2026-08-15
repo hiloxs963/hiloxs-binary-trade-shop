@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Menu, ShoppingCart, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHiloxs } from "@/lib/hiloxs-store";
-import logoAsset from "@/assets/hiloxs-logo.png.asset.json";
+import logoIcon from "@/assets/hiloxs-icon.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -27,12 +27,15 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
         <Link to="/" className="flex items-center gap-2">
           <img
-            src={logoAsset.url}
-            alt="HILOXS"
-            width={600}
-            height={211}
-            className="h-10 w-auto object-contain"
+            src={logoIcon.url}
+            alt=""
+            width={256}
+            height={256}
+            className="h-9 w-auto object-contain"
           />
+          <span className="font-display text-lg font-bold tracking-tight">
+            HILO<span className="text-gradient-brand">XS</span>
+          </span>
         </Link>
 
         <nav className="ml-auto hidden items-center gap-1 lg:flex">
@@ -100,13 +103,18 @@ export function SiteFooter() {
     <footer className="mt-20 border-t border-border bg-surface/60">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <img
-            src={logoAsset.url}
-            alt="HILOXS"
-            width={600}
-            height={211}
-            className="h-7 w-auto object-contain"
-          />
+          <div className="flex items-center gap-2">
+            <img
+              src={logoIcon.url}
+              alt=""
+              width={256}
+              height={256}
+              className="h-7 w-auto object-contain"
+            />
+            <span className="font-display text-lg font-bold tracking-tight">
+              HILO<span className="text-gradient-brand">XS</span>
+            </span>
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">
             Electronics marketplace, binary network marketing and a demo trading desk — one
             platform, one community.
