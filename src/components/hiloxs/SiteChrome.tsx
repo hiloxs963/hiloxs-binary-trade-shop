@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Menu, ShoppingCart, X, Zap } from "lucide-react";
+import { Menu, ShoppingCart, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHiloxs } from "@/lib/hiloxs-store";
+import logoIcon from "@/assets/hiloxs-icon.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -25,9 +26,13 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
         <Link to="/" className="flex items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground shadow-[var(--shadow-glow)]">
-            <Zap className="size-5" />
-          </span>
+          <img
+            src={logoIcon.url}
+            alt=""
+            width={256}
+            height={256}
+            className="h-9 w-auto object-contain"
+          />
           <span className="font-display text-lg font-bold tracking-tight">
             HILO<span className="text-gradient-brand">XS</span>
           </span>
@@ -98,9 +103,18 @@ export function SiteFooter() {
     <footer className="mt-20 border-t border-border bg-surface/60">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="font-display text-lg font-bold">
-            HILO<span className="text-gradient-brand">XS</span>
-          </p>
+          <div className="flex items-center gap-2">
+            <img
+              src={logoIcon.url}
+              alt=""
+              width={256}
+              height={256}
+              className="h-7 w-auto object-contain"
+            />
+            <span className="font-display text-lg font-bold tracking-tight">
+              HILO<span className="text-gradient-brand">XS</span>
+            </span>
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">
             Electronics marketplace, binary network marketing and a demo trading desk — one
             platform, one community.
