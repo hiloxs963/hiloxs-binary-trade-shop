@@ -10,33 +10,115 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BinaryPlanRouteImport } from './routes/binary-plan'
+import { Route as MyOrdersRouteImport } from './routes/my-orders'
+import { Route as SellWithUsRouteImport } from './routes/sell-with-us'
+import { Route as ShopRouteImport } from './routes/shop'
+import { Route as TradingRouteImport } from './routes/trading'
+import { Route as TrainingRouteImport } from './routes/training'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BinaryPlanRoute = BinaryPlanRouteImport.update({
+  id: '/binary-plan',
+  path: '/binary-plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyOrdersRoute = MyOrdersRouteImport.update({
+  id: '/my-orders',
+  path: '/my-orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellWithUsRoute = SellWithUsRouteImport.update({
+  id: '/sell-with-us',
+  path: '/sell-with-us',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopRoute = ShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TradingRoute = TradingRouteImport.update({
+  id: '/trading',
+  path: '/trading',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingRoute = TrainingRouteImport.update({
+  id: '/training',
+  path: '/training',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/binary-plan': typeof BinaryPlanRoute
+  '/my-orders': typeof MyOrdersRoute
+  '/sell-with-us': typeof SellWithUsRoute
+  '/shop': typeof ShopRoute
+  '/trading': typeof TradingRoute
+  '/training': typeof TrainingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/binary-plan': typeof BinaryPlanRoute
+  '/my-orders': typeof MyOrdersRoute
+  '/sell-with-us': typeof SellWithUsRoute
+  '/shop': typeof ShopRoute
+  '/trading': typeof TradingRoute
+  '/training': typeof TrainingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/binary-plan': typeof BinaryPlanRoute
+  '/my-orders': typeof MyOrdersRoute
+  '/sell-with-us': typeof SellWithUsRoute
+  '/shop': typeof ShopRoute
+  '/trading': typeof TradingRoute
+  '/training': typeof TrainingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/binary-plan'
+    | '/my-orders'
+    | '/sell-with-us'
+    | '/shop'
+    | '/trading'
+    | '/training'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/binary-plan'
+    | '/my-orders'
+    | '/sell-with-us'
+    | '/shop'
+    | '/trading'
+    | '/training'
+  id:
+    | '__root__'
+    | '/'
+    | '/binary-plan'
+    | '/my-orders'
+    | '/sell-with-us'
+    | '/shop'
+    | '/trading'
+    | '/training'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BinaryPlanRoute: typeof BinaryPlanRoute
+  MyOrdersRoute: typeof MyOrdersRoute
+  SellWithUsRoute: typeof SellWithUsRoute
+  ShopRoute: typeof ShopRoute
+  TradingRoute: typeof TradingRoute
+  TrainingRoute: typeof TrainingRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +130,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/binary-plan': {
+      id: '/binary-plan'
+      path: '/binary-plan'
+      fullPath: '/binary-plan'
+      preLoaderRoute: typeof BinaryPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-orders': {
+      id: '/my-orders'
+      path: '/my-orders'
+      fullPath: '/my-orders'
+      preLoaderRoute: typeof MyOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sell-with-us': {
+      id: '/sell-with-us'
+      path: '/sell-with-us'
+      fullPath: '/sell-with-us'
+      preLoaderRoute: typeof SellWithUsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop': {
+      id: '/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trading': {
+      id: '/trading'
+      path: '/trading'
+      fullPath: '/trading'
+      preLoaderRoute: typeof TradingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/training': {
+      id: '/training'
+      path: '/training'
+      fullPath: '/training'
+      preLoaderRoute: typeof TrainingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BinaryPlanRoute: BinaryPlanRoute,
+  MyOrdersRoute: MyOrdersRoute,
+  SellWithUsRoute: SellWithUsRoute,
+  ShopRoute: ShopRoute,
+  TradingRoute: TradingRoute,
+  TrainingRoute: TrainingRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
