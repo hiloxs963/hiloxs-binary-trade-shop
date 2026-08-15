@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BinaryPlanRouteImport } from './routes/binary-plan'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as TrainingRouteImport } from './routes/training'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BinaryPlanRoute = BinaryPlanRouteImport.update({
+  id: '/binary-plan',
+  path: '/binary-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -31,30 +37,34 @@ const TrainingRoute = TrainingRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/binary-plan': typeof BinaryPlanRoute
   '/shop': typeof ShopRoute
   '/training': typeof TrainingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/binary-plan': typeof BinaryPlanRoute
   '/shop': typeof ShopRoute
   '/training': typeof TrainingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/binary-plan': typeof BinaryPlanRoute
   '/shop': typeof ShopRoute
   '/training': typeof TrainingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/shop' | '/training'
+  fullPaths: '/' | '/binary-plan' | '/shop' | '/training'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/shop' | '/training'
-  id: '__root__' | '/' | '/shop' | '/training'
+  to: '/' | '/binary-plan' | '/shop' | '/training'
+  id: '__root__' | '/' | '/binary-plan' | '/shop' | '/training'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BinaryPlanRoute: typeof BinaryPlanRoute
   ShopRoute: typeof ShopRoute
   TrainingRoute: typeof TrainingRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/binary-plan': {
+      id: '/binary-plan'
+      path: '/binary-plan'
+      fullPath: '/binary-plan'
+      preLoaderRoute: typeof BinaryPlanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BinaryPlanRoute: BinaryPlanRoute,
   ShopRoute: ShopRoute,
   TrainingRoute: TrainingRoute,
 }

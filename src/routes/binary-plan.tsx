@@ -98,7 +98,10 @@ function BinaryPlanPage() {
             className="panel mt-3 grid gap-4 p-5 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!form.name.trim()) return toast.error("Enter the referral's name");
+              if (!form.name.trim()) {
+                toast.error("Enter the referral's name");
+                return;
+              }
               addReferral({ name: form.name.trim(), phone: form.phone.trim(), leg: form.leg });
               toast.success(`${form.name} added to the ${form.leg === "L" ? "left" : "right"} leg`);
               setForm({ name: "", phone: "", leg: form.leg === "L" ? "R" : "L" });
