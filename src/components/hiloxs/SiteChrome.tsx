@@ -31,7 +31,7 @@ export function SiteHeader() {
             alt="HILOXS"
             width={600}
             height={211}
-            className="h-9 w-auto object-contain"
+            className="h-10 w-auto object-contain"
           />
         </Link>
 
