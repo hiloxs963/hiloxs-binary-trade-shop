@@ -54,6 +54,14 @@ function ShopPage() {
     [category, query],
   );
 
+  const flashDeals = useMemo(
+    () =>
+      PRODUCTS.filter((p) => p.oldPriceKes)
+        .sort((a, b) => discountPct(b) - discountPct(a))
+        .slice(0, 4),
+    [],
+  );
+
   const cartLines = hydrated
     ? Object.entries(state.cart).map(([id, qty]) => ({
         product: PRODUCTS.find((p) => p.id === id)!,
