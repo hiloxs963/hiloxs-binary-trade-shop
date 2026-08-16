@@ -251,3 +251,46 @@ function ShopPage() {
     </div>
   );
 }
+function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => void }) {
+  const off = discountPct(p);
+  return (
+    <article className="panel flex flex-col overflow-hidden">
+      <div className="relative grid h-36 place-items-center bg-[image:var(--gradient-night)] text-5xl">
+        <span aria-hidden>{p.emoji}</span>
+        {p.badge && (
+          <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+            {p.badge}
+          </span>
+        )}
+        {off > 0 && (
+          <span className="absolute right-2 top-2 rounded-md bg-background/85 px-2 py-1 text-[11px] font-semibold">
+            -{off}%
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col p-4">
+        <Badge variant="secondary" className="w-fit">{p.category}</Badge>
+        <h3 className="mt-2 text-sm font-semibold leading-snug">{p.name}</h3>
+        <p className="mt-1 flex-1 text-xs text-muted-foreground">{p.blurb}</p>
+        <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Star className="size-3.5 fill-primary text-primary" />
+          {p.rating} · {p.sold.toLocaleString()} reviews
+        </div>
+        <div className="mt-2">
+          <p className="text-base font-bold text-primary">
+            {kes(p.priceKes)}{" "}
+            {p.oldPriceKes && (
+              <span className="text-xs font-normal text-muted-foreground line-through">
+                {kes(p.oldPriceKes)}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground">{dual(p.priceKes).split(" (")[0]}</p>
+        </div>
+        <Button className="mt-3" variant="hero" size="sm" onClick={onAdd}>
+          <ShoppingCart /> Add to cart
+        </Button>
+      </div>
+    </article>
+  );
+}
