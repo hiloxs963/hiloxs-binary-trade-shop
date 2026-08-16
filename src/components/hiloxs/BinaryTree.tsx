@@ -67,7 +67,7 @@ export function BinaryTree({ node, depth = 0 }: { node: TreeNode; depth?: number
   );
 }
 
-function Branch({ label, child, depth }: { label: string; child?: TreeNode; depth: number }) {
+function Branch({ label, child, depth }: { label: string; child?: TreeNode | undefined; depth: number }) {
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
