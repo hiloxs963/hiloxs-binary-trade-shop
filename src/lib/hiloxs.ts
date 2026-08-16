@@ -27,16 +27,54 @@ export const PLAN_USD = {
   netToProfit: kesToUsd(PLAN.entryPackageKes - PLAN.registrationFeeKes),
 };
 
+export const ELECTRONIC_CATEGORIES = [
+  "Laptops",
+  "Screens",
+  "Woofers",
+  "Accessories",
+] as const;
+
+export const SHOP_CATEGORIES = [
+  "Laptops",
+  "Screens",
+  "Woofers",
+  "Accessories",
+  "Phones & Tablets",
+  "Home & Kitchen",
+  "Fashion",
+  "Beauty & Health",
+  "School & Office",
+  "Groceries",
+  "Sports & Outdoors",
+] as const;
+
+export type ShopCategory = (typeof SHOP_CATEGORIES)[number];
+
+export const CATEGORY_EMOJI: Record<ShopCategory, string> = {
+  Laptops: "💻",
+  Screens: "🖥️",
+  Woofers: "🔊",
+  Accessories: "🔌",
+  "Phones & Tablets": "📱",
+  "Home & Kitchen": "🍳",
+  Fashion: "👗",
+  "Beauty & Health": "💄",
+  "School & Office": "🎒",
+  Groceries: "🛒",
+  "Sports & Outdoors": "⚽",
+};
+
 export type Product = {
   id: string;
   name: string;
-  category: "Laptops" | "Screens" | "Woofers" | "Accessories";
+  category: ShopCategory;
   priceKes: number;
   oldPriceKes?: number;
   rating: number;
   sold: number;
   blurb: string;
   emoji: string;
+  badge?: "FLASH SALE" | "BEST SELLER" | "HOT DEAL" | "TOP RATED";
 };
 
 export const PRODUCTS: Product[] = [
@@ -56,9 +94,51 @@ export const PRODUCTS: Product[] = [
   { id: "ac-02", name: "Logitech MX Keys S Wireless Keyboard", category: "Accessories", priceKes: 13_500, oldPriceKes: 15_900, rating: 4.8, sold: 176, blurb: "Backlit, multi-device, USB-C.", emoji: "⌨️" },
   { id: "ac-03", name: "1500VA Line-Interactive UPS", category: "Accessories", priceKes: 16_800, rating: 4.5, sold: 340, blurb: "Keeps the shop running through blackouts.", emoji: "🔋" },
   { id: "ac-04", name: "HDMI 2.1 8K Braided Cable · 3m", category: "Accessories", priceKes: 2_300, rating: 4.4, sold: 2_010, blurb: "48Gbps for screens and consoles.", emoji: "🧵" },
+
+  { id: "ph-01", name: "20000mAh Fast Power Bank", category: "Phones & Tablets", priceKes: 2_199, oldPriceKes: 3_499, rating: 4.5, sold: 533, blurb: "22.5W fast charge, triple output.", emoji: "🔋", badge: "BEST SELLER" },
+  { id: "ph-02", name: "Smart 6.7\" Android Phone 128GB", category: "Phones & Tablets", priceKes: 18_499, oldPriceKes: 24_999, rating: 4.4, sold: 812, blurb: "5000mAh battery, 50MP camera.", emoji: "📱", badge: "HOT DEAL" },
+  { id: "ph-03", name: "AirPulse Wireless Earbuds", category: "Phones & Tablets", priceKes: 3_499, oldPriceKes: 5_999, rating: 4.5, sold: 780, blurb: "ENC calls, 30h case, USB-C.", emoji: "🎧", badge: "FLASH SALE" },
+  { id: "ph-04", name: "10\" Kids Learning Tablet", category: "Phones & Tablets", priceKes: 12_999, oldPriceKes: 16_500, rating: 4.3, sold: 288, blurb: "Parental controls and a tough case.", emoji: "📲" },
+
+  { id: "hk-01", name: "6L Digital Air Fryer", category: "Home & Kitchen", priceKes: 7_499, oldPriceKes: 11_999, rating: 4.7, sold: 932, blurb: "8 presets, non-stick basket.", emoji: "🍟", badge: "BEST SELLER" },
+  { id: "hk-02", name: "Non-Stick Cookware Set · 7pc", category: "Home & Kitchen", priceKes: 4_899, oldPriceKes: 7_200, rating: 4.5, sold: 1_140, blurb: "Pots, pans and glass lids.", emoji: "🍳" },
+  { id: "hk-03", name: "Stainless Steel Cutlery 24pc", category: "Home & Kitchen", priceKes: 1_899, oldPriceKes: 2_800, rating: 4.4, sold: 2_310, blurb: "Rust-free family set.", emoji: "🍴" },
+  { id: "hk-04", name: "2L Electric Kettle · Cordless", category: "Home & Kitchen", priceKes: 2_299, oldPriceKes: 3_400, rating: 4.6, sold: 1_505, blurb: "Auto shut-off, fast boil.", emoji: "🫖", badge: "HOT DEAL" },
+
+  { id: "fa-01", name: "Men's Classic Polo Shirt", category: "Fashion", priceKes: 1_299, oldPriceKes: 1_999, rating: 4.3, sold: 1_920, blurb: "Breathable cotton pique.", emoji: "👕" },
+  { id: "fa-02", name: "Urban Canvas Sneakers", category: "Fashion", priceKes: 3_299, oldPriceKes: 4_999, rating: 4.2, sold: 410, blurb: "Everyday street sneakers.", emoji: "👟" },
+  { id: "fa-03", name: "Ladies Ankara Maxi Dress", category: "Fashion", priceKes: 2_499, oldPriceKes: 3_800, rating: 4.6, sold: 622, blurb: "Vibrant print, all sizes.", emoji: "👗", badge: "TOP RATED" },
+  { id: "fa-04", name: "Minimalist Steel Watch", category: "Fashion", priceKes: 2_899, oldPriceKes: 4_800, rating: 4.5, sold: 224, blurb: "Sapphire-look glass, 3ATM.", emoji: "⌚", badge: "FLASH SALE" },
+
+  { id: "bh-01", name: "Vitamin C Brightening Serum", category: "Beauty & Health", priceKes: 1_499, oldPriceKes: 2_400, rating: 4.5, sold: 382, blurb: "30ml, hyaluronic blend.", emoji: "🧴" },
+  { id: "bh-02", name: "Shea & Argan Body Butter", category: "Beauty & Health", priceKes: 999, oldPriceKes: 1_599, rating: 4.7, sold: 640, blurb: "Deep moisture, natural.", emoji: "🧈" },
+  { id: "bh-03", name: "Digital Bathroom Scale", category: "Beauty & Health", priceKes: 1_799, oldPriceKes: 2_600, rating: 4.4, sold: 355, blurb: "Tempered glass, 180kg.", emoji: "⚖️" },
+  { id: "bh-04", name: "Rechargeable Hair Clipper", category: "Beauty & Health", priceKes: 2_450, oldPriceKes: 3_600, rating: 4.3, sold: 470, blurb: "Cordless, 8 guards.", emoji: "💈" },
+
+  { id: "so-01", name: "School Backpack · Waterproof", category: "School & Office", priceKes: 1_650, oldPriceKes: 2_500, rating: 4.5, sold: 1_733, blurb: "Padded laptop sleeve.", emoji: "🎒", badge: "BEST SELLER" },
+  { id: "so-02", name: "A4 Exercise Books · 10 pack", category: "School & Office", priceKes: 780, oldPriceKes: 1_100, rating: 4.6, sold: 3_420, blurb: "200 pages, squared or ruled.", emoji: "📚" },
+  { id: "so-03", name: "Scientific Calculator FX-991", category: "School & Office", priceKes: 1_450, oldPriceKes: 2_100, rating: 4.8, sold: 890, blurb: "417 functions, exam ready.", emoji: "🧮" },
+  { id: "so-04", name: "Office Desk Organiser Set", category: "School & Office", priceKes: 1_250, rating: 4.2, sold: 265, blurb: "Trays, pen pots and file rack.", emoji: "🗂️" },
+
+  { id: "gr-01", name: "Premium AA Arabica Coffee 1kg", category: "Groceries", priceKes: 1_899, oldPriceKes: 2_600, rating: 4.8, sold: 256, blurb: "Roasted beans, Kenyan grown.", emoji: "☕", badge: "TOP RATED" },
+  { id: "gr-02", name: "Sunflower Cooking Oil 5L", category: "Groceries", priceKes: 1_450, oldPriceKes: 1_890, rating: 4.4, sold: 4_120, blurb: "Cholesterol free, family size.", emoji: "🛢️" },
+  { id: "gr-03", name: "Long Grain Pishori Rice 5kg", category: "Groceries", priceKes: 1_290, oldPriceKes: 1_650, rating: 4.7, sold: 2_870, blurb: "Aromatic Mwea rice.", emoji: "🍚" },
+  { id: "gr-04", name: "Assorted Spice Rack 12 jars", category: "Groceries", priceKes: 1_150, rating: 4.3, sold: 505, blurb: "Everyday kitchen spices.", emoji: "🧂" },
+
+  { id: "sp-01", name: "Adjustable Dumbbell Set 20kg", category: "Sports & Outdoors", priceKes: 6_900, oldPriceKes: 9_500, rating: 4.6, sold: 318, blurb: "Home gym starter kit.", emoji: "🏋️" },
+  { id: "sp-02", name: "Size 5 Match Football", category: "Sports & Outdoors", priceKes: 1_350, oldPriceKes: 1_900, rating: 4.4, sold: 1_460, blurb: "Hand-stitched, all surfaces.", emoji: "⚽" },
+  { id: "sp-03", name: "6mm Yoga Mat + Strap", category: "Sports & Outdoors", priceKes: 1_690, oldPriceKes: 2_400, rating: 4.5, sold: 720, blurb: "Non-slip, easy to roll.", emoji: "🧘" },
+  { id: "sp-04", name: "4-Person Camping Tent", category: "Sports & Outdoors", priceKes: 7_800, oldPriceKes: 10_500, rating: 4.3, sold: 141, blurb: "Waterproof, quick pitch.", emoji: "⛺", badge: "HOT DEAL" },
 ];
 
-export const CATEGORIES = ["All", "Laptops", "Screens", "Woofers", "Accessories"] as const;
+export const ELECTRONICS_PRODUCTS = PRODUCTS.filter((p) =>
+  (ELECTRONIC_CATEGORIES as readonly string[]).includes(p.category),
+);
+
+export const CATEGORIES = ["All", ...SHOP_CATEGORIES] as const;
+
+export const discountPct = (p: Product) =>
+  p.oldPriceKes ? Math.round((1 - p.priceKes / p.oldPriceKes) * 100) : 0;
 
 export type TrainingTrack = "Binary Network Marketing" | "Trading" | "Shopping" | "Getting Started";
 
@@ -94,3 +174,14 @@ export const TRACKS: TrainingTrack[] = [
 /** Till number placeholder — replace once your Buy Goods till is live. */
 export const TILL_NUMBER: string | null = null;
 export const TILL_LABEL = "HILOXS Buy Goods Till";
+
+/** Paybill placeholder for the trading desk float — replace once live. */
+export const PAYBILL_NUMBER: string | null = null;
+export const PAYBILL_LABEL = "HILOXS Trading Paybill";
+
+export const SUPPORT = {
+  hours: "Mon–Sat, 8am–7pm EAT",
+  email: "help@hiloxs.com",
+  phone: "+254 727 375 963",
+  phoneHref: "+254727375963",
+};
