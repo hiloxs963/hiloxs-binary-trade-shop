@@ -246,6 +246,13 @@ function ShopPage() {
                 : "Till number: ____________ (reserved — Buy Goods only, no paybill)"}
             </p>
           </div>
+
+          <div className="mt-4 rounded-lg border border-border p-3 text-xs text-muted-foreground">
+            <p className="font-semibold text-foreground">Support</p>
+            <p className="mt-1">{SUPPORT.hours}</p>
+            <p>{SUPPORT.email}</p>
+            <p>{SUPPORT.phone}</p>
+          </div>
         </aside>
       </div>
     </div>
