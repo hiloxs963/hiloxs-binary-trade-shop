@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import heroImage from "@/assets/hiloxs-hero.jpg";
+import heroImage from "@/assets/hiloxs-brand-hero.jpg.asset.json";
 import { PLAN, PRODUCTS, dual, kes } from "@/lib/hiloxs";
 
 export const Route = createFileRoute("/")({
@@ -109,10 +109,10 @@ function Index() {
         </div>
         <div className="panel overflow-hidden">
           <img
-            src={heroImage}
-            alt="Laptop, ultrawide monitor showing a candlestick chart, and a subwoofer on a dark surface"
-            width={1600}
-            height={1008}
+            src={heroImage.url}
+            alt="HILOXS brand mark with the tagline Luxury. Quality. Lifestyle."
+            width={1254}
+            height={1254}
             className="h-full w-full object-cover"
           />
         </div>

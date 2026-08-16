@@ -16,13 +16,14 @@ export type Referral = {
   name: string;
   phone: string;
   leg: Leg;
+  parentId: string | null;
   activated: boolean;
   joinedAt: number;
 };
 
 export type LedgerEntry = {
   id: string;
-  kind: "direct" | "pair" | "withdrawal" | "registration";
+  kind: "direct" | "pair" | "withdrawal" | "registration" | "trading";
   label: string;
   amountKes: number; // negative for money leaving the wallet
   at: number;
@@ -59,6 +60,24 @@ export type Trade = {
   at: number;
 };
 
+export type AdminTrading = {
+  /** Only the admin can change these. */
+  unlocked: boolean;
+  outcome: "market" | "win" | "loss";
+  payoutRate: number;
+};
+
+export type TrainingLevel = "Beginner" | "Intermediate" | "Advanced";
+
+export type CustomVideo = {
+  id: string;
+  title: string;
+  level: TrainingLevel;
+  youtubeId: string;
+  url: string;
+  at: number;
+};
+
 export type HiloxsState = {
   member: { name: string; activated: boolean; joinedAt: number };
   referrals: Referral[];
@@ -69,9 +88,12 @@ export type HiloxsState = {
   orders: Order[];
   trades: Trade[];
   demoBalanceUsd: number;
+  admin: AdminTrading;
+  paybillFloatUsd: number;
+  videos: CustomVideo[];
 };
 
-const STORAGE_KEY = "hiloxs.state.v1";
+const STORAGE_KEY = "hiloxs.state.v2";
 
 const initialState: HiloxsState = {
   member: { name: "Guest Member", activated: false, joinedAt: Date.now() },
@@ -83,16 +105,29 @@ const initialState: HiloxsState = {
   orders: [],
   trades: [],
   demoBalanceUsd: 1000,
+  admin: { unlocked: false, outcome: "market", payoutRate: 1.85 },
+  paybillFloatUsd: 0,
+  videos: [],
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+/** Accepts a full YouTube URL (watch, youtu.be, shorts, embed) or a bare 11-char ID. */
+export function parseYouTubeId(input: string): string | null {
+  const value = input.trim();
+  if (/^[\w-]{11}$/.test(value)) return value;
+  const match = value.match(
+    /(?:youtu\.be\/|v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/,
+  );
+  return match?.[1] ?? null;
+}
 
 type Ctx = {
   state: HiloxsState;
   hydrated: boolean;
   walletKes: number;
   legCounts: { L: number; R: number };
-  addReferral: (input: { name: string; phone: string; leg: Leg }) => void;
+  addReferral: (input: { name: string; phone: string; leg: Leg; parentId: string | null }) => void;
   activateReferral: (id: string) => void;
   activateMember: (name: string) => void;
   saveAccounts: (accounts: PayoutAccounts) => void;
@@ -103,6 +138,10 @@ type Ctx = {
   checkout: (method: Order["method"]) => Order | null;
   recordTrade: (trade: Trade) => void;
   settleTrade: (id: string, exit: number) => void;
+  setAdmin: (patch: Partial<AdminTrading>) => void;
+  withdrawTrading: (amountUsd: number, to: "paypal" | "minipay" | "mpesa") => string | null;
+  addVideo: (input: { title: string; level: TrainingLevel; url: string }) => string | null;
+  removeVideo: (id: string) => void;
 };
 
 const HiloxsContext = createContext<Ctx | null>(null);
@@ -312,17 +351,80 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     setState((prev) => {
       const trade = prev.trades.find((t) => t.id === id);
       if (!trade || trade.result) return prev;
+      const marketWin = trade.direction === "UP" ? exit > trade.entry : exit < trade.entry;
       const win =
-        trade.direction === "UP" ? exit > trade.entry : exit < trade.entry;
-      const payoutUsd = win ? trade.stakeUsd * 1.85 : 0;
+        prev.admin.outcome === "win" ? true : prev.admin.outcome === "loss" ? false : marketWin;
+      const payoutUsd = win ? trade.stakeUsd * prev.admin.payoutRate : 0;
       return {
         ...prev,
         demoBalanceUsd: prev.demoBalanceUsd + payoutUsd,
+        paybillFloatUsd: win
+          ? prev.paybillFloatUsd - (payoutUsd - trade.stakeUsd)
+          : prev.paybillFloatUsd + trade.stakeUsd,
         trades: prev.trades.map((t) =>
           t.id === id ? { ...t, exit, result: win ? "WIN" : "LOSS", payoutUsd } : t,
         ),
       };
     });
+  }, []);
+
+  const setAdmin = useCallback((patch: Partial<AdminTrading>) => {
+    setState((prev) => ({ ...prev, admin: { ...prev.admin, ...patch } }));
+  }, []);
+
+  const withdrawTrading: Ctx["withdrawTrading"] = useCallback(
+    (amountUsd, to) => {
+      if (!amountUsd || amountUsd <= 0) return "Enter an amount greater than zero.";
+      if (amountUsd > state.demoBalanceUsd) return "Amount is higher than your trading balance.";
+      const destination =
+        to === "paypal"
+          ? state.accounts.paypalEmail
+          : to === "minipay"
+            ? state.accounts.miniPayNumber
+            : state.accounts.mpesaNumber;
+      if (!destination) return "Save that payout account on the Binary Plan page first.";
+      setState((prev) => ({
+        ...prev,
+        demoBalanceUsd: prev.demoBalanceUsd - amountUsd,
+        ledger: [
+          {
+            id: `tw-${uid()}`,
+            kind: "trading",
+            label: `Trading withdrawal to ${to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"} · ${destination}`,
+            amountKes: 0,
+            at: Date.now(),
+          },
+          ...prev.ledger,
+        ],
+      }));
+      return null;
+    },
+    [state.accounts, state.demoBalanceUsd],
+  );
+
+  const addVideo: Ctx["addVideo"] = useCallback((input) => {
+    const id = parseYouTubeId(input.url);
+    if (!input.title.trim()) return "Give the video a title.";
+    if (!id) return "That does not look like a YouTube link or video ID.";
+    setState((prev) => ({
+      ...prev,
+      videos: [
+        {
+          id: uid(),
+          title: input.title.trim(),
+          level: input.level,
+          youtubeId: id,
+          url: input.url.trim(),
+          at: Date.now(),
+        },
+        ...prev.videos,
+      ],
+    }));
+    return null;
+  }, []);
+
+  const removeVideo = useCallback((id: string) => {
+    setState((prev) => ({ ...prev, videos: prev.videos.filter((v) => v.id !== id) }));
   }, []);
 
   const value: Ctx = {
@@ -341,6 +443,10 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     checkout,
     recordTrade,
     settleTrade,
+    setAdmin,
+    withdrawTrading,
+    addVideo,
+    removeVideo,
   };
 
   return <HiloxsContext.Provider value={value}>{children}</HiloxsContext.Provider>;

@@ -6,8 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { PLAN, TILL_NUMBER, dual, kes, usd, kesToUsd } from "@/lib/hiloxs";
+import {
+  ELECTRONICS_PRODUCTS,
+  PLAN,
+  SUPPORT,
+  TILL_NUMBER,
+  dual,
+  kes,
+  usd,
+  kesToUsd,
+} from "@/lib/hiloxs";
 import { useHiloxs, type Leg } from "@/lib/hiloxs-store";
+import { BinaryTree, buildTree } from "@/components/hiloxs/BinaryTree";
 
 export const Route = createFileRoute("/binary-plan")({
   head: () => ({
@@ -41,13 +51,23 @@ function BinaryPlanPage() {
     withdraw,
   } = useHiloxs();
 
-  const [form, setForm] = useState({ name: "", phone: "", leg: "L" as Leg });
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    leg: "L" as Leg,
+    parentId: "" as string,
+  });
   const [accounts, setAccounts] = useState(state.accounts);
   const [amount, setAmount] = useState("");
   const [memberName, setMemberName] = useState("");
 
   const pairs = Math.min(legCounts.L, legCounts.R);
   const directs = state.referrals.filter((r) => r.activated).length;
+  const tree = buildTree(
+    hydrated ? state.referrals : [],
+    state.member.name || "You",
+    state.member.activated,
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -102,9 +122,19 @@ function BinaryPlanPage() {
                 toast.error("Enter the referral's name");
                 return;
               }
-              addReferral({ name: form.name.trim(), phone: form.phone.trim(), leg: form.leg });
+              addReferral({
+                name: form.name.trim(),
+                phone: form.phone.trim(),
+                leg: form.leg,
+                parentId: form.parentId || null,
+              });
               toast.success(`${form.name} added to the ${form.leg === "L" ? "left" : "right"} leg`);
-              setForm({ name: "", phone: "", leg: form.leg === "L" ? "R" : "L" });
+              setForm({
+                name: "",
+                phone: "",
+                leg: form.leg === "L" ? "R" : "L",
+                parentId: form.parentId,
+              });
             }}
           >
             <div className="space-y-1.5">
@@ -126,6 +156,22 @@ function BinaryPlanPage() {
               />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="ref-parent">Place under (sponsor position)</Label>
+              <select
+                id="ref-parent"
+                value={form.parentId}
+                onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">{state.member.name || "You"} (top of your tree)</option>
+                {state.referrals.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    Under {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
               <Label>Placement leg</Label>
               <div className="flex gap-2">
                 {(["L", "R"] as Leg[]).map((leg) => (
@@ -144,6 +190,32 @@ function BinaryPlanPage() {
               <Users /> Add referral
             </Button>
           </form>
+
+          <h3 className="mt-8 text-lg font-semibold">Your binary tree</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Every member you register takes a left or right position. Their own referrals sit under
+            them the same way, so the structure keeps expanding level after level — to infinity.
+            Expand any node to follow a leg down.
+          </p>
+          <div className="panel mt-3 overflow-x-auto p-5">
+            <BinaryTree node={tree} />
+          </div>
+
+          <h3 className="mt-8 text-lg font-semibold">Electronics packages behind the plan</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The binary plan is backed by electronics only — laptops, screens, woofers and their
+            accessories. Nothing else qualifies for the entry package.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ELECTRONICS_PRODUCTS.map((p) => (
+              <div key={p.id} className="panel p-4">
+                <span className="text-2xl" aria-hidden>{p.emoji}</span>
+                <p className="mt-2 text-sm font-semibold leading-tight">{p.name}</p>
+                <p className="text-xs text-muted-foreground">{p.category}</p>
+                <p className="mt-1 text-sm font-bold text-primary">{kes(p.priceKes)}</p>
+              </div>
+            ))}
+          </div>
 
           <h3 className="mt-8 text-lg font-semibold">My team</h3>
           {hydrated && state.referrals.length > 0 ? (
@@ -319,6 +391,13 @@ function BinaryPlanPage() {
               Buy Goods till (no paybill):{" "}
               {TILL_NUMBER ?? "____________ — reserved for the HILOXS till you are creating."}
             </p>
+          </div>
+
+          <div className="panel p-5 text-sm text-muted-foreground">
+            <p className="font-semibold text-foreground">Support</p>
+            <p className="mt-2">{SUPPORT.hours}</p>
+            <p>{SUPPORT.email}</p>
+            <p>{SUPPORT.phone}</p>
           </div>
         </aside>
       </div>

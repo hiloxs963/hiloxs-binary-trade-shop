@@ -85,8 +85,22 @@ function SellWithUsPage() {
             <Input id="cats" required placeholder="Laptops, monitors, subwoofers…" />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="notes">Tell us about your stock</Label>
+            <Label htmlFor="notes">
+              Tell us about your stock — business permit and user 🆔 attached
+            </Label>
             <Textarea id="notes" rows={4} placeholder="Brands, warranty, monthly volume, location" />
+            <p className="text-xs text-muted-foreground">
+              Attach a clear copy of your business permit and your national ID / passport. Both are
+              required before your shop is verified.
+            </p>
+            <Input
+              id="docs"
+              type="file"
+              multiple
+              accept="image/*,application/pdf"
+              aria-label="Attach business permit and user ID"
+              className="cursor-pointer"
+            />
           </div>
           <Button type="submit" variant="hero" className="sm:col-span-2">
             {sent ? "Application sent" : "Apply to sell"}

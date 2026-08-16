@@ -1,26 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Activity, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, Lock, ShieldCheck, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { CandleChart, makeSeed, stepCandles, type Candle } from "@/components/hiloxs/CandleChart";
 import { useHiloxs, type Trade } from "@/lib/hiloxs-store";
+import { PAYBILL_LABEL, PAYBILL_NUMBER, SUPPORT } from "@/lib/hiloxs";
 
 export const Route = createFileRoute("/trading")({
   head: () => ({
     meta: [
-      { title: "HILOXS Demo Trading Desk — Live Candles & Expiry Timers" },
+      { title: "HILOXS Binary Trading — Live Candles, Expiry Timers & Payouts" },
       {
         name: "description",
         content:
-          "Practise binary-style UP/DOWN calls on the HILOXS demo desk with live candlestick charts, selectable expiry timers and real-time market movement.",
+          "Place real binary UP/DOWN calls on HILOXS with live candlestick charts, expiry timers and winnings withdrawable to PayPal, MiniPay or M-Pesa.",
       },
-      { property: "og:title", content: "HILOXS Demo Trading Desk" },
+      { property: "og:title", content: "HILOXS Binary Trading" },
       {
         property: "og:description",
-        content: "Live-style candles, expiry timers and a risk-free demo balance.",
+        content: "Live candles, expiry timers and withdrawable winnings, settled through the HILOXS paybill.",
       },
     ],
   }),
@@ -43,7 +44,7 @@ const EXPIRIES = [
 ];
 
 function TradingPage() {
-  const { state, hydrated, recordTrade, settleTrade } = useHiloxs();
+  const { state, hydrated, recordTrade, settleTrade, setAdmin, withdrawTrading } = useHiloxs();
   const [assetIndex, setAssetIndex] = useState(0);
   const asset = ASSETS[assetIndex]!;
   const [candles, setCandles] = useState<Candle[]>(() => makeSeed(asset.base));
@@ -51,6 +52,8 @@ function TradingPage() {
   const [stake, setStake] = useState("10");
   const [openTrade, setOpenTrade] = useState<{ id: string; endsAt: number } | null>(null);
   const [now, setNow] = useState(0);
+  const [adminPin, setAdminPin] = useState("");
+  const [payout, setPayout] = useState("");
   const tick = useRef(0);
   const priceRef = useRef(asset.base);
 
@@ -119,12 +122,13 @@ function TradingPage() {
     <div className="mx-auto max-w-7xl px-4 py-10">
       <div className="flex items-center gap-2 text-accent">
         <Activity className="size-5" />
-        <span className="text-xs font-semibold uppercase tracking-widest">Demo desk</span>
+        <span className="text-xs font-semibold uppercase tracking-widest">Live binary desk</span>
       </div>
-      <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Trading</h1>
+      <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Binary Trading</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        A risk-free practice desk with live-style candles and expiry timers. No real money moves
-        here — it exists so you can rehearse what you learn in training.
+        Real binary trading on HILOXS. Stakes are funded through the HILOXS paybill, results are
+        released by the admin, and won trades can be withdrawn to your PayPal, MiniPay or M-Pesa
+        account. Losing stakes remain in the HILOXS paybill float.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -169,10 +173,14 @@ function TradingPage() {
 
         <aside className="panel h-fit p-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Demo balance
+            Trading balance
           </p>
           <p className="text-3xl font-bold">
             ${hydrated ? state.demoBalanceUsd.toFixed(2) : "1000.00"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {PAYBILL_LABEL}:{" "}
+            {PAYBILL_NUMBER ?? "____________ (reserved — paybill you are creating)"}
           </p>
 
           <p className="mt-5 text-sm font-medium">Expiry timer</p>
@@ -199,14 +207,122 @@ function TradingPage() {
 
           <div className="mt-5 grid gap-2">
             <Button variant="up" onClick={() => place("UP")} disabled={!!openTrade}>
-              <TrendingUp /> UP · 85% payout
+              <TrendingUp /> UP · {Math.round((state.admin.payoutRate - 1) * 100)}% payout
             </Button>
             <Button variant="down" onClick={() => place("DOWN")} disabled={!!openTrade}>
-              <TrendingDown /> DOWN · 85% payout
+              <TrendingDown /> DOWN · {Math.round((state.admin.payoutRate - 1) * 100)}% payout
             </Button>
+          </div>
+
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="text-sm font-medium">Withdraw winnings (USD)</p>
+            <Input
+              className="mt-2"
+              value={payout}
+              inputMode="decimal"
+              onChange={(e) => setPayout(e.target.value)}
+              placeholder="Amount in USD"
+            />
+            <div className="mt-2 grid gap-2">
+              {(["paypal", "minipay", "mpesa"] as const).map((to) => (
+                <Button
+                  key={to}
+                  size="sm"
+                  variant={to === "paypal" ? "hero" : "outline"}
+                  onClick={() => {
+                    const err = withdrawTrading(Number(payout), to);
+                    if (err) toast.error(err);
+                    else {
+                      toast.success(`Withdrawal sent to ${to}`);
+                      setPayout("");
+                    }
+                  }}
+                >
+                  Withdraw to {to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"}
+                </Button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Support: {SUPPORT.hours} · {SUPPORT.email} · {SUPPORT.phone}
+            </p>
           </div>
         </aside>
       </div>
+
+      <section className="panel mt-8 p-5">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="size-5 text-primary" />
+          <h2 className="text-lg font-semibold">Admin control</h2>
+        </div>
+        {state.admin.unlocked ? (
+          <div className="mt-4 grid gap-5 lg:grid-cols-3">
+            <div>
+              <p className="text-sm font-medium">Trade outcome</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(["market", "win", "loss"] as const).map((o) => (
+                  <Button
+                    key={o}
+                    size="sm"
+                    variant={state.admin.outcome === o ? "default" : "outline"}
+                    onClick={() => setAdmin({ outcome: o })}
+                  >
+                    {o === "market" ? "Follow market" : o === "win" ? "Force WIN" : "Force LOSS"}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Applies to every trade settled from now on.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Payout multiplier</p>
+              <Input
+                className="mt-2"
+                value={String(state.admin.payoutRate)}
+                inputMode="decimal"
+                onChange={(e) => setAdmin({ payoutRate: Number(e.target.value) || 1 })}
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                1.85 pays 85% on top of the stake.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Paybill float</p>
+              <p className="mt-2 font-display text-2xl font-bold text-primary">
+                ${state.paybillFloatUsd.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Lost stakes settle into your paybill; paid winnings are deducted here.
+              </p>
+              <Button size="sm" variant="ghost" className="mt-2" onClick={() => setAdmin({ unlocked: false })}>
+                Lock admin
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form
+            className="mt-3 flex max-w-sm gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (adminPin.trim() === "HILOXS-ADMIN") {
+                setAdmin({ unlocked: true });
+                setAdminPin("");
+                toast.success("Admin controls unlocked");
+              } else toast.error("Wrong admin key");
+            }}
+          >
+            <Input
+              value={adminPin}
+              onChange={(e) => setAdminPin(e.target.value)}
+              placeholder="Admin key"
+              type="password"
+            />
+            <Button type="submit" variant="outline">
+              <Lock /> Unlock
+            </Button>
+          </form>
+        )}
+      </section>
 
       <h2 className="mt-10 text-xl font-semibold">Trade history</h2>
       <div className="panel mt-3 divide-y divide-border">

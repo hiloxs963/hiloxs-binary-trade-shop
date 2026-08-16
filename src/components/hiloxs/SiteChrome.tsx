@@ -4,6 +4,7 @@ import { Menu, ShoppingCart, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHiloxs } from "@/lib/hiloxs-store";
 import logoIcon from "@/assets/hiloxs-icon.png.asset.json";
+import { SUPPORT } from "@/lib/hiloxs";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -137,15 +138,25 @@ export function SiteFooter() {
           </ul>
         </div>
         <div>
-          <p className="text-sm font-semibold">Payments</p>
-          <p className="mt-3 text-sm text-muted-foreground">
-            PayPal · MiniPay · M-Pesa withdrawals. Buy Goods till number reserved and pending
-            activation.
-          </p>
+          <p className="text-sm font-semibold">Support</p>
+          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+            <li>{SUPPORT.hours}</li>
+            <li>
+              <a href={`mailto:${SUPPORT.email}`} className="hover:text-foreground">
+                {SUPPORT.email}
+              </a>
+            </li>
+            <li>
+              <a href={`tel:${SUPPORT.phoneHref}`} className="hover:text-foreground">
+                {SUPPORT.phone}
+              </a>
+            </li>
+            <li className="pt-1">PayPal · MiniPay · M-Pesa payouts</li>
+          </ul>
         </div>
       </div>
       <div className="border-t border-border px-4 py-5 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} HILOXS. Trading content is educational; the desk is demo-only.
+        © {new Date().getFullYear()} HILOXS. Trading carries risk of loss.
       </div>
     </footer>
   );
