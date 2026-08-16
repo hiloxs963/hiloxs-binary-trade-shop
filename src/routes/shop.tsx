@@ -4,23 +4,35 @@ import { Search, ShoppingCart, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CATEGORIES, PRODUCTS, TILL_NUMBER, TILL_LABEL, dual, kes } from "@/lib/hiloxs";
+import {
+  CATEGORIES,
+  CATEGORY_EMOJI,
+  PRODUCTS,
+  SHOP_CATEGORIES,
+  SUPPORT,
+  TILL_NUMBER,
+  TILL_LABEL,
+  discountPct,
+  dual,
+  kes,
+  type Product,
+} from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/shop")({
   head: () => ({
     meta: [
-      { title: "Shop Laptops, Screens & Woofers — HILOXS" },
+      { title: "Shop Electronics, Fashion, Kitchen & More — HILOXS" },
       {
         name: "description",
         content:
-          "Buy laptops, monitors, TVs, subwoofers and accessories on HILOXS with till, PayPal or MiniPay checkout.",
+          "Buy laptops, phones, kitchen utensils, clothes, school products, groceries and more on HILOXS with till, PayPal or MiniPay checkout.",
       },
-      { property: "og:title", content: "Shop Electronics on HILOXS" },
+      { property: "og:title", content: "Shop Everything on HILOXS" },
       {
         property: "og:description",
-        content: "Laptops, screens, woofers and accessories priced in KSh and USD.",
+        content: "Electronics, fashion, home & kitchen, school and groceries priced in KSh and USD.",
       },
     ],
   }),
@@ -54,17 +66,59 @@ function ShopPage() {
     <div className="mx-auto max-w-7xl px-4 py-10">
       <h1 className="text-3xl font-bold sm:text-4xl">HILOXS Shop</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        Electronics only — laptops, screens and woofers, plus the accessories that keep them
-        running. Every price is shown in shillings and dollars.
+        Everything you need in one place — electronics, phones, home &amp; kitchen, fashion, beauty,
+        school products, groceries and sports gear. Every price is shown in shillings and dollars.
       </p>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <section className="mt-8">
+        <h2 className="text-2xl font-bold">Shop by category</h2>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {SHOP_CATEGORIES.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCategory(c)}
+              className={`panel flex flex-col items-center gap-2 p-5 transition-colors hover:border-primary ${
+                category === c ? "border-primary" : ""
+              }`}
+            >
+              <span className="text-3xl" aria-hidden>{CATEGORY_EMOJI[c]}</span>
+              <span className="text-center text-sm font-medium">{c}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-10">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Flash deals</h2>
+            <p className="text-sm text-muted-foreground">Biggest markdowns right now</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setCategory("All")}>See all</Button>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {flashDeals.map((p) => (
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAdd={() => {
+                addToCart(p.id);
+                toast.success(`${p.name} added to cart`);
+              }}
+            />
+          ))}
+        </div>
+      </section>
+
+      <h2 className="mt-12 text-2xl font-bold">Trending on HILOXS</h2>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search laptops, monitors, woofers…"
+            placeholder="Search laptops, phones, cookware, uniforms…"
             className="pl-9"
           />
         </div>
@@ -83,41 +137,20 @@ function ShopPage() {
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
           {products.map((p) => (
-            <article key={p.id} className="panel flex flex-col overflow-hidden">
-              <div className="grid h-36 place-items-center bg-[image:var(--gradient-night)] text-5xl">
-                <span aria-hidden>{p.emoji}</span>
-              </div>
-              <div className="flex flex-1 flex-col p-4">
-                <Badge variant="secondary" className="w-fit">{p.category}</Badge>
-                <h2 className="mt-2 text-sm font-semibold leading-snug">{p.name}</h2>
-                <p className="mt-1 flex-1 text-xs text-muted-foreground">{p.blurb}</p>
-                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                  <Star className="size-3.5 fill-primary text-primary" />
-                  {p.rating} · {p.sold.toLocaleString()} sold
-                </div>
-                <div className="mt-2">
-                  <p className="text-base font-bold text-primary">{kes(p.priceKes)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {dual(p.priceKes).split(" (")[0]}
-                    {p.oldPriceKes ? ` · was ${kes(p.oldPriceKes)}` : ""}
-                  </p>
-                </div>
-                <Button
-                  className="mt-3"
-                  variant="hero"
-                  size="sm"
-                  onClick={() => {
-                    addToCart(p.id);
-                    toast.success(`${p.name} added to cart`);
-                  }}
-                >
-                  <ShoppingCart /> Add to cart
-                </Button>
-              </div>
-            </article>
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAdd={() => {
+                addToCart(p.id);
+                toast.success(`${p.name} added to cart`);
+              }}
+            />
           ))}
+          {products.length === 0 && (
+            <p className="text-sm text-muted-foreground">Nothing matches that search yet.</p>
+          )}
         </div>
 
         <aside id="cart" className="panel h-fit p-5 lg:sticky lg:top-20">
