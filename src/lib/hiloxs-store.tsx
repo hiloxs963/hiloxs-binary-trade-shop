@@ -16,13 +16,14 @@ export type Referral = {
   name: string;
   phone: string;
   leg: Leg;
+  parentId: string | null;
   activated: boolean;
   joinedAt: number;
 };
 
 export type LedgerEntry = {
   id: string;
-  kind: "direct" | "pair" | "withdrawal" | "registration";
+  kind: "direct" | "pair" | "withdrawal" | "registration" | "trading";
   label: string;
   amountKes: number; // negative for money leaving the wallet
   at: number;
@@ -59,6 +60,24 @@ export type Trade = {
   at: number;
 };
 
+export type AdminTrading = {
+  /** Only the admin can change these. */
+  unlocked: boolean;
+  outcome: "market" | "win" | "loss";
+  payoutRate: number;
+};
+
+export type TrainingLevel = "Beginner" | "Intermediate" | "Advanced";
+
+export type CustomVideo = {
+  id: string;
+  title: string;
+  level: TrainingLevel;
+  youtubeId: string;
+  url: string;
+  at: number;
+};
+
 export type HiloxsState = {
   member: { name: string; activated: boolean; joinedAt: number };
   referrals: Referral[];
@@ -69,9 +88,12 @@ export type HiloxsState = {
   orders: Order[];
   trades: Trade[];
   demoBalanceUsd: number;
+  admin: AdminTrading;
+  paybillFloatUsd: number;
+  videos: CustomVideo[];
 };
 
-const STORAGE_KEY = "hiloxs.state.v1";
+const STORAGE_KEY = "hiloxs.state.v2";
 
 const initialState: HiloxsState = {
   member: { name: "Guest Member", activated: false, joinedAt: Date.now() },
@@ -83,6 +105,9 @@ const initialState: HiloxsState = {
   orders: [],
   trades: [],
   demoBalanceUsd: 1000,
+  admin: { unlocked: false, outcome: "market", payoutRate: 1.85 },
+  paybillFloatUsd: 0,
+  videos: [],
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -92,7 +117,7 @@ type Ctx = {
   hydrated: boolean;
   walletKes: number;
   legCounts: { L: number; R: number };
-  addReferral: (input: { name: string; phone: string; leg: Leg }) => void;
+  addReferral: (input: { name: string; phone: string; leg: Leg; parentId: string | null }) => void;
   activateReferral: (id: string) => void;
   activateMember: (name: string) => void;
   saveAccounts: (accounts: PayoutAccounts) => void;
@@ -103,6 +128,10 @@ type Ctx = {
   checkout: (method: Order["method"]) => Order | null;
   recordTrade: (trade: Trade) => void;
   settleTrade: (id: string, exit: number) => void;
+  setAdmin: (patch: Partial<AdminTrading>) => void;
+  withdrawTrading: (amountUsd: number, to: "paypal" | "minipay" | "mpesa") => string | null;
+  addVideo: (input: { title: string; level: TrainingLevel; url: string }) => string | null;
+  removeVideo: (id: string) => void;
 };
 
 const HiloxsContext = createContext<Ctx | null>(null);
