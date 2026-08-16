@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { PlayCircle, Youtube } from "lucide-react";
+import { PlayCircle, Plus, Trash2, Youtube } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { TRACKS, TRAININGS, type TrainingTrack } from "@/lib/hiloxs";
+import { useHiloxs, type TrainingLevel } from "@/lib/hiloxs-store";
+
+const LEVELS: TrainingLevel[] = ["Beginner", "Intermediate", "Advanced"];
 
 export const Route = createFileRoute("/training")({
   head: () => ({
@@ -28,6 +34,8 @@ function TrainingPage() {
   const [track, setTrack] = useState<TrainingTrack | "All">("All");
   const list = TRAININGS.filter((t) => track === "All" || t.track === track);
   const [active, setActive] = useState(TRAININGS[0]!);
+  const { state, hydrated, addVideo, removeVideo } = useHiloxs();
+  const [form, setForm] = useState({ title: "", url: "", level: "Beginner" as TrainingLevel });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -95,6 +103,109 @@ function TrainingPage() {
           ))}
         </ul>
       </div>
+
+      <section className="mt-14">
+        <h2 className="text-2xl font-bold">My YouTube uploads</h2>
+        <p className="mt-2 max-w-2xl text-muted-foreground">
+          Paste a link straight from my YouTube channel and choose the level it belongs to. It
+          appears in the library below immediately.
+        </p>
+
+        <form
+          className="panel mt-5 grid gap-4 p-5 sm:grid-cols-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const err = addVideo(form);
+            if (err) toast.error(err);
+            else {
+              toast.success("Video added to the library");
+              setForm({ title: "", url: "", level: form.level });
+            }
+          }}
+        >
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="v-title">Video title</Label>
+            <Input
+              id="v-title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="e.g. Placing your first binary trade"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="v-url">YouTube link or video ID</Label>
+            <Input
+              id="v-url"
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+              placeholder="https://youtu.be/…"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Level</Label>
+            <div className="flex flex-wrap gap-2">
+              {LEVELS.map((l) => (
+                <Button
+                  key={l}
+                  type="button"
+                  size="sm"
+                  variant={form.level === l ? "default" : "outline"}
+                  onClick={() => setForm({ ...form, level: l })}
+                >
+                  {l}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <Button type="submit" variant="hero" className="sm:col-span-2 sm:self-end">
+            <Plus /> Add to library
+          </Button>
+        </form>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          {LEVELS.map((level) => {
+            const videos = hydrated ? state.videos.filter((v) => v.level === level) : [];
+            return (
+              <div key={level} className="panel p-5">
+                <h3 className="text-lg font-semibold">{level}</h3>
+                {videos.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Space reserved — {level.toLowerCase()} videos you upload will show here.
+                  </p>
+                ) : (
+                  <ul className="mt-3 space-y-4">
+                    {videos.map((v) => (
+                      <li key={v.id}>
+                        <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
+                          <iframe
+                            className="h-full w-full"
+                            src={`https://www.youtube.com/embed/${v.youtubeId}`}
+                            title={v.title}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+                            allowFullScreen
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="mt-2 flex items-start gap-2">
+                          <p className="flex-1 text-sm font-medium">{v.title}</p>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Remove ${v.title}`}
+                            onClick={() => removeVideo(v.id)}
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
