@@ -1,21 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, ShoppingCart, Star, Trash2 } from "lucide-react";
+import { ImagePlus, Lock, Search, ShoppingCart, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   CATEGORIES,
   CATEGORY_EMOJI,
-  PRODUCTS,
   SHOP_CATEGORIES,
   SUPPORT,
   TILL_NUMBER,
   TILL_LABEL,
+  PAYBILL_NUMBER,
+  PAYBILL_LABEL,
   discountPct,
   dual,
   kes,
   type Product,
+  type ShopCategory,
 } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-store";
 import { toast } from "sonner";
@@ -40,33 +42,46 @@ export const Route = createFileRoute("/shop")({
 });
 
 function ShopPage() {
-  const { state, hydrated, addToCart, setCartQty, clearCart, checkout } = useHiloxs();
+  const {
+    state,
+    hydrated,
+    addToCart,
+    setCartQty,
+    clearCart,
+    checkout,
+    allProducts,
+    addProduct,
+    removeProduct,
+    setAdmin,
+  } = useHiloxs();
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("All");
   const [query, setQuery] = useState("");
 
   const products = useMemo(
     () =>
-      PRODUCTS.filter(
+      allProducts.filter(
         (p) =>
           (category === "All" || p.category === category) &&
           p.name.toLowerCase().includes(query.toLowerCase()),
       ),
-    [category, query],
+    [allProducts, category, query],
   );
 
   const flashDeals = useMemo(
     () =>
-      PRODUCTS.filter((p) => p.oldPriceKes)
+      allProducts
+        .filter((p) => p.oldPriceKes)
         .sort((a, b) => discountPct(b) - discountPct(a))
         .slice(0, 4),
-    [],
+    [allProducts],
   );
 
   const cartLines = hydrated
     ? Object.entries(state.cart).map(([id, qty]) => ({
-        product: PRODUCTS.find((p) => p.id === id)!,
+        product: allProducts.find((p) => p.id === id)!,
         qty,
       }))
+        .filter((l) => Boolean(l.product))
     : [];
   const total = cartLines.reduce((s, l) => s + l.product.priceKes * l.qty, 0);
 
@@ -117,6 +132,14 @@ function ShopPage() {
           ))}
         </div>
       </section>
+
+      <AdminUploader
+        unlocked={state.admin.unlocked}
+        onUnlock={() => setAdmin({ unlocked: true })}
+        onAdd={addProduct}
+        customProducts={hydrated ? state.customProducts : []}
+        onRemove={removeProduct}
+      />
 
       <h2 className="mt-12 text-2xl font-bold">Trending on HILOXS</h2>
 
@@ -211,6 +234,17 @@ function ShopPage() {
                     Pay with M-Pesa Till
                   </Button>
                   <Button
+                    variant="hero"
+                    className="w-full"
+                    onClick={() => {
+                      const order = checkout("paybill");
+                      if (order)
+                        toast.success(`Order ${order.id} placed — pay to the HILOXS paybill`);
+                    }}
+                  >
+                    Pay with Paybill
+                  </Button>
+                  <Button
                     variant="outline"
                     className="w-full"
                     onClick={() => {
@@ -244,6 +278,12 @@ function ShopPage() {
               {TILL_NUMBER
                 ? `Buy Goods Till: ${TILL_NUMBER}`
                 : "Till number: ____________ (reserved — Buy Goods only, no paybill)"}
+            </p>
+            <p className="mt-2 font-semibold text-foreground">{PAYBILL_LABEL}</p>
+            <p className="mt-1">
+              {PAYBILL_NUMBER
+                ? `Paybill: ${PAYBILL_NUMBER}`
+                : "Paybill: ____________ (reserved — add it once you create the paybill)"}
             </p>
           </div>
 
