@@ -48,7 +48,13 @@ function MyOrdersPage() {
                 <span className="font-display text-lg font-bold">{o.id}</span>
                 <Badge variant="secondary">{o.status}</Badge>
                 <Badge variant="outline">
-                  {o.method === "till" ? "M-Pesa Till" : o.method === "paypal" ? "PayPal" : "MiniPay"}
+                  {o.method === "till"
+                    ? "M-Pesa Till"
+                    : o.method === "paybill"
+                      ? "M-Pesa Paybill"
+                      : o.method === "paypal"
+                        ? "PayPal"
+                        : "MiniPay"}
                 </Badge>
                 <span className="ml-auto font-semibold text-primary">{dual(o.totalKes)}</span>
               </div>
@@ -66,6 +72,12 @@ function MyOrdersPage() {
                 <p className="mt-3 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
                   Pay to {TILL_LABEL}:{" "}
                   {TILL_NUMBER ?? "____________ (Buy Goods till pending activation)"}
+                </p>
+              )}
+              {o.method === "paybill" && (
+                <p className="mt-3 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
+                  Pay to {PAYBILL_LABEL}:{" "}
+                  {PAYBILL_NUMBER ?? "____________ (paybill pending activation)"}
                 </p>
               )}
             </li>
