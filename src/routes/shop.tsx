@@ -300,10 +300,15 @@ function ShopPage() {
 }
 function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => void }) {
   const off = discountPct(p);
+  const image = (p as Product & { image?: string }).image;
   return (
     <article className="panel flex flex-col overflow-hidden">
       <div className="relative grid h-36 place-items-center bg-[image:var(--gradient-night)] text-5xl">
-        <span aria-hidden>{p.emoji}</span>
+        {image ? (
+          <img src={image} alt={p.name} className="size-full object-cover" loading="lazy" />
+        ) : (
+          <span aria-hidden>{p.emoji}</span>
+        )}
         {p.badge && (
           <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
             {p.badge}
