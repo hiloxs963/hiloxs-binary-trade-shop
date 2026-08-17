@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TILL_LABEL, TILL_NUMBER, dual } from "@/lib/hiloxs";
+import { PAYBILL_LABEL, PAYBILL_NUMBER, TILL_LABEL, TILL_NUMBER, dual } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-store";
 
 export const Route = createFileRoute("/my-orders")({
