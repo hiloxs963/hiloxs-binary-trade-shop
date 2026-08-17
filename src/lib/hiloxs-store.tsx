@@ -7,7 +7,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { PLAN, PRODUCTS } from "./hiloxs";
+import { PLAN, PRODUCTS, type Product, type ShopCategory } from "./hiloxs";
+
+/** A product uploaded by the admin from the Shop page. */
+export type CustomProduct = Product & { image?: string; custom: true; at: number };
 
 export type Leg = "L" | "R";
 
@@ -42,7 +45,7 @@ export type Order = {
   id: string;
   items: OrderItem[];
   totalKes: number;
-  method: "till" | "paypal" | "minipay";
+  method: "till" | "paybill" | "paypal" | "minipay";
   status: "Processing" | "Shipped" | "Delivered";
   at: number;
 };
@@ -91,6 +94,7 @@ export type HiloxsState = {
   admin: AdminTrading;
   paybillFloatUsd: number;
   videos: CustomVideo[];
+  customProducts: CustomProduct[];
 };
 
 const STORAGE_KEY = "hiloxs.state.v2";
@@ -108,6 +112,7 @@ const initialState: HiloxsState = {
   admin: { unlocked: false, outcome: "market", payoutRate: 1.85 },
   paybillFloatUsd: 0,
   videos: [],
+  customProducts: [],
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -142,6 +147,18 @@ type Ctx = {
   withdrawTrading: (amountUsd: number, to: "paypal" | "minipay" | "mpesa") => string | null;
   addVideo: (input: { title: string; level: TrainingLevel; url: string }) => string | null;
   removeVideo: (id: string) => void;
+  addProduct: (input: {
+    name: string;
+    category: ShopCategory;
+    priceKes: number;
+    oldPriceKes?: number;
+    reviews: number;
+    blurb: string;
+    image?: string;
+    badge?: Product["badge"];
+  }) => string | null;
+  removeProduct: (id: string) => void;
+  allProducts: Product[];
 };
 
 const HiloxsContext = createContext<Ctx | null>(null);
@@ -427,6 +444,48 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, videos: prev.videos.filter((v) => v.id !== id) }));
   }, []);
 
+  const addProduct: Ctx["addProduct"] = useCallback((input) => {
+    if (!input.name.trim()) return "Give the product a name.";
+    if (!input.priceKes || input.priceKes <= 0) return "Enter a price greater than zero.";
+    if (input.oldPriceKes && input.oldPriceKes <= input.priceKes)
+      return "The old price must be higher than the selling price.";
+    setState((prev) => ({
+      ...prev,
+      customProducts: [
+        {
+          id: `cp-${uid()}`,
+          name: input.name.trim(),
+          category: input.category,
+          priceKes: input.priceKes,
+          ...(input.oldPriceKes ? { oldPriceKes: input.oldPriceKes } : {}),
+          rating: 5,
+          sold: Math.max(0, Math.round(input.reviews || 0)),
+          blurb: input.blurb.trim() || "New arrival on HILOXS.",
+          emoji: "🆕",
+          ...(input.badge ? { badge: input.badge } : {}),
+          ...(input.image ? { image: input.image } : {}),
+          custom: true as const,
+          at: Date.now(),
+        },
+        ...prev.customProducts,
+      ],
+    }));
+    return null;
+  }, []);
+
+  const removeProduct = useCallback((id: string) => {
+    setState((prev) => {
+      const cart = { ...prev.cart };
+      delete cart[id];
+      return { ...prev, cart, customProducts: prev.customProducts.filter((p) => p.id !== id) };
+    });
+  }, []);
+
+  const allProducts = useMemo<Product[]>(
+    () => [...state.customProducts, ...PRODUCTS],
+    [state.customProducts],
+  );
+
   const value: Ctx = {
     state,
     hydrated,
@@ -447,6 +506,9 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     withdrawTrading,
     addVideo,
     removeVideo,
+    addProduct,
+    removeProduct,
+    allProducts,
   };
 
   return <HiloxsContext.Provider value={value}>{children}</HiloxsContext.Provider>;
