@@ -346,3 +346,214 @@ function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => voi
     </article>
   );
 }
+
+type NewProduct = {
+  name: string;
+  category: ShopCategory;
+  priceKes: number;
+  oldPriceKes?: number;
+  reviews: number;
+  blurb: string;
+  image?: string;
+  badge?: Product["badge"];
+};
+
+const BADGES = ["FLASH SALE", "BEST SELLER", "HOT DEAL", "TOP RATED"] as const;
+
+function AdminUploader({
+  unlocked,
+  onUnlock,
+  onAdd,
+  customProducts,
+  onRemove,
+}: {
+  unlocked: boolean;
+  onUnlock: () => void;
+  onAdd: (input: NewProduct) => string | null;
+  customProducts: (Product & { image?: string })[];
+  onRemove: (id: string) => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<ShopCategory>("Laptops");
+  const [price, setPrice] = useState("");
+  const [oldPrice, setOldPrice] = useState("");
+  const [reviews, setReviews] = useState("");
+  const [blurb, setBlurb] = useState("");
+  const [badge, setBadge] = useState<Product["badge"] | "">("");
+  const [image, setImage] = useState<string | undefined>(undefined);
+
+  const readFile = (file: File) => {
+    if (file.size > 1_500_000) {
+      toast.error("Please use a photo under 1.5 MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setImage(String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <section className="panel mt-10 p-5">
+      <div className="flex items-center gap-2">
+        <ImagePlus className="size-5 text-primary" />
+        <h2 className="text-xl font-bold">Admin — upload a new product</h2>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Only the HILOXS admin can post products here. Add a photo, price, discount and review count —
+        shoppers can then add it to cart and pay through the HILOXS paybill.
+      </p>
+
+      {!unlocked ? (
+        <form
+          className="mt-4 flex max-w-sm gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (pin.trim() === "HILOXS-ADMIN") {
+              onUnlock();
+              setPin("");
+              toast.success("Admin upload unlocked");
+            } else toast.error("Wrong admin key");
+          }}
+        >
+          <Input
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="Admin key"
+            type="password"
+          />
+          <Button type="submit" variant="outline">
+            <Lock /> Unlock
+          </Button>
+        </form>
+      ) : (
+        <form
+          className="mt-4 grid gap-3 sm:grid-cols-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const error = onAdd({
+              name,
+              category,
+              priceKes: Number(price),
+              ...(oldPrice ? { oldPriceKes: Number(oldPrice) } : {}),
+              reviews: Number(reviews) || 0,
+              blurb,
+              ...(image ? { image } : {}),
+              ...(badge ? { badge } : {}),
+            });
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            toast.success(`${name} is live in the shop`);
+            setName("");
+            setPrice("");
+            setOldPrice("");
+            setReviews("");
+            setBlurb("");
+            setBadge("");
+            setImage(undefined);
+          }}
+        >
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-muted-foreground">Product photo</label>
+            <div className="mt-1 flex items-center gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) readFile(file);
+                }}
+                className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1.5 file:text-secondary-foreground"
+              />
+              {image && (
+                <img src={image} alt="Preview" className="size-14 rounded-md object-cover" />
+              )}
+            </div>
+          </div>
+
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" />
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value as ShopCategory)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            {SHOP_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <Input
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Price (KSh)"
+            inputMode="numeric"
+          />
+          <Input
+            value={oldPrice}
+            onChange={(e) => setOldPrice(e.target.value)}
+            placeholder="Old price (KSh) — for the discount"
+            inputMode="numeric"
+          />
+          <Input
+            value={reviews}
+            onChange={(e) => setReviews(e.target.value)}
+            placeholder="Number of reviews"
+            inputMode="numeric"
+          />
+          <select
+            value={badge}
+            onChange={(e) => setBadge(e.target.value as Product["badge"] | "")}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">No badge</option>
+            {BADGES.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+          <Input
+            className="sm:col-span-2"
+            value={blurb}
+            onChange={(e) => setBlurb(e.target.value)}
+            placeholder="Short description"
+          />
+          <Button type="submit" variant="hero" className="sm:col-span-2">
+            <ImagePlus /> Publish to shop
+          </Button>
+        </form>
+      )}
+
+      {customProducts.length > 0 && (
+        <div className="mt-5 space-y-2">
+          <p className="text-sm font-semibold">Your uploaded products</p>
+          {customProducts.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm"
+            >
+              {p.image ? (
+                <img src={p.image} alt={p.name} className="size-10 rounded object-cover" />
+              ) : (
+                <span className="text-xl" aria-hidden>
+                  {p.emoji}
+                </span>
+              )}
+              <span className="flex-1">
+                {p.name} · {kes(p.priceKes)} · {p.sold.toLocaleString()} reviews
+              </span>
+              {unlocked && (
+                <Button size="icon" variant="ghost" aria-label="Remove" onClick={() => onRemove(p.id)}>
+                  <Trash2 />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
