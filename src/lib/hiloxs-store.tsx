@@ -339,7 +339,9 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
       const entries = Object.entries(state.cart);
       if (entries.length === 0) return null;
       const items: OrderItem[] = entries.map(([productId, qty]) => {
-        const product = PRODUCTS.find((p) => p.id === productId)!;
+        const product =
+          PRODUCTS.find((p) => p.id === productId) ??
+          state.customProducts.find((p) => p.id === productId)!;
         return { productId, name: product.name, qty, priceKes: product.priceKes };
       });
       const order: Order = {
@@ -353,7 +355,7 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({ ...prev, orders: [order, ...prev.orders], cart: {} }));
       return order;
     },
-    [state.cart],
+    [state.cart, state.customProducts],
   );
 
   const recordTrade = useCallback((trade: Trade) => {
