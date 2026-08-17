@@ -299,8 +299,6 @@ function ShopPage() {
   );
 }
 function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => void }) {
-  const off2 = 0;
-  void off2;
   const off = discountPct(p);
   const image = (p as Product & { image?: string }).image;
   return (
