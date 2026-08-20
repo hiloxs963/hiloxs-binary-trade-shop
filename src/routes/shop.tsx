@@ -10,9 +10,7 @@ import {
   SHOP_CATEGORIES,
   SUPPORT,
   TILL_NUMBER,
-  TILL_LABEL,
-  PAYBILL_NUMBER,
-  PAYBILL_LABEL,
+  MERCHANT_NAME,
   discountPct,
   dual,
   kes,
@@ -228,21 +226,11 @@ function ShopPage() {
                     className="w-full"
                     onClick={() => {
                       const order = checkout("till");
-                      if (order) toast.success(`Order ${order.id} placed — pay to the HILOXS till`);
-                    }}
-                  >
-                    Pay with M-Pesa Till
-                  </Button>
-                  <Button
-                    variant="hero"
-                    className="w-full"
-                    onClick={() => {
-                      const order = checkout("paybill");
                       if (order)
-                        toast.success(`Order ${order.id} placed — pay to the HILOXS paybill`);
+                        toast.success(`Order ${order.id} placed — pay ${MERCHANT_NAME} on till ${TILL_NUMBER}`);
                     }}
                   >
-                    Pay with Paybill
+                    Pay {MERCHANT_NAME} — M-Pesa Till {TILL_NUMBER}
                   </Button>
                   <Button
                     variant="outline"
@@ -273,17 +261,11 @@ function ShopPage() {
           )}
 
           <div className="mt-5 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground">{TILL_LABEL}</p>
+            <p className="font-semibold text-foreground">{MERCHANT_NAME}</p>
+            <p className="mt-1">Buy Goods Till: {TILL_NUMBER}</p>
             <p className="mt-1">
-              {TILL_NUMBER
-                ? `Buy Goods Till: ${TILL_NUMBER}`
-                : "Till number: ____________ (reserved — Buy Goods only, no paybill)"}
-            </p>
-            <p className="mt-2 font-semibold text-foreground">{PAYBILL_LABEL}</p>
-            <p className="mt-1">
-              {PAYBILL_NUMBER
-                ? `Paybill: ${PAYBILL_NUMBER}`
-                : "Paybill: ____________ (reserved — add it once you create the paybill)"}
+              Payments in and out of shop, binary and trading all run through this one till, and
+              show as {MERCHANT_NAME} on the M-Pesa prompt.
             </p>
           </div>
 
