@@ -36,6 +36,7 @@ function TrainingPage() {
   const [active, setActive] = useState(TRAININGS[0]!);
   const { state, hydrated, addVideo, removeVideo } = useHiloxs();
   const [form, setForm] = useState({ title: "", url: "", level: "Beginner" as TrainingLevel });
+  const adminMode = useAdminMode();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -105,12 +106,16 @@ function TrainingPage() {
       </div>
 
       <section className="mt-14">
-        <h2 className="text-2xl font-bold">My YouTube uploads</h2>
+        <h2 className="text-2xl font-bold">
+          {adminMode ? "My YouTube uploads" : "Training library"}
+        </h2>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Paste a link straight from my YouTube channel and choose the level it belongs to. It
-          appears in the library below immediately.
+          {adminMode
+            ? "Paste a link straight from my YouTube channel and choose the level it belongs to. It appears in the library below immediately."
+            : "Beginner, intermediate and advanced classes uploaded from the HILOXS channel."}
         </p>
 
+        {adminMode && (
         <form
           className="panel mt-5 grid gap-4 p-5 sm:grid-cols-4"
           onSubmit={(e) => {
@@ -161,6 +166,7 @@ function TrainingPage() {
             <Plus /> Add to library
           </Button>
         </form>
+        )}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
           {LEVELS.map((level) => {
@@ -188,14 +194,16 @@ function TrainingPage() {
                         </div>
                         <div className="mt-2 flex items-start gap-2">
                           <p className="flex-1 text-sm font-medium">{v.title}</p>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label={`Remove ${v.title}`}
-                            onClick={() => removeVideo(v.id)}
-                          >
-                            <Trash2 />
-                          </Button>
+                          {adminMode && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label={`Remove ${v.title}`}
+                              onClick={() => removeVideo(v.id)}
+                            >
+                              <Trash2 />
+                            </Button>
+                          )}
                         </div>
                       </li>
                     ))}
