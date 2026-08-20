@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { TRACKS, TRAININGS, type TrainingTrack } from "@/lib/hiloxs";
 import { useHiloxs, type TrainingLevel } from "@/lib/hiloxs-store";
+import { useAdminMode } from "@/lib/admin";
 
 const LEVELS: TrainingLevel[] = ["Beginner", "Intermediate", "Advanced"];
 
