@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { TILL_LABEL, TILL_NUMBER } from "@/lib/hiloxs";
+import { MERCHANT_NAME, TILL_NUMBER } from "@/lib/hiloxs";
 
 export const Route = createFileRoute("/sell-with-us")({
   head: () => ({
@@ -116,11 +116,10 @@ function SellWithUsPage() {
               <li>· M-Pesa — cash-out from either wallet</li>
             </ul>
             <div className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm">
-              <p className="font-semibold">{TILL_LABEL}</p>
+              <p className="font-semibold">{MERCHANT_NAME}</p>
               <p className="mt-1 text-muted-foreground">
-                {TILL_NUMBER
-                  ? `Buy Goods Till: ${TILL_NUMBER}`
-                  : "Till number: ____________ (Buy Goods only — paybill is not accepted)"}
+                Buy Goods Till: {TILL_NUMBER} (Buy Goods only — no paybill). Payouts and vendor
+                payments show as {MERCHANT_NAME}.
               </p>
             </div>
           </div>

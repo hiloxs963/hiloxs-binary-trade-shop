@@ -18,6 +18,7 @@ import {
   type ShopCategory,
 } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-store";
+import { ADMIN_KEY, useAdminMode } from "@/lib/admin";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/shop")({
@@ -394,7 +395,7 @@ function AdminUploader({
           className="mt-4 flex max-w-sm gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (pin.trim() === "HILOXS-ADMIN") {
+            if (pin.trim() === ADMIN_KEY) {
               onUnlock();
               setPin("");
               toast.success("Admin upload unlocked");
