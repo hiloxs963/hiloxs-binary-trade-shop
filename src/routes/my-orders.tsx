@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PAYBILL_LABEL, PAYBILL_NUMBER, TILL_LABEL, TILL_NUMBER, dual } from "@/lib/hiloxs";
+import { MERCHANT_NAME, TILL_NUMBER, dual } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-store";
 
 export const Route = createFileRoute("/my-orders")({
@@ -48,13 +48,11 @@ function MyOrdersPage() {
                 <span className="font-display text-lg font-bold">{o.id}</span>
                 <Badge variant="secondary">{o.status}</Badge>
                 <Badge variant="outline">
-                  {o.method === "till"
+                  {o.method === "till" || o.method === "paybill"
                     ? "M-Pesa Till"
-                    : o.method === "paybill"
-                      ? "M-Pesa Paybill"
-                      : o.method === "paypal"
-                        ? "PayPal"
-                        : "MiniPay"}
+                    : o.method === "paypal"
+                      ? "PayPal"
+                      : "MiniPay"}
                 </Badge>
                 <span className="ml-auto font-semibold text-primary">{dual(o.totalKes)}</span>
               </div>
@@ -68,16 +66,10 @@ function MyOrdersPage() {
                   </li>
                 ))}
               </ul>
-              {o.method === "till" && (
+              {(o.method === "till" || o.method === "paybill") && (
                 <p className="mt-3 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-                  Pay to {TILL_LABEL}:{" "}
-                  {TILL_NUMBER ?? "____________ (Buy Goods till pending activation)"}
-                </p>
-              )}
-              {o.method === "paybill" && (
-                <p className="mt-3 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-                  Pay to {PAYBILL_LABEL}:{" "}
-                  {PAYBILL_NUMBER ?? "____________ (paybill pending activation)"}
+                  Pay to {MERCHANT_NAME} · Buy Goods Till {TILL_NUMBER}. The M-Pesa prompt and
+                  receipt read {MERCHANT_NAME}.
                 </p>
               )}
             </li>

@@ -10,9 +10,7 @@ import {
   SHOP_CATEGORIES,
   SUPPORT,
   TILL_NUMBER,
-  TILL_LABEL,
-  PAYBILL_NUMBER,
-  PAYBILL_LABEL,
+  MERCHANT_NAME,
   discountPct,
   dual,
   kes,
@@ -20,6 +18,7 @@ import {
   type ShopCategory,
 } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-store";
+import { ADMIN_KEY, useAdminMode } from "@/lib/admin";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/shop")({
@@ -228,21 +227,11 @@ function ShopPage() {
                     className="w-full"
                     onClick={() => {
                       const order = checkout("till");
-                      if (order) toast.success(`Order ${order.id} placed — pay to the HILOXS till`);
-                    }}
-                  >
-                    Pay with M-Pesa Till
-                  </Button>
-                  <Button
-                    variant="hero"
-                    className="w-full"
-                    onClick={() => {
-                      const order = checkout("paybill");
                       if (order)
-                        toast.success(`Order ${order.id} placed — pay to the HILOXS paybill`);
+                        toast.success(`Order ${order.id} placed — pay ${MERCHANT_NAME} on till ${TILL_NUMBER}`);
                     }}
                   >
-                    Pay with Paybill
+                    Pay {MERCHANT_NAME} — M-Pesa Till {TILL_NUMBER}
                   </Button>
                   <Button
                     variant="outline"
@@ -273,17 +262,11 @@ function ShopPage() {
           )}
 
           <div className="mt-5 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground">{TILL_LABEL}</p>
+            <p className="font-semibold text-foreground">{MERCHANT_NAME}</p>
+            <p className="mt-1">Buy Goods Till: {TILL_NUMBER}</p>
             <p className="mt-1">
-              {TILL_NUMBER
-                ? `Buy Goods Till: ${TILL_NUMBER}`
-                : "Till number: ____________ (reserved — Buy Goods only, no paybill)"}
-            </p>
-            <p className="mt-2 font-semibold text-foreground">{PAYBILL_LABEL}</p>
-            <p className="mt-1">
-              {PAYBILL_NUMBER
-                ? `Paybill: ${PAYBILL_NUMBER}`
-                : "Paybill: ____________ (reserved — add it once you create the paybill)"}
+              Payments in and out of shop, binary and trading all run through this one till, and
+              show as {MERCHANT_NAME} on the M-Pesa prompt.
             </p>
           </div>
 
@@ -382,6 +365,7 @@ function AdminUploader({
   const [blurb, setBlurb] = useState("");
   const [badge, setBadge] = useState<Product["badge"] | "">("");
   const [image, setImage] = useState<string | undefined>(undefined);
+  const adminMode = useAdminMode();
 
   const readFile = (file: File) => {
     if (file.size > 1_500_000) {
@@ -393,6 +377,8 @@ function AdminUploader({
     reader.readAsDataURL(file);
   };
 
+  if (!adminMode) return null;
+
   return (
     <section className="panel mt-10 p-5">
       <div className="flex items-center gap-2">
@@ -401,7 +387,7 @@ function AdminUploader({
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Only the HILOXS admin can post products here. Add a photo, price, discount and review count —
-        shoppers can then add it to cart and pay through the HILOXS paybill.
+        shoppers can then add it to cart and pay {MERCHANT_NAME} on till {TILL_NUMBER}.
       </p>
 
       {!unlocked ? (
@@ -409,7 +395,7 @@ function AdminUploader({
           className="mt-4 flex max-w-sm gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (pin.trim() === "HILOXS-ADMIN") {
+            if (pin.trim() === ADMIN_KEY) {
               onUnlock();
               setPin("");
               toast.success("Admin upload unlocked");

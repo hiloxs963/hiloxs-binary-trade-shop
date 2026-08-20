@@ -171,13 +171,12 @@ export const TRACKS: TrainingTrack[] = [
   "Getting Started",
 ];
 
-/** Till number placeholder — replace once your Buy Goods till is live. */
-export const TILL_NUMBER: string | null = null;
+/** Every payment in or out of HILOXS runs through this single Buy Goods till. */
+export const MERCHANT_NAME = "HILOXS";
+export const TILL_NUMBER = "1628777";
 export const TILL_LABEL = "HILOXS Buy Goods Till";
-
-/** Paybill placeholder for the trading desk float — replace once live. */
-export const PAYBILL_NUMBER: string | null = null;
-export const PAYBILL_LABEL = "HILOXS Trading Paybill";
+/** What a client sees on the M-Pesa prompt / receipt. */
+export const TILL_DISPLAY = `${MERCHANT_NAME} · Buy Goods Till ${TILL_NUMBER}`;
 
 export const SUPPORT = {
   hours: "Mon–Sat, 8am–7pm EAT",
