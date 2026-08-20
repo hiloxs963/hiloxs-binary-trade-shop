@@ -387,7 +387,7 @@ function AdminUploader({
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Only the HILOXS admin can post products here. Add a photo, price, discount and review count —
-        shoppers can then add it to cart and pay through the HILOXS paybill.
+        shoppers can then add it to cart and pay {MERCHANT_NAME} on till {TILL_NUMBER}.
       </p>
 
       {!unlocked ? (
