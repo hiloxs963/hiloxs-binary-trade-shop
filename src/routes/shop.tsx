@@ -364,6 +364,7 @@ function AdminUploader({
   const [blurb, setBlurb] = useState("");
   const [badge, setBadge] = useState<Product["badge"] | "">("");
   const [image, setImage] = useState<string | undefined>(undefined);
+  const adminMode = useAdminMode();
 
   const readFile = (file: File) => {
     if (file.size > 1_500_000) {
@@ -374,6 +375,8 @@ function AdminUploader({
     reader.onload = () => setImage(String(reader.result));
     reader.readAsDataURL(file);
   };
+
+  if (!adminMode) return null;
 
   return (
     <section className="panel mt-10 p-5">

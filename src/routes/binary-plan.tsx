@@ -17,6 +17,7 @@ import {
   kesToUsd,
 } from "@/lib/hiloxs";
 import { useHiloxs, type Leg } from "@/lib/hiloxs-store";
+import { MERCHANT_NAME } from "@/lib/hiloxs";
 import { BinaryTree, buildTree } from "@/components/hiloxs/BinaryTree";
 
 export const Route = createFileRoute("/binary-plan")({
@@ -388,8 +389,9 @@ function BinaryPlanPage() {
               ))}
             </div>
             <p className="mt-3 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-              Buy Goods till (no paybill):{" "}
-              {TILL_NUMBER ?? "____________ — reserved for the HILOXS till you are creating."}
+              Entry packages and bonus cash-outs run through {MERCHANT_NAME} · Buy Goods Till{" "}
+              {TILL_NUMBER} — the same till used in the shop and on the trading desk. Every prompt
+              and receipt reads {MERCHANT_NAME}.
             </p>
           </div>
 
