@@ -155,9 +155,57 @@ export function SiteFooter() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-border px-4 py-5 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} HILOXS. Trading carries risk of loss.
+      <div className="border-t border-border px-4 py-5">
+        <AdminKeyBox />
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} HILOXS. Trading carries risk of loss.
+        </p>
       </div>
     </footer>
+  );
+}
+
+/** Discreet admin key box — regular shoppers can ignore it. */
+function AdminKeyBox() {
+  const [key, setKey] = useState("");
+  const admin = useAdminMode();
+
+  if (admin) {
+    return (
+      <div className="mx-auto flex max-w-sm items-center justify-center gap-3 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 text-primary">
+          <ShieldCheck className="size-3.5" /> Admin mode on
+        </span>
+        <Button size="sm" variant="ghost" onClick={() => setAdminMode(false)}>
+          Exit admin
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="mx-auto flex max-w-sm items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (key.trim() === ADMIN_KEY) {
+          setAdminMode(true);
+          setKey("");
+          toast.success("Admin mode unlocked");
+        } else toast.error("Wrong admin key");
+      }}
+    >
+      <Input
+        value={key}
+        type="password"
+        aria-label="Admin key"
+        placeholder="Admin key"
+        onChange={(e) => setKey(e.target.value)}
+        className="h-9 text-sm"
+      />
+      <Button type="submit" size="sm" variant="outline">
+        <ShieldCheck /> Enter
+      </Button>
+    </form>
   );
 }
