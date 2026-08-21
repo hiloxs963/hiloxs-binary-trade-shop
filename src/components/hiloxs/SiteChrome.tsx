@@ -1,10 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Menu, ShoppingCart, X } from "lucide-react";
+import { Menu, ShieldCheck, ShoppingCart, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useHiloxs } from "@/lib/hiloxs-store";
 import logoIcon from "@/assets/hiloxs-icon.png.asset.json";
 import { SUPPORT } from "@/lib/hiloxs";
+import { ADMIN_KEY, setAdminMode, useAdminMode } from "@/lib/admin";
+
 
 const NAV = [
   { to: "/", label: "Home" },
