@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useHiloxs } from "@/lib/hiloxs-store";
-import logoIcon from "@/assets/hiloxs-icon.png.asset.json";
+import logoIcon from "@/assets/hiloxs-icon.png";
 import { SUPPORT } from "@/lib/hiloxs";
 import { ADMIN_KEY, setAdminMode, useAdminMode } from "@/lib/admin";
 
@@ -32,7 +32,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
         <Link to="/" className="flex items-center gap-2">
           <img
-            src={logoIcon.url}
+            src={logoIcon}
             alt=""
             width={256}
             height={256}
@@ -110,7 +110,7 @@ export function SiteFooter() {
         <div>
           <div className="flex items-center gap-2">
             <img
-              src={logoIcon.url}
+              src={logoIcon}
               alt=""
               width={256}
               height={256}
