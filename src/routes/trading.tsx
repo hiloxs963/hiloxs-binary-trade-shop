@@ -5,8 +5,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CandleChart, makeSeed, stepCandles, type Candle } from "@/components/hiloxs/CandleChart";
-import { useHiloxs, type Trade } from "@/lib/hiloxs-store";
+import { CandleChart } from "@/components/hiloxs/CandleChart";
+import { makeSeed, stepCandles, type Candle } from "@/components/hiloxs/CandleChart.helpers";
+import { useHiloxs } from "@/lib/hiloxs-context";
+import { type Trade } from "@/lib/hiloxs-store";
 import { MERCHANT_NAME, TILL_NUMBER, SUPPORT } from "@/lib/hiloxs";
 import { ADMIN_KEY, useAdminMode } from "@/lib/admin";
 
@@ -22,7 +24,8 @@ export const Route = createFileRoute("/trading")({
       { property: "og:title", content: "HILOXS Binary Trading" },
       {
         property: "og:description",
-        content: "Live candles, expiry timers and withdrawable winnings, settled through the HILOXS till.",
+        content:
+          "Live candles, expiry timers and withdrawable winnings, settled through the HILOXS till.",
       },
     ],
   }),
@@ -157,7 +160,11 @@ function TradingPage() {
               </p>
             </div>
             <Badge variant="secondary" className="gap-1">
-              {change >= 0 ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+              {change >= 0 ? (
+                <TrendingUp className="size-3.5" />
+              ) : (
+                <TrendingDown className="size-3.5" />
+              )}
               {change.toFixed(2)}%
             </Badge>
           </div>
@@ -250,80 +257,85 @@ function TradingPage() {
       </div>
 
       {adminMode && (
-      <section className="panel mt-8 p-5">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="size-5 text-primary" />
-          <h2 className="text-lg font-semibold">Admin control</h2>
-        </div>
-        {state.admin.unlocked ? (
-          <div className="mt-4 grid gap-5 lg:grid-cols-3">
-            <div>
-              <p className="text-sm font-medium">Trade outcome</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(["market", "win", "loss"] as const).map((o) => (
-                  <Button
-                    key={o}
-                    size="sm"
-                    variant={state.admin.outcome === o ? "default" : "outline"}
-                    onClick={() => setAdmin({ outcome: o })}
-                  >
-                    {o === "market" ? "Follow market" : o === "win" ? "Force WIN" : "Force LOSS"}
-                  </Button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Applies to every trade settled from now on.
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Payout multiplier</p>
-              <Input
-                className="mt-2"
-                value={String(state.admin.payoutRate)}
-                inputMode="decimal"
-                onChange={(e) => setAdmin({ payoutRate: Number(e.target.value) || 1 })}
-              />
-              <p className="mt-2 text-xs text-muted-foreground">
-                1.85 pays 85% on top of the stake.
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Till float</p>
-              <p className="mt-2 font-display text-2xl font-bold text-primary">
-                ${state.paybillFloatUsd.toFixed(2)}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Lost stakes settle into till {TILL_NUMBER}; paid winnings are deducted here.
-              </p>
-              <Button size="sm" variant="ghost" className="mt-2" onClick={() => setAdmin({ unlocked: false })}>
-                Lock admin
-              </Button>
-            </div>
+        <section className="panel mt-8 p-5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-5 text-primary" />
+            <h2 className="text-lg font-semibold">Admin control</h2>
           </div>
-        ) : (
-          <form
-            className="mt-3 flex max-w-sm gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (adminPin.trim() === ADMIN_KEY) {
-                setAdmin({ unlocked: true });
-                setAdminPin("");
-                toast.success("Admin controls unlocked");
-              } else toast.error("Wrong admin key");
-            }}
-          >
-            <Input
-              value={adminPin}
-              onChange={(e) => setAdminPin(e.target.value)}
-              placeholder="Admin key"
-              type="password"
-            />
-            <Button type="submit" variant="outline">
-              <Lock /> Unlock
-            </Button>
-          </form>
-        )}
-      </section>
+          {state.admin.unlocked ? (
+            <div className="mt-4 grid gap-5 lg:grid-cols-3">
+              <div>
+                <p className="text-sm font-medium">Trade outcome</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(["market", "win", "loss"] as const).map((o) => (
+                    <Button
+                      key={o}
+                      size="sm"
+                      variant={state.admin.outcome === o ? "default" : "outline"}
+                      onClick={() => setAdmin({ outcome: o })}
+                    >
+                      {o === "market" ? "Follow market" : o === "win" ? "Force WIN" : "Force LOSS"}
+                    </Button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Applies to every trade settled from now on.
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Payout multiplier</p>
+                <Input
+                  className="mt-2"
+                  value={String(state.admin.payoutRate)}
+                  inputMode="decimal"
+                  onChange={(e) => setAdmin({ payoutRate: Number(e.target.value) || 1 })}
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  1.85 pays 85% on top of the stake.
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Till float</p>
+                <p className="mt-2 font-display text-2xl font-bold text-primary">
+                  ${state.paybillFloatUsd.toFixed(2)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Lost stakes settle into till {TILL_NUMBER}; paid winnings are deducted here.
+                </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="mt-2"
+                  onClick={() => setAdmin({ unlocked: false })}
+                >
+                  Lock admin
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form
+              className="mt-3 flex max-w-sm gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (adminPin.trim() === ADMIN_KEY) {
+                  setAdmin({ unlocked: true });
+                  setAdminPin("");
+                  toast.success("Admin controls unlocked");
+                } else toast.error("Wrong admin key");
+              }}
+            >
+              <Input
+                value={adminPin}
+                onChange={(e) => setAdminPin(e.target.value)}
+                placeholder="Admin key"
+                type="password"
+              />
+              <Button type="submit" variant="outline">
+                <Lock /> Unlock
+              </Button>
+            </form>
+          )}
+        </section>
       )}
 
       <h2 className="mt-10 text-xl font-semibold">Trade history</h2>
@@ -331,7 +343,9 @@ function TradingPage() {
         {hydrated && state.trades.length > 0 ? (
           state.trades.map((t) => (
             <div key={t.id} className="flex flex-wrap items-center gap-3 p-4 text-sm">
-              <Badge variant={t.direction === "UP" ? "default" : "destructive"}>{t.direction}</Badge>
+              <Badge variant={t.direction === "UP" ? "default" : "destructive"}>
+                {t.direction}
+              </Badge>
               <span className="font-medium">{t.asset}</span>
               <span className="text-muted-foreground">
                 ${t.stakeUsd.toFixed(2)} · {t.expirySec}s · entry {t.entry.toFixed(4)}

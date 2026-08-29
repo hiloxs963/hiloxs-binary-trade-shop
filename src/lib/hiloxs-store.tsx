@@ -1,13 +1,6 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { PLAN, PRODUCTS, type Product, type ShopCategory } from "./hiloxs";
+import { HiloxsContext, type HiloxsContextValue } from "./hiloxs-context";
 
 /** A product uploaded by the admin from the Shop page. */
 export type CustomProduct = Product & { image?: string; custom: true; at: number };
@@ -118,50 +111,14 @@ const initialState: HiloxsState = {
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 /** Accepts a full YouTube URL (watch, youtu.be, shorts, embed) or a bare 11-char ID. */
-export function parseYouTubeId(input: string): string | null {
+function parseYouTubeId(input: string): string | null {
   const value = input.trim();
   if (/^[\w-]{11}$/.test(value)) return value;
-  const match = value.match(
-    /(?:youtu\.be\/|v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/,
-  );
+  const match = value.match(/(?:youtu\.be\/|v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/);
   return match?.[1] ?? null;
 }
 
-type Ctx = {
-  state: HiloxsState;
-  hydrated: boolean;
-  walletKes: number;
-  legCounts: { L: number; R: number };
-  addReferral: (input: { name: string; phone: string; leg: Leg; parentId: string | null }) => void;
-  activateReferral: (id: string) => void;
-  activateMember: (name: string) => void;
-  saveAccounts: (accounts: PayoutAccounts) => void;
-  withdraw: (amountKes: number, to: "paypal" | "minipay" | "mpesa") => string | null;
-  addToCart: (productId: string, qty?: number) => void;
-  setCartQty: (productId: string, qty: number) => void;
-  clearCart: () => void;
-  checkout: (method: Order["method"]) => Order | null;
-  recordTrade: (trade: Trade) => void;
-  settleTrade: (id: string, exit: number) => void;
-  setAdmin: (patch: Partial<AdminTrading>) => void;
-  withdrawTrading: (amountUsd: number, to: "paypal" | "minipay" | "mpesa") => string | null;
-  addVideo: (input: { title: string; level: TrainingLevel; url: string }) => string | null;
-  removeVideo: (id: string) => void;
-  addProduct: (input: {
-    name: string;
-    category: ShopCategory;
-    priceKes: number;
-    oldPriceKes?: number;
-    reviews: number;
-    blurb: string;
-    image?: string;
-    badge?: Product["badge"];
-  }) => string | null;
-  removeProduct: (id: string) => void;
-  allProducts: Product[];
-};
-
-const HiloxsContext = createContext<Ctx | null>(null);
+type Ctx = HiloxsContextValue;
 
 export function HiloxsProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<HiloxsState>(initialState);
@@ -514,10 +471,4 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
   };
 
   return <HiloxsContext.Provider value={value}>{children}</HiloxsContext.Provider>;
-}
-
-export function useHiloxs() {
-  const ctx = useContext(HiloxsContext);
-  if (!ctx) throw new Error("useHiloxs must be used inside HiloxsProvider");
-  return ctx;
 }

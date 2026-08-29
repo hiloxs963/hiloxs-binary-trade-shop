@@ -1,34 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, UserPlus } from "lucide-react";
-import type { Referral } from "@/lib/hiloxs-store";
-
-export type TreeNode = {
-  id: string | null;
-  name: string;
-  activated: boolean;
-  left?: TreeNode;
-  right?: TreeNode;
-};
-
-/** Builds an infinitely deep binary tree from flat referrals (parentId + leg). */
-export function buildTree(referrals: Referral[], rootName: string, rootActive: boolean): TreeNode {
-  const childOf = (parentId: string | null, leg: "L" | "R") =>
-    referrals.find((r) => (r.parentId ?? null) === parentId && r.leg === leg);
-
-  const build = (id: string | null, name: string, activated: boolean): TreeNode => {
-    const l = childOf(id, "L");
-    const r = childOf(id, "R");
-    return {
-      id,
-      name,
-      activated,
-      ...(l ? { left: build(l.id, l.name, l.activated) } : {}),
-      ...(r ? { right: build(r.id, r.name, r.activated) } : {}),
-    };
-  };
-
-  return build(null, rootName, rootActive);
-}
+import type { TreeNode } from "@/components/hiloxs/BinaryTree.helpers";
 
 export function BinaryTree({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
   const [open, setOpen] = useState(depth < 3);
@@ -46,7 +18,11 @@ export function BinaryTree({ node, depth = 0 }: { node: TreeNode; depth?: number
           } ${hasChildren ? "hover:border-primary" : "opacity-90"}`}
         >
           {hasChildren ? (
-            open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />
+            open ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronRight className="size-4" />
+            )
           ) : (
             <span className="size-4" />
           )}
@@ -67,7 +43,15 @@ export function BinaryTree({ node, depth = 0 }: { node: TreeNode; depth?: number
   );
 }
 
-function Branch({ label, child, depth }: { label: string; child?: TreeNode | undefined; depth: number }) {
+function Branch({
+  label,
+  child,
+  depth,
+}: {
+  label: string;
+  child?: TreeNode | undefined;
+  depth: number;
+}) {
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">

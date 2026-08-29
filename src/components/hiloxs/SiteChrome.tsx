@@ -4,11 +4,10 @@ import { Menu, ShieldCheck, ShoppingCart, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useHiloxs } from "@/lib/hiloxs-store";
+import { useHiloxs } from "@/lib/hiloxs-context";
 import logoIcon from "@/assets/hiloxs-icon.png";
 import { SUPPORT } from "@/lib/hiloxs";
 import { ADMIN_KEY, setAdminMode, useAdminMode } from "@/lib/admin";
-
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -23,9 +22,7 @@ const NAV = [
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const { state, hydrated } = useHiloxs();
-  const cartCount = hydrated
-    ? Object.values(state.cart).reduce((s, q) => s + q, 0)
-    : 0;
+  const cartCount = hydrated ? Object.values(state.cart).reduce((s, q) => s + q, 0) : 0;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
@@ -128,17 +125,41 @@ export function SiteFooter() {
         <div>
           <p className="text-sm font-semibold">Platform</p>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li><Link to="/shop" className="hover:text-foreground">Shop electronics</Link></li>
-            <li><Link to="/binary-plan" className="hover:text-foreground">Binary plan</Link></li>
-            <li><Link to="/trading" className="hover:text-foreground">Demo trading desk</Link></li>
-            <li><Link to="/training" className="hover:text-foreground">Training library</Link></li>
+            <li>
+              <Link to="/shop" className="hover:text-foreground">
+                Shop electronics
+              </Link>
+            </li>
+            <li>
+              <Link to="/binary-plan" className="hover:text-foreground">
+                Binary plan
+              </Link>
+            </li>
+            <li>
+              <Link to="/trading" className="hover:text-foreground">
+                Demo trading desk
+              </Link>
+            </li>
+            <li>
+              <Link to="/training" className="hover:text-foreground">
+                Training library
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
           <p className="text-sm font-semibold">Business</p>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li><Link to="/sell-with-us" className="hover:text-foreground">Sell with us</Link></li>
-            <li><Link to="/my-orders" className="hover:text-foreground">My orders</Link></li>
+            <li>
+              <Link to="/sell-with-us" className="hover:text-foreground">
+                Sell with us
+              </Link>
+            </li>
+            <li>
+              <Link to="/my-orders" className="hover:text-foreground">
+                My orders
+              </Link>
+            </li>
           </ul>
         </div>
         <div>

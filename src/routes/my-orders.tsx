@@ -3,7 +3,7 @@ import { Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MERCHANT_NAME, TILL_NUMBER, dual } from "@/lib/hiloxs";
-import { useHiloxs } from "@/lib/hiloxs-store";
+import { useHiloxs } from "@/lib/hiloxs-context";
 
 export const Route = createFileRoute("/my-orders")({
   head: () => ({
@@ -15,7 +15,10 @@ export const Route = createFileRoute("/my-orders")({
           "Track your HILOXS electronics orders, payment method and delivery status in one place.",
       },
       { property: "og:title", content: "My HILOXS Orders" },
-      { property: "og:description", content: "Order history and delivery status for HILOXS buyers." },
+      {
+        property: "og:description",
+        content: "Order history and delivery status for HILOXS buyers.",
+      },
     ],
   }),
   component: MyOrdersPage,

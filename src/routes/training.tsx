@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { TRACKS, TRAININGS, type TrainingTrack } from "@/lib/hiloxs";
-import { useHiloxs, type TrainingLevel } from "@/lib/hiloxs-store";
+import { useHiloxs } from "@/lib/hiloxs-context";
+import { type TrainingLevel } from "@/lib/hiloxs-store";
 import { useAdminMode } from "@/lib/admin";
 
 const LEVELS: TrainingLevel[] = ["Beginner", "Intermediate", "Advanced"];
@@ -117,56 +118,56 @@ function TrainingPage() {
         </p>
 
         {adminMode && (
-        <form
-          className="panel mt-5 grid gap-4 p-5 sm:grid-cols-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const err = addVideo(form);
-            if (err) toast.error(err);
-            else {
-              toast.success("Video added to the library");
-              setForm({ title: "", url: "", level: form.level });
-            }
-          }}
-        >
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="v-title">Video title</Label>
-            <Input
-              id="v-title"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="e.g. Placing your first binary trade"
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="v-url">YouTube link or video ID</Label>
-            <Input
-              id="v-url"
-              value={form.url}
-              onChange={(e) => setForm({ ...form, url: e.target.value })}
-              placeholder="https://youtu.be/…"
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Level</Label>
-            <div className="flex flex-wrap gap-2">
-              {LEVELS.map((l) => (
-                <Button
-                  key={l}
-                  type="button"
-                  size="sm"
-                  variant={form.level === l ? "default" : "outline"}
-                  onClick={() => setForm({ ...form, level: l })}
-                >
-                  {l}
-                </Button>
-              ))}
+          <form
+            className="panel mt-5 grid gap-4 p-5 sm:grid-cols-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const err = addVideo(form);
+              if (err) toast.error(err);
+              else {
+                toast.success("Video added to the library");
+                setForm({ title: "", url: "", level: form.level });
+              }
+            }}
+          >
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="v-title">Video title</Label>
+              <Input
+                id="v-title"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="e.g. Placing your first binary trade"
+              />
             </div>
-          </div>
-          <Button type="submit" variant="hero" className="sm:col-span-2 sm:self-end">
-            <Plus /> Add to library
-          </Button>
-        </form>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="v-url">YouTube link or video ID</Label>
+              <Input
+                id="v-url"
+                value={form.url}
+                onChange={(e) => setForm({ ...form, url: e.target.value })}
+                placeholder="https://youtu.be/…"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Level</Label>
+              <div className="flex flex-wrap gap-2">
+                {LEVELS.map((l) => (
+                  <Button
+                    key={l}
+                    type="button"
+                    size="sm"
+                    variant={form.level === l ? "default" : "outline"}
+                    onClick={() => setForm({ ...form, level: l })}
+                  >
+                    {l}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <Button type="submit" variant="hero" className="sm:col-span-2 sm:self-end">
+              <Plus /> Add to library
+            </Button>
+          </form>
         )}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">

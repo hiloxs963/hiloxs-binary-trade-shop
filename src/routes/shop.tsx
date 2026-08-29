@@ -17,7 +17,7 @@ import {
   type Product,
   type ShopCategory,
 } from "@/lib/hiloxs";
-import { useHiloxs } from "@/lib/hiloxs-store";
+import { useHiloxs } from "@/lib/hiloxs-context";
 import { ADMIN_KEY, useAdminMode } from "@/lib/admin";
 import { toast } from "sonner";
 
@@ -33,7 +33,8 @@ export const Route = createFileRoute("/shop")({
       { property: "og:title", content: "Shop Everything on HILOXS" },
       {
         property: "og:description",
-        content: "Electronics, fashion, home & kitchen, school and groceries priced in KSh and USD.",
+        content:
+          "Electronics, fashion, home & kitchen, school and groceries priced in KSh and USD.",
       },
     ],
   }),
@@ -76,10 +77,11 @@ function ShopPage() {
   );
 
   const cartLines = hydrated
-    ? Object.entries(state.cart).map(([id, qty]) => ({
-        product: allProducts.find((p) => p.id === id)!,
-        qty,
-      }))
+    ? Object.entries(state.cart)
+        .map(([id, qty]) => ({
+          product: allProducts.find((p) => p.id === id)!,
+          qty,
+        }))
         .filter((l) => Boolean(l.product))
     : [];
   const total = cartLines.reduce((s, l) => s + l.product.priceKes * l.qty, 0);
@@ -103,7 +105,9 @@ function ShopPage() {
                 category === c ? "border-primary" : ""
               }`}
             >
-              <span className="text-3xl" aria-hidden>{CATEGORY_EMOJI[c]}</span>
+              <span className="text-3xl" aria-hidden>
+                {CATEGORY_EMOJI[c]}
+              </span>
               <span className="text-center text-sm font-medium">{c}</span>
             </button>
           ))}
@@ -116,7 +120,9 @@ function ShopPage() {
             <h2 className="text-2xl font-bold">Flash deals</h2>
             <p className="text-sm text-muted-foreground">Biggest markdowns right now</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setCategory("All")}>See all</Button>
+          <Button variant="ghost" size="sm" onClick={() => setCategory("All")}>
+            See all
+          </Button>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {flashDeals.map((p) => (
@@ -194,14 +200,28 @@ function ShopPage() {
               <ul className="mt-4 space-y-3">
                 {cartLines.map(({ product, qty }) => (
                   <li key={product.id} className="flex items-start gap-3 text-sm">
-                    <span className="text-xl" aria-hidden>{product.emoji}</span>
+                    <span className="text-xl" aria-hidden>
+                      {product.emoji}
+                    </span>
                     <div className="flex-1">
                       <p className="font-medium leading-tight">{product.name}</p>
                       <p className="text-xs text-muted-foreground">{kes(product.priceKes)} each</p>
                       <div className="mt-1 flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setCartQty(product.id, qty - 1)}>-</Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCartQty(product.id, qty - 1)}
+                        >
+                          -
+                        </Button>
                         <span className="w-6 text-center">{qty}</span>
-                        <Button size="sm" variant="outline" onClick={() => setCartQty(product.id, qty + 1)}>+</Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCartQty(product.id, qty + 1)}
+                        >
+                          +
+                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -228,7 +248,9 @@ function ShopPage() {
                     onClick={() => {
                       const order = checkout("till");
                       if (order)
-                        toast.success(`Order ${order.id} placed — pay ${MERCHANT_NAME} on till ${TILL_NUMBER}`);
+                        toast.success(
+                          `Order ${order.id} placed — pay ${MERCHANT_NAME} on till ${TILL_NUMBER}`,
+                        );
                     }}
                   >
                     Pay {MERCHANT_NAME} — M-Pesa Till {TILL_NUMBER}
@@ -304,7 +326,9 @@ function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => voi
         )}
       </div>
       <div className="flex flex-1 flex-col p-4">
-        <Badge variant="secondary" className="w-fit">{p.category}</Badge>
+        <Badge variant="secondary" className="w-fit">
+          {p.category}
+        </Badge>
         <h3 className="mt-2 text-sm font-semibold leading-snug">{p.name}</h3>
         <p className="mt-1 flex-1 text-xs text-muted-foreground">{p.blurb}</p>
         <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -386,8 +410,8 @@ function AdminUploader({
         <h2 className="text-xl font-bold">Admin — upload a new product</h2>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Only the HILOXS admin can post products here. Add a photo, price, discount and review count —
-        shoppers can then add it to cart and pay {MERCHANT_NAME} on till {TILL_NUMBER}.
+        Only the HILOXS admin can post products here. Add a photo, price, discount and review count
+        — shoppers can then add it to cart and pay {MERCHANT_NAME} on till {TILL_NUMBER}.
       </p>
 
       {!unlocked ? (
@@ -459,7 +483,11 @@ function AdminUploader({
             </div>
           </div>
 
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Product name"
+          />
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as ShopCategory)}
@@ -532,7 +560,12 @@ function AdminUploader({
                 {p.name} · {kes(p.priceKes)} · {p.sold.toLocaleString()} reviews
               </span>
               {unlocked && (
-                <Button size="icon" variant="ghost" aria-label="Remove" onClick={() => onRemove(p.id)}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Remove"
+                  onClick={() => onRemove(p.id)}
+                >
                   <Trash2 />
                 </Button>
               )}

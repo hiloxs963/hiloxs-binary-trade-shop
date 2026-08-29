@@ -16,9 +16,11 @@ import {
   usd,
   kesToUsd,
 } from "@/lib/hiloxs";
-import { useHiloxs, type Leg } from "@/lib/hiloxs-store";
+import { useHiloxs } from "@/lib/hiloxs-context";
+import { type Leg } from "@/lib/hiloxs-store";
 import { MERCHANT_NAME } from "@/lib/hiloxs";
-import { BinaryTree, buildTree } from "@/components/hiloxs/BinaryTree";
+import { BinaryTree } from "@/components/hiloxs/BinaryTree";
+import { buildTree } from "@/components/hiloxs/BinaryTree.helpers";
 
 export const Route = createFileRoute("/binary-plan")({
   head: () => ({
@@ -210,7 +212,9 @@ function BinaryPlanPage() {
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {ELECTRONICS_PRODUCTS.map((p) => (
               <div key={p.id} className="panel p-4">
-                <span className="text-2xl" aria-hidden>{p.emoji}</span>
+                <span className="text-2xl" aria-hidden>
+                  {p.emoji}
+                </span>
                 <p className="mt-2 text-sm font-semibold leading-tight">{p.name}</p>
                 <p className="text-xs text-muted-foreground">{p.category}</p>
                 <p className="mt-1 text-sm font-bold text-primary">{kes(p.priceKes)}</p>
@@ -259,7 +263,9 @@ function BinaryPlanPage() {
                     <span className="flex-1">{e.label}</span>
                     <span
                       className={
-                        e.amountKes < 0 ? "font-semibold text-destructive" : "font-semibold text-success"
+                        e.amountKes < 0
+                          ? "font-semibold text-destructive"
+                          : "font-semibold text-success"
                       }
                     >
                       {e.amountKes === 0
@@ -298,9 +304,7 @@ function BinaryPlanPage() {
           <div className="panel p-5">
             <h3 className="text-sm font-semibold">Membership</h3>
             {state.member.activated ? (
-              <p className="mt-2 text-sm text-success">
-                {state.member.name} — package activated.
-              </p>
+              <p className="mt-2 text-sm text-success">{state.member.name} — package activated.</p>
             ) : (
               <form
                 className="mt-3 space-y-3"
