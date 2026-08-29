@@ -112,11 +112,8 @@
   --sidebar-ring: oklch(0.79 0.168 66);
 
   --gradient-brand: linear-gradient(135deg, oklch(0.82 0.17 72), oklch(0.72 0.16 40));
-  --gradient-night: radial-gradient(
-      1200px 600px at 15% -10%,
-      oklch(0.36 0.09 250 / 55%),
-      transparent 60%
-    ),
+  --gradient-night:
+    radial-gradient(1200px 600px at 15% -10%, oklch(0.36 0.09 250 / 55%), transparent 60%),
     radial-gradient(900px 500px at 95% 0%, oklch(0.5 0.13 66 / 28%), transparent 60%);
   --shadow-glow: 0 12px 40px -12px oklch(0.79 0.168 66 / 55%);
   --shadow-card: 0 18px 40px -24px oklch(0 0 0 / 80%);

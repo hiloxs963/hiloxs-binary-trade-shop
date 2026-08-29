@@ -29,9 +29,21 @@ export const Route = createFileRoute("/sell-with-us")({
 
 const STEPS = [
   { icon: Store, title: "Apply", body: "Send your shop details and the electronics you stock." },
-  { icon: BadgeCheck, title: "Get verified", body: "We confirm stock quality, warranty and pricing." },
-  { icon: PackageCheck, title: "List products", body: "Your items appear in the HILOXS shop instantly." },
-  { icon: Truck, title: "Ship & get paid", body: "We handle the order flow; payouts go to your account." },
+  {
+    icon: BadgeCheck,
+    title: "Get verified",
+    body: "We confirm stock quality, warranty and pricing.",
+  },
+  {
+    icon: PackageCheck,
+    title: "List products",
+    body: "Your items appear in the HILOXS shop instantly.",
+  },
+  {
+    icon: Truck,
+    title: "Ship & get paid",
+    body: "We handle the order flow; payouts go to your account.",
+  },
 ];
 
 function SellWithUsPage() {
@@ -88,7 +100,11 @@ function SellWithUsPage() {
             <Label htmlFor="notes">
               Tell us about your stock — business permit and user 🆔 attached
             </Label>
-            <Textarea id="notes" rows={4} placeholder="Brands, warranty, monthly volume, location" />
+            <Textarea
+              id="notes"
+              rows={4}
+              placeholder="Brands, warranty, monthly volume, location"
+            />
             <p className="text-xs text-muted-foreground">
               Attach a clear copy of your business permit and your national ID / passport. Both are
               required before your shop is verified.

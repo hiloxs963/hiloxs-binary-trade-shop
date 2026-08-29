@@ -125,7 +125,11 @@ function Index() {
         </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PILLARS.map((p) => (
-            <Link key={p.title} to={p.to} className="panel block p-6 transition-colors hover:border-primary">
+            <Link
+              key={p.title}
+              to={p.to}
+              className="panel block p-6 transition-colors hover:border-primary"
+            >
               <p.icon className="size-6 text-primary" />
               <h3 className="mt-3 text-lg font-semibold">{p.title}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{p.body}</p>
@@ -173,7 +177,9 @@ function Index() {
           <div className="grid gap-3 sm:grid-cols-2">
             {featured.map((p) => (
               <div key={p.id} className="rounded-xl border border-border bg-background/40 p-4">
-                <span className="text-3xl" aria-hidden>{p.emoji}</span>
+                <span className="text-3xl" aria-hidden>
+                  {p.emoji}
+                </span>
                 <p className="mt-2 text-sm font-semibold leading-tight">{p.name}</p>
                 <p className="mt-1 text-sm font-bold text-primary">{kes(p.priceKes)}</p>
               </div>
