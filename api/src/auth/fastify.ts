@@ -14,19 +14,25 @@ import {
 type RegisterAuthRoutesOptions = {
   auth: AuthService;
   baseURL: string;
+  frontendURL: string;
   trustedOrigins: readonly string[];
 };
 
 export function registerAuthRoutes(
   app: FastifyInstance,
-  { auth, baseURL, trustedOrigins }: RegisterAuthRoutesOptions,
+  { auth, baseURL, frontendURL, trustedOrigins }: RegisterAuthRoutesOptions,
 ): void {
   app.route({
     method: ["GET", "POST"],
     url: "/api/auth/*",
     async handler(request, reply) {
       const requestUrl = new URL(request.url, baseURL);
-      const body = normalizeAuthBody(requestUrl.pathname, request.body, trustedOrigins);
+      const body = normalizeAuthBody(
+        requestUrl.pathname,
+        request.body,
+        frontendURL,
+        trustedOrigins,
+      );
       await enforceOneTimeEmailVerification(requestUrl, auth);
       const authRequest = new Request(requestUrl, {
         method: request.method,
@@ -64,6 +70,7 @@ async function enforceOneTimeEmailVerification(requestUrl: URL, auth: AuthServic
 function normalizeAuthBody(
   path: string,
   body: unknown,
+  frontendURL: string,
   trustedOrigins: readonly string[],
 ): unknown {
   const parsed = (() => {
@@ -79,7 +86,21 @@ function normalizeAuthBody(
   if (redirect && !validateTrustedRedirect(redirect, trustedOrigins)) {
     throw new ValidationError("The redirect destination is not trusted");
   }
-  return parsed;
+  return withCanonicalAuthRedirect(path, parsed, frontendURL);
+}
+
+function withCanonicalAuthRedirect(path: string, value: unknown, frontendURL: string): unknown {
+  if (!value || typeof value !== "object") return value;
+  if (path.endsWith("/sign-up/email") || path.endsWith("/send-verification-email")) {
+    return {
+      ...value,
+      callbackURL: new URL("/verify-email?verified=true", frontendURL).href,
+    };
+  }
+  if (path.endsWith("/request-password-reset")) {
+    return { ...value, redirectTo: new URL("/reset-password", frontendURL).href };
+  }
+  return value;
 }
 
 function redirectFrom(value: unknown): string | undefined {

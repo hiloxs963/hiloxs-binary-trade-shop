@@ -39,6 +39,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
     registerAuthRoutes(app, {
       auth: options.auth,
       baseURL: options.authRuntime.baseURL,
+      frontendURL: options.authRuntime.frontendURL,
       trustedOrigins: options.authRuntime.trustedOrigins,
     });
     registerCurrentUserRoute(app, { auth: options.auth, database: options.database });

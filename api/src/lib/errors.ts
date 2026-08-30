@@ -2,6 +2,7 @@ export type ErrorCode =
   | "VALIDATION_ERROR"
   | "CONFIGURATION_ERROR"
   | "DATABASE_UNAVAILABLE"
+  | "EMAIL_DELIVERY_FAILED"
   | "UNAUTHENTICATED"
   | "ORIGIN_NOT_ALLOWED"
   | "NOT_FOUND"
@@ -54,6 +55,17 @@ export class DatabaseUnavailableError extends AppError {
   constructor(cause?: unknown) {
     super("The database is unavailable", {
       code: "DATABASE_UNAVAILABLE",
+      statusCode: 503,
+      expose: false,
+      ...(cause === undefined ? {} : { cause }),
+    });
+  }
+}
+
+export class EmailDeliveryError extends AppError {
+  constructor(cause?: unknown) {
+    super("Authentication email delivery failed", {
+      code: "EMAIL_DELIVERY_FAILED",
       statusCode: 503,
       expose: false,
       ...(cause === undefined ? {} : { cause }),
@@ -131,6 +143,8 @@ export function serializeError(
 }
 
 function publicMessageFor(code: ErrorCode): string {
-  if (code === "DATABASE_UNAVAILABLE") return "Service temporarily unavailable";
+  if (code === "DATABASE_UNAVAILABLE" || code === "EMAIL_DELIVERY_FAILED") {
+    return "Service temporarily unavailable";
+  }
   return "An unexpected error occurred";
 }

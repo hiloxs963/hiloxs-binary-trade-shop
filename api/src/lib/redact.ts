@@ -22,6 +22,7 @@ export const LOG_REDACT_PATHS = [
   "secret",
   "DATABASE_URL",
   "databaseUrl",
+  "RESEND_API_KEY",
   ...API_KEY_FIELDS,
   ...HEADER_PATHS.map((path) => `${path}["x-api-key"]`),
 ] as const;
@@ -31,7 +32,7 @@ export function redactText(value: string): string {
     .replace(/(postgres(?:ql)?:\/\/)[^\s@]+@/gi, "$1[REDACTED]@")
     .replace(/(bearer\s+)[^\s]+/gi, "$1[REDACTED]")
     .replace(
-      /((?:password|token|secret|database[_-]?url|(?:x[_-]?)?api[_-]?key)\s*[=:]\s*)[^\s,;]+/gi,
+      /((?:password|token|secret|database[_-]?url|(?:resend[_-]?)?(?:x[_-]?)?api[_-]?key)\s*[=:]\s*)[^\s,;]+/gi,
       "$1[REDACTED]",
     );
 }

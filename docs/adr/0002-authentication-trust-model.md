@@ -33,8 +33,23 @@ following rules apply:
 - Only active accounts may create or retain sessions. Suspended or disabled status is server-owned.
 - `/api/v1/users/me` returns the minimum frontend profile and no credentials, tokens, session rows,
   or internal authorization data.
-- Authentication emails are delivered through an adapter. Development uses an ignored local sink;
-  production startup is blocked until a transactional provider is configured.
+- Authentication emails are delivered through a provider-neutral adapter. Development uses an
+  ignored local sink, tests use an in-memory sender, and production uses Resend's HTTPS API with a
+  sending-only key restricted to the verified `mail.hiloxs.co.ke` domain.
+- Production requires `RESEND_API_KEY`, `AUTH_EMAIL_FROM`, and `FRONTEND_URL` and fails startup when
+  any are absent. The expected sender is `HILOXS <auth@mail.hiloxs.co.ke>`; the secret is never
+  committed or logged.
+- Verification callbacks and reset action destinations are rebuilt from the validated canonical
+  `FRONTEND_URL`; request Host, Origin, forwarded-host headers, and arbitrary callback paths cannot
+  choose email destinations. Reset tokens travel in a frontend URL fragment, are captured only in
+  browser memory, and are removed from the address bar before submission to the API.
+- Resend calls use a bounded timeout. Authorization is carried only in the HTTPS header, provider
+  response bodies are discarded on failure, and verification/reset tokens and full URLs are not
+  logged.
+- Registration reports a safe failure if its verification email cannot be accepted by Resend. The
+  account remains unverified and can use the rate-limited resend flow. Password-reset responses stay
+  generic for both known and unknown accounts even when delivery fails, preserving enumeration
+  resistance.
 
 ## Consequences
 

@@ -1,9 +1,11 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { eq } from "drizzle-orm";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { AuthRuntimeConfig } from "../config/env.js";
 import type { DatabaseClient } from "../db/client.js";
 import { ACCOUNT_STATUSES, account, session, user, verification } from "../db/schema/auth.js";
+import { EmailDeliveryError } from "../lib/errors.js";
 import type { AuthEmailSender } from "./email.js";
 import { PASSWORD_MIN_LENGTH } from "./validation.js";
 import { EmailVerificationTokenStore } from "./verification-tokens.js";
@@ -16,8 +18,13 @@ type CreateAuthOptions = {
   runtime: AuthRuntimeConfig;
 };
 
+type AuthRequestDeliveryState = {
+  verificationError?: unknown;
+};
+
 export function createAuthService({ database, emailSender, runtime }: CreateAuthOptions) {
   const verificationTokens = new EmailVerificationTokenStore(database);
+  const deliveryState = new AsyncLocalStorage<AuthRequestDeliveryState>();
   const service = betterAuth({
     appName: "HILOXS",
     baseURL: runtime.baseURL,
@@ -50,8 +57,14 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
       autoSignInAfterVerification: false,
       expiresIn: EMAIL_VERIFICATION_TTL_SECONDS,
       sendVerificationEmail: async ({ user: target, url, token }) => {
-        await verificationTokens.issue(token, target.id, EMAIL_VERIFICATION_TTL_SECONDS);
-        await emailSender.send({ kind: "verification", recipient: target.email, url });
+        try {
+          await verificationTokens.issue(token, target.id, EMAIL_VERIFICATION_TTL_SECONDS);
+          await emailSender.send({ kind: "verification", recipient: target.email, url });
+        } catch (error) {
+          const currentDelivery = deliveryState.getStore();
+          if (currentDelivery) currentDelivery.verificationError = error;
+          throw error;
+        }
       },
     },
     emailAndPassword: {
@@ -60,9 +73,14 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: ({ user: target, url }) => {
+      resetPasswordTokenExpiresIn: 60 * 60,
+      sendResetPassword: ({ user: target, token }) => {
         void emailSender
-          .send({ kind: "password-reset", recipient: target.email, url })
+          .send({
+            kind: "password-reset",
+            recipient: target.email,
+            url: passwordResetFrontendURL(runtime.frontendURL, token),
+          })
           .catch(() => undefined);
         return Promise.resolve();
       },
@@ -112,9 +130,31 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
     logger: { disabled: true },
   });
 
+  const handleAuthRequest = service.handler.bind(service);
+
   return Object.assign(service, {
+    handler: (request: Request) =>
+      deliveryState.run({}, async () => {
+        const response = await handleAuthRequest(request);
+        const failure = deliveryState.getStore()?.verificationError;
+        if (failure && requiresConfirmedVerificationDelivery(new URL(request.url).pathname)) {
+          if (failure instanceof Error) throw failure;
+          throw new EmailDeliveryError();
+        }
+        return response;
+      }),
     consumeEmailVerificationToken: (token: string) => verificationTokens.consume(token),
   });
+}
+
+function requiresConfirmedVerificationDelivery(path: string): boolean {
+  return path.endsWith("/sign-up/email") || path.endsWith("/send-verification-email");
+}
+
+function passwordResetFrontendURL(frontendURL: string, token: string): string {
+  const url = new URL("/reset-password", frontendURL);
+  url.hash = new URLSearchParams({ token }).toString();
+  return url.href;
 }
 
 export type AuthService = ReturnType<typeof createAuthService>;

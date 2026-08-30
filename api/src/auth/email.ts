@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { ConfigurationError } from "../lib/errors.js";
+import type { AppEnv } from "../config/env.js";
+import { resolveProductionEmailConfig } from "../config/env.js";
+import { ResendAuthEmailSender } from "./resend-email.js";
 
 export type AuthEmail = {
   kind: "verification" | "password-reset";
@@ -38,11 +40,8 @@ export class DevelopmentAuthEmailSender implements AuthEmailSender {
   }
 }
 
-export function createRuntimeEmailSender(nodeEnv: string): AuthEmailSender {
-  if (nodeEnv === "production") {
-    throw new ConfigurationError(
-      "A transactional authentication email provider must be configured before production startup",
-    );
-  }
+export function createRuntimeEmailSender(env: AppEnv): AuthEmailSender {
+  const productionConfig = resolveProductionEmailConfig(env);
+  if (productionConfig) return new ResendAuthEmailSender(productionConfig);
   return new DevelopmentAuthEmailSender();
 }

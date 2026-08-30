@@ -12,7 +12,7 @@ async function start(): Promise<void> {
   const authRuntime = resolveAuthRuntimeConfig(env);
   const auth = createAuthService({
     database,
-    emailSender: createRuntimeEmailSender(env.NODE_ENV),
+    emailSender: createRuntimeEmailSender(env),
     runtime: authRuntime,
   });
   const app = await buildApp({

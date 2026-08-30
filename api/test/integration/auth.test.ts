@@ -6,7 +6,7 @@ import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { createAuthService } from "../../src/auth/auth.js";
-import { InMemoryAuthEmailSender } from "../../src/auth/email.js";
+import { InMemoryAuthEmailSender, type AuthEmailSender } from "../../src/auth/email.js";
 import {
   assertSafeTestDatabaseUrl,
   parseEnv,
@@ -15,6 +15,7 @@ import {
 } from "../../src/config/env.js";
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
 import { session, user, verification } from "../../src/db/schema/auth.js";
+import { EmailDeliveryError } from "../../src/lib/errors.js";
 
 const FRONTEND_ORIGIN = "http://localhost:8080";
 const VERIFIED_CALLBACK = `${FRONTEND_ORIGIN}/verify-email?verified=true`;
@@ -80,6 +81,18 @@ describe("email and password authentication", () => {
     });
   });
 
+  it("replaces same-origin callback paths with the canonical frontend verification route", async () => {
+    const response = await post("/api/auth/sign-up/email", {
+      ...registrationBody("canonical-verification@example.com"),
+      callbackURL: `${FRONTEND_ORIGIN}/checkout`,
+    });
+    const message = emailSender.messages.find((email) => email.kind === "verification");
+    const verificationUrl = new URL(message?.url ?? "");
+
+    expect(response.statusCode).toBe(200);
+    expect(verificationUrl.searchParams.get("callbackURL")).toBe(VERIFIED_CALLBACK);
+  });
+
   it("returns an enumeration-resistant response for duplicate registration", async () => {
     const first = await register("duplicate@example.com");
     const duplicate = await register("DUPLICATE@example.com");
@@ -129,11 +142,40 @@ describe("email and password authentication", () => {
     expect(replayLocation.searchParams.get("error")).toBe("INVALID_TOKEN");
   });
 
+  it("rejects invalid and expired email verification tokens", async () => {
+    await register("expired-verification@example.com");
+    const message = emailSender.messages.find((email) => email.kind === "verification");
+    const verificationUrl = new URL(message?.url ?? "");
+    await database.db.update(verification).set({ expiresAt: new Date(Date.now() - 1_000) });
+
+    const expired = await app.inject({
+      method: "GET",
+      url: `${verificationUrl.pathname}${verificationUrl.search}`,
+    });
+    const invalid = await app.inject({
+      method: "GET",
+      url: `/api/auth/verify-email?token=invalid-verification-token&callbackURL=${encodeURIComponent(VERIFIED_CALLBACK)}`,
+    });
+    const [stored] = await database.db
+      .select({ verified: user.emailVerified })
+      .from(user)
+      .where(eq(user.email, "expired-verification@example.com"));
+
+    expect(new URL(expired.headers.location ?? "", FRONTEND_ORIGIN).searchParams.get("error")).toBe(
+      "INVALID_TOKEN",
+    );
+    expect(new URL(invalid.headers.location ?? "", FRONTEND_ORIGIN).searchParams.get("error")).toBe(
+      "INVALID_TOKEN",
+    );
+    expect(stored).toEqual({ verified: false });
+  });
+
   it("emits a secure host-only cookie for the production cross-origin flow", async () => {
     const productionDatabase = createDatabaseClient(databaseUrl);
     const productionEmailSender = new InMemoryAuthEmailSender();
     const productionRuntime = {
       baseURL: "https://api.hiloxs.co.ke",
+      frontendURL: "https://hiloxs.co.ke",
       secret: "production-cookie-test-secret-with-sufficient-entropy-42",
       trustedOrigins: ["https://hiloxs.co.ke"],
       secureCookies: true,
@@ -254,7 +296,7 @@ describe("email and password authentication", () => {
     });
     const requested = await post("/api/auth/request-password-reset", {
       email: "reset@example.com",
-      redirectTo: RESET_CALLBACK,
+      redirectTo: `${FRONTEND_ORIGIN}/checkout`,
     });
 
     expect(unknown.statusCode).toBe(200);
@@ -264,13 +306,10 @@ describe("email and password authentication", () => {
     const message = emailSender.messages.find((email) => email.kind === "password-reset");
     expect(message).toBeDefined();
     const resetLink = new URL(message?.url ?? "");
-    const callback = await app.inject({
-      method: "GET",
-      url: `${resetLink.pathname}${resetLink.search}`,
-    });
-    const location = new URL(callback.headers.location ?? "", FRONTEND_ORIGIN);
-    const token = location.searchParams.get("token");
-    expect(callback.statusCode).toBe(302);
+    const token = new URLSearchParams(resetLink.hash.slice(1)).get("token");
+    expect(resetLink.origin).toBe(FRONTEND_ORIGIN);
+    expect(resetLink.pathname).toBe("/reset-password");
+    expect(resetLink.search).toBe("");
     expect(token).toEqual(expect.any(String));
 
     const reset = await post("/api/auth/reset-password", { newPassword: NEW_PASSWORD, token });
@@ -286,6 +325,119 @@ describe("email and password authentication", () => {
     expect(reused.statusCode).toBeGreaterThanOrEqual(400);
     expect(oldSession.statusCode).toBe(401);
     expect(newLogin.statusCode).toBe(200);
+  });
+
+  it("rejects invalid and expired password-reset tokens", async () => {
+    await register("expired-reset@example.com");
+    await post("/api/auth/request-password-reset", {
+      email: "expired-reset@example.com",
+      redirectTo: RESET_CALLBACK,
+    });
+    const message = emailSender.messages.find((email) => email.kind === "password-reset");
+    const resetLink = new URL(message?.url ?? "");
+    const resetToken = new URLSearchParams(resetLink.hash.slice(1)).get("token") ?? "";
+    await database.db.update(verification).set({ expiresAt: new Date(Date.now() - 1_000) });
+
+    const expiredReset = await post("/api/auth/reset-password", {
+      newPassword: NEW_PASSWORD,
+      token: resetToken,
+    });
+    const invalidReset = await post("/api/auth/reset-password", {
+      newPassword: NEW_PASSWORD,
+      token: "invalid-reset-token",
+    });
+
+    expect(expiredReset.statusCode).toBeGreaterThanOrEqual(400);
+    expect(invalidReset.statusCode).toBeGreaterThanOrEqual(400);
+  });
+
+  it("keeps verification and reset tokens purpose-bound", async () => {
+    await register("purpose-bound@example.com");
+    const verificationMessage = emailSender.messages.find((email) => email.kind === "verification");
+    const verificationLink = new URL(verificationMessage?.url ?? "");
+    const verificationToken = verificationLink.searchParams.get("token") ?? "";
+    await post("/api/auth/request-password-reset", {
+      email: "purpose-bound@example.com",
+      redirectTo: RESET_CALLBACK,
+    });
+    const resetMessage = emailSender.messages.find((email) => email.kind === "password-reset");
+    const resetLink = new URL(resetMessage?.url ?? "");
+    const resetToken = new URLSearchParams(resetLink.hash.slice(1)).get("token") ?? "";
+
+    const verificationAsReset = await post("/api/auth/reset-password", {
+      newPassword: NEW_PASSWORD,
+      token: verificationToken,
+    });
+    const resetAsVerification = await app.inject({
+      method: "GET",
+      url: `/api/auth/verify-email?token=${encodeURIComponent(resetToken)}&callbackURL=${encodeURIComponent(VERIFIED_CALLBACK)}`,
+    });
+    const intendedVerification = await app.inject({
+      method: "GET",
+      url: `${verificationLink.pathname}${verificationLink.search}`,
+    });
+    const intendedReset = await post("/api/auth/reset-password", {
+      newPassword: NEW_PASSWORD,
+      token: resetToken,
+    });
+
+    expect(verificationAsReset.statusCode).toBeGreaterThanOrEqual(400);
+    expect(
+      new URL(resetAsVerification.headers.location ?? "", FRONTEND_ORIGIN).searchParams.get(
+        "error",
+      ),
+    ).toBe("INVALID_TOKEN");
+    expect(intendedVerification.statusCode).toBe(302);
+    expect(intendedReset.statusCode).toBe(200);
+  });
+
+  it("does not report successful registration when email delivery fails", async () => {
+    const failing = await createAppWithEmailSender(new RejectingAuthEmailSender());
+
+    try {
+      const response = await postToApp(
+        failing.app,
+        "/api/auth/sign-up/email",
+        registrationBody("failed-registration-email@example.com"),
+      );
+      const [stored] = await database.db
+        .select({ verified: user.emailVerified })
+        .from(user)
+        .where(eq(user.email, "failed-registration-email@example.com"));
+
+      expect(response.statusCode).toBeGreaterThanOrEqual(500);
+      expect(response.body).not.toMatch(/resend|provider|token|secret/i);
+      expect(stored).toEqual({ verified: false });
+    } finally {
+      await failing.app.close();
+    }
+  });
+
+  it("keeps password-reset responses enumeration-resistant when delivery fails", async () => {
+    await register("failed-reset-email@example.com");
+    const failing = await createAppWithEmailSender(new RejectingAuthEmailSender());
+
+    try {
+      const existing = await postToApp(
+        failing.app,
+        "/api/auth/request-password-reset",
+        { email: "failed-reset-email@example.com", redirectTo: RESET_CALLBACK },
+        { ip: "203.0.113.170" },
+      );
+      const missing = await postToApp(
+        failing.app,
+        "/api/auth/request-password-reset",
+        { email: "missing-reset-email@example.com", redirectTo: RESET_CALLBACK },
+        { ip: "203.0.113.171" },
+      );
+
+      expect(existing.statusCode).toBe(200);
+      expect(missing.statusCode).toBe(200);
+      expect(existing.body).toBe(missing.body);
+      expect(existing.body).not.toMatch(/resend|provider|token|secret/i);
+    } finally {
+      await failing.app.close();
+    }
   });
 
   it.each(["SUSPENDED", "DISABLED"] as const)(
@@ -363,6 +515,32 @@ describe("email and password authentication", () => {
     }
     expect(responses.at(-1)?.statusCode).toBe(429);
   });
+
+  it("rate limits verification resend and password recovery requests", async () => {
+    await register("email-rate-limit@example.com");
+    const verificationResponses: InjectResponse[] = [];
+    const resetResponses: InjectResponse[] = [];
+
+    for (let index = 0; index < 4; index += 1) {
+      verificationResponses.push(
+        await post(
+          "/api/auth/send-verification-email",
+          { email: "email-rate-limit@example.com", callbackURL: VERIFIED_CALLBACK },
+          { ip: "203.0.113.180" },
+        ),
+      );
+      resetResponses.push(
+        await post(
+          "/api/auth/request-password-reset",
+          { email: "unknown-rate-limit@example.com", redirectTo: RESET_CALLBACK },
+          { ip: "203.0.113.181" },
+        ),
+      );
+    }
+
+    expect(verificationResponses.at(-1)?.statusCode).toBe(429);
+    expect(resetResponses.at(-1)?.statusCode).toBe(429);
+  });
 });
 
 async function register(email: string, phone = "0712345678"): Promise<InjectResponse> {
@@ -408,8 +586,17 @@ async function post(
   payload: Record<string, unknown>,
   options: { cookie?: string; origin?: string; ip?: string; forwardedFor?: string } = {},
 ): Promise<InjectResponse> {
+  return postToApp(app, url, payload, options);
+}
+
+async function postToApp(
+  target: FastifyInstance,
+  url: string,
+  payload: Record<string, unknown>,
+  options: { cookie?: string; origin?: string; ip?: string; forwardedFor?: string } = {},
+): Promise<InjectResponse> {
   requestCounter += 1;
-  return app.inject({
+  return target.inject({
     method: "POST",
     url,
     headers: {
@@ -421,6 +608,31 @@ async function post(
     },
     payload,
   });
+}
+
+async function createAppWithEmailSender(emailSenderOverride: AuthEmailSender): Promise<{
+  app: FastifyInstance;
+}> {
+  const isolatedDatabase = createDatabaseClient(databaseUrl);
+  const runtime = resolveAuthRuntimeConfig(env);
+  const auth = createAuthService({
+    database: isolatedDatabase,
+    emailSender: emailSenderOverride,
+    runtime,
+  });
+  const isolatedApp = await buildApp({
+    database: isolatedDatabase,
+    auth,
+    authRuntime: runtime,
+    allowedOrigins: runtime.trustedOrigins,
+  });
+  return { app: isolatedApp };
+}
+
+class RejectingAuthEmailSender implements AuthEmailSender {
+  send(): Promise<void> {
+    return Promise.reject(new EmailDeliveryError(new Error("provider rejected the request")));
+  }
 }
 
 function cookieHeaders(response: InjectResponse): string[] {
