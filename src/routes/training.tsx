@@ -10,25 +10,18 @@ import { TRACKS, TRAININGS, type TrainingTrack } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { type TrainingLevel } from "@/lib/hiloxs-store";
 import { useAdminMode } from "@/lib/admin";
+import { pageSeo } from "@/lib/seo";
 
 const LEVELS: TrainingLevel[] = ["Beginner", "Intermediate", "Advanced"];
 
 export const Route = createFileRoute("/training")({
-  head: () => ({
-    meta: [
-      { title: "HILOXS Training — Binary, Trading & Shopping Classes" },
-      {
-        name: "description",
-        content:
-          "Watch HILOXS training uploaded straight from YouTube: binary network marketing, market trading and smart shopping.",
-      },
-      { property: "og:title", content: "HILOXS Training Library" },
-      {
-        property: "og:description",
-        content: "Free video classes on the binary plan, the trading desk and the shop.",
-      },
-    ],
-  }),
+  head: () =>
+    pageSeo({
+      title: "Training Library: Binary Plan, Shopping and Practice Trading | HILOXS",
+      description:
+        "Browse HILOXS video lessons covering the binary-plan prototype, shopping, getting started and practice trading.",
+      path: "/training",
+    }),
   component: TrainingPage,
 });
 
@@ -59,6 +52,7 @@ function TrainingPage() {
             size="sm"
             variant={t === track ? "default" : "outline"}
             onClick={() => setTrack(t)}
+            aria-pressed={t === track}
           >
             {t}
           </Button>
@@ -158,6 +152,7 @@ function TrainingPage() {
                     size="sm"
                     variant={form.level === l ? "default" : "outline"}
                     onClick={() => setForm({ ...form, level: l })}
+                    aria-pressed={form.level === l}
                   >
                     {l}
                   </Button>

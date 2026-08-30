@@ -21,23 +21,16 @@ import { type Leg } from "@/lib/hiloxs-store";
 import { MERCHANT_NAME } from "@/lib/hiloxs";
 import { BinaryTree } from "@/components/hiloxs/BinaryTree";
 import { buildTree } from "@/components/hiloxs/BinaryTree.helpers";
+import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/binary-plan")({
-  head: () => ({
-    meta: [
-      { title: "HILOXS Binary Plan — Referral & Matching Bonuses" },
-      {
-        name: "description",
-        content:
-          "Register your own referrals, fill your left and right legs, and let HILOXS release direct and pairing bonuses to PayPal, MiniPay or M-Pesa.",
-      },
-      { property: "og:title", content: "The HILOXS Binary Plan" },
-      {
-        property: "og:description",
-        content: "Direct referral and matching pair bonuses paid out automatically.",
-      },
-    ],
-  }),
+  head: () =>
+    pageSeo({
+      title: "Binary Plan Overview and Prototype Dashboard | HILOXS",
+      description:
+        "Review the HILOXS binary-plan structure, electronics entry package and current prototype referral dashboard.",
+      path: "/binary-plan",
+    }),
   component: BinaryPlanPage,
 });
 
@@ -183,6 +176,7 @@ function BinaryPlanPage() {
                     type="button"
                     variant={form.leg === leg ? "default" : "outline"}
                     onClick={() => setForm({ ...form, leg })}
+                    aria-pressed={form.leg === leg}
                   >
                     {leg === "L" ? "Left leg" : "Right leg"}
                   </Button>

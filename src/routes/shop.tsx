@@ -1,12 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ImagePlus, Lock, Search, ShoppingCart, Star, Trash2 } from "lucide-react";
+import { ArrowRight, ImagePlus, Lock, Search, SearchX, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   CATEGORIES,
   CATEGORY_EMOJI,
+  PRODUCTS,
   SHOP_CATEGORIES,
   SUPPORT,
   TILL_NUMBER,
@@ -14,30 +15,24 @@ import {
   discountPct,
   dual,
   kes,
+  productSlug,
   type Product,
   type ShopCategory,
 } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { ADMIN_KEY, useAdminMode } from "@/lib/admin";
 import { toast } from "sonner";
+import { ProductMedia } from "@/components/hiloxs/ProductMedia";
+import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/shop")({
-  head: () => ({
-    meta: [
-      { title: "Shop Electronics, Fashion, Kitchen & More — HILOXS" },
-      {
-        name: "description",
-        content:
-          "Buy laptops, phones, kitchen utensils, clothes, school products, groceries and more on HILOXS with till, PayPal or MiniPay checkout.",
-      },
-      { property: "og:title", content: "Shop Everything on HILOXS" },
-      {
-        property: "og:description",
-        content:
-          "Electronics, fashion, home & kitchen, school and groceries priced in KSh and USD.",
-      },
-    ],
-  }),
+  head: () =>
+    pageSeo({
+      title: "Shop Electronics, Home, Fashion and More | HILOXS",
+      description:
+        "Browse the HILOXS catalog by category, compare listed prices and add products to your cart before account-based checkout.",
+      path: "/shop",
+    }),
   component: ShopPage,
 });
 
@@ -48,7 +43,6 @@ function ShopPage() {
     addToCart,
     setCartQty,
     clearCart,
-    checkout,
     allProducts,
     addProduct,
     removeProduct,
@@ -101,6 +95,7 @@ function ShopPage() {
             <button
               key={c}
               onClick={() => setCategory(c)}
+              aria-pressed={category === c}
               className={`panel flex flex-col items-center gap-2 p-5 transition-colors hover:border-primary ${
                 category === c ? "border-primary" : ""
               }`}
@@ -165,6 +160,7 @@ function ShopPage() {
               size="sm"
               variant={c === category ? "default" : "outline"}
               onClick={() => setCategory(c)}
+              aria-pressed={c === category}
             >
               {c}
             </Button>
@@ -173,7 +169,7 @@ function ShopPage() {
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((p) => (
             <ProductCard
               key={p.id}
@@ -185,7 +181,20 @@ function ShopPage() {
             />
           ))}
           {products.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nothing matches that search yet.</p>
+            <div className="panel grid place-items-center gap-3 p-8 text-center sm:col-span-2 xl:col-span-3">
+              <SearchX className="size-8 text-muted-foreground" aria-hidden />
+              <p className="text-sm font-medium">No products match this search.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setQuery("");
+                  setCategory("All");
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
           )}
         </div>
 
@@ -210,6 +219,7 @@ function ShopPage() {
                         <Button
                           size="sm"
                           variant="outline"
+                          aria-label={`Decrease quantity of ${product.name}`}
                           onClick={() => setCartQty(product.id, qty - 1)}
                         >
                           -
@@ -218,6 +228,7 @@ function ShopPage() {
                         <Button
                           size="sm"
                           variant="outline"
+                          aria-label={`Increase quantity of ${product.name}`}
                           onClick={() => setCartQty(product.id, qty + 1)}
                         >
                           +
@@ -225,7 +236,7 @@ function ShopPage() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label="Remove"
+                          aria-label={`Remove ${product.name} from cart`}
                           onClick={() => setCartQty(product.id, 0)}
                         >
                           <Trash2 />
@@ -242,39 +253,15 @@ function ShopPage() {
                   <span className="font-semibold">{dual(total)}</span>
                 </p>
                 <div className="mt-4 space-y-2">
-                  <Button
-                    variant="hero"
-                    className="w-full"
-                    onClick={() => {
-                      const order = checkout("till");
-                      if (order)
-                        toast.success(
-                          `Order ${order.id} placed — pay ${MERCHANT_NAME} on till ${TILL_NUMBER}`,
-                        );
-                    }}
-                  >
-                    Pay {MERCHANT_NAME} — M-Pesa Till {TILL_NUMBER}
+                  <Button asChild variant="hero" className="w-full">
+                    <Link to="/checkout">
+                      Checkout <ArrowRight aria-hidden />
+                    </Link>
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      const order = checkout("paypal");
-                      if (order) toast.success(`Order ${order.id} placed via PayPal`);
-                    }}
-                  >
-                    Pay with PayPal
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      const order = checkout("minipay");
-                      if (order) toast.success(`Order ${order.id} placed via MiniPay`);
-                    }}
-                  >
-                    Pay with MiniPay
-                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Account access will be required at checkout. Your cart stays available while you
+                    sign in or register.
+                  </p>
                   <Button variant="ghost" className="w-full" onClick={clearCart}>
                     Clear cart
                   </Button>
@@ -287,8 +274,8 @@ function ShopPage() {
             <p className="font-semibold text-foreground">{MERCHANT_NAME}</p>
             <p className="mt-1">Buy Goods Till: {TILL_NUMBER}</p>
             <p className="mt-1">
-              Payments in and out of shop, binary and trading all run through this one till, and
-              show as {MERCHANT_NAME} on the M-Pesa prompt.
+              Payment instructions will be confirmed during secure checkout when payment services
+              are connected.
             </p>
           </div>
 
@@ -305,20 +292,11 @@ function ShopPage() {
 }
 function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => void }) {
   const off = discountPct(p);
-  const image = (p as Product & { image?: string }).image;
+  const hasDetailPage = PRODUCTS.some((product) => product.id === p.id);
   return (
     <article className="panel flex flex-col overflow-hidden">
-      <div className="relative grid h-36 place-items-center bg-[image:var(--gradient-night)] text-5xl">
-        {image ? (
-          <img src={image} alt={p.name} className="size-full object-cover" loading="lazy" />
-        ) : (
-          <span aria-hidden>{p.emoji}</span>
-        )}
-        {p.badge && (
-          <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-            {p.badge}
-          </span>
-        )}
+      <div className="relative">
+        <ProductMedia product={p} className="aspect-[4/3]" imageClassName="object-contain p-3" />
         {off > 0 && (
           <span className="absolute right-2 top-2 rounded-md bg-background/85 px-2 py-1 text-[11px] font-semibold">
             -{off}%
@@ -329,12 +307,18 @@ function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => voi
         <Badge variant="secondary" className="w-fit">
           {p.category}
         </Badge>
-        <h3 className="mt-2 text-sm font-semibold leading-snug">{p.name}</h3>
+        {hasDetailPage ? (
+          <Link
+            to="/shop/$slug"
+            params={{ slug: productSlug(p) }}
+            className="mt-2 block rounded-sm text-sm font-semibold leading-snug hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {p.name}
+          </Link>
+        ) : (
+          <h3 className="mt-2 text-sm font-semibold leading-snug">{p.name}</h3>
+        )}
         <p className="mt-1 flex-1 text-xs text-muted-foreground">{p.blurb}</p>
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Star className="size-3.5 fill-primary text-primary" />
-          {p.rating} · {p.sold.toLocaleString()} reviews
-        </div>
         <div className="mt-2">
           <p className="text-base font-bold text-primary">
             {kes(p.priceKes)}{" "}
@@ -349,6 +333,13 @@ function ProductCard({ product: p, onAdd }: { product: Product; onAdd: () => voi
         <Button className="mt-3" variant="hero" size="sm" onClick={onAdd}>
           <ShoppingCart /> Add to cart
         </Button>
+        {hasDetailPage && (
+          <Button asChild className="mt-2" variant="ghost" size="sm">
+            <Link to="/shop/$slug" params={{ slug: productSlug(p) }}>
+              View details
+            </Link>
+          </Button>
+        )}
       </div>
     </article>
   );
@@ -362,10 +353,7 @@ type NewProduct = {
   reviews: number;
   blurb: string;
   image?: string;
-  badge?: Product["badge"];
 };
-
-const BADGES = ["FLASH SALE", "BEST SELLER", "HOT DEAL", "TOP RATED"] as const;
 
 function AdminUploader({
   unlocked,
@@ -385,9 +373,7 @@ function AdminUploader({
   const [category, setCategory] = useState<ShopCategory>("Laptops");
   const [price, setPrice] = useState("");
   const [oldPrice, setOldPrice] = useState("");
-  const [reviews, setReviews] = useState("");
   const [blurb, setBlurb] = useState("");
-  const [badge, setBadge] = useState<Product["badge"] | "">("");
   const [image, setImage] = useState<string | undefined>(undefined);
   const adminMode = useAdminMode();
 
@@ -410,8 +396,8 @@ function AdminUploader({
         <h2 className="text-xl font-bold">Admin — upload a new product</h2>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Only the HILOXS admin can post products here. Add a photo, price, discount and review count
-        — shoppers can then add it to cart and pay {MERCHANT_NAME} on till {TILL_NUMBER}.
+        Only the HILOXS admin can post products here. Add an authorized photo, price, discount and
+        description so shoppers can review the listing before checkout.
       </p>
 
       {!unlocked ? (
@@ -446,10 +432,9 @@ function AdminUploader({
               category,
               priceKes: Number(price),
               ...(oldPrice ? { oldPriceKes: Number(oldPrice) } : {}),
-              reviews: Number(reviews) || 0,
+              reviews: 0,
               blurb,
               ...(image ? { image } : {}),
-              ...(badge ? { badge } : {}),
             });
             if (error) {
               toast.error(error);
@@ -459,9 +444,7 @@ function AdminUploader({
             setName("");
             setPrice("");
             setOldPrice("");
-            setReviews("");
             setBlurb("");
-            setBadge("");
             setImage(undefined);
           }}
         >
@@ -478,7 +461,11 @@ function AdminUploader({
                 className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1.5 file:text-secondary-foreground"
               />
               {image && (
-                <img src={image} alt="Preview" className="size-14 rounded-md object-cover" />
+                <img
+                  src={image}
+                  alt={`Preview of ${name || "new product"}`}
+                  className="size-14 rounded-md object-cover"
+                />
               )}
             </div>
           </div>
@@ -512,24 +499,6 @@ function AdminUploader({
             inputMode="numeric"
           />
           <Input
-            value={reviews}
-            onChange={(e) => setReviews(e.target.value)}
-            placeholder="Number of reviews"
-            inputMode="numeric"
-          />
-          <select
-            value={badge}
-            onChange={(e) => setBadge(e.target.value as Product["badge"] | "")}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">No badge</option>
-            {BADGES.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-          <Input
             className="sm:col-span-2"
             value={blurb}
             onChange={(e) => setBlurb(e.target.value)}
@@ -557,7 +526,7 @@ function AdminUploader({
                 </span>
               )}
               <span className="flex-1">
-                {p.name} · {kes(p.priceKes)} · {p.sold.toLocaleString()} reviews
+                {p.name} · {kes(p.priceKes)}
               </span>
               {unlocked && (
                 <Button

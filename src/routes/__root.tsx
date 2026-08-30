@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { HiloxsProvider } from "@/lib/hiloxs-store";
+import { AuthProvider } from "@/lib/auth-provider";
 import { SiteFooter, SiteHeader } from "@/components/hiloxs/SiteChrome";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -82,6 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "HILOXS combines an electronics marketplace, a binary network marketing plan, a demo trading desk and video training.",
       },
       { name: "author", content: "HILOXS" },
+      { name: "theme-color", content: "#080b12" },
       { property: "og:title", content: "HILOXS" },
       {
         property: "og:description",
@@ -129,17 +131,19 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <HiloxsProvider>
-        <div className="flex min-h-screen flex-col">
-          <SiteHeader />
-          <main className="flex-1">
-            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-            <Outlet />
-          </main>
-          <SiteFooter />
-        </div>
-        <Toaster />
-      </HiloxsProvider>
+      <AuthProvider>
+        <HiloxsProvider>
+          <div className="flex min-h-screen flex-col">
+            <SiteHeader />
+            <main className="flex-1">
+              {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+              <Outlet />
+            </main>
+            <SiteFooter />
+          </div>
+          <Toaster />
+        </HiloxsProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

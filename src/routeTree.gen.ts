@@ -11,11 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BinaryPlanRouteImport } from './routes/binary-plan'
+import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as MyOrdersRouteImport } from './routes/my-orders'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SellWithUsRouteImport } from './routes/sell-with-us'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as TradingRouteImport } from './routes/trading'
 import { Route as TrainingRouteImport } from './routes/training'
+import { Route as ShopSlugRouteImport } from './routes/shop_.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -27,9 +32,29 @@ const BinaryPlanRoute = BinaryPlanRouteImport.update({
   path: '/binary-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MyOrdersRoute = MyOrdersRouteImport.update({
   id: '/my-orders',
   path: '/my-orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SellWithUsRoute = SellWithUsRouteImport.update({
@@ -52,73 +77,113 @@ const TrainingRoute = TrainingRouteImport.update({
   path: '/training',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShopSlugRoute = ShopSlugRouteImport.update({
+  id: '/shop_/$slug',
+  path: '/shop/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
+  '/checkout': typeof CheckoutRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
   '/my-orders': typeof MyOrdersRoute
+  '/register': typeof RegisterRoute
   '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
+  '/shop/$slug': typeof ShopSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
+  '/checkout': typeof CheckoutRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
   '/my-orders': typeof MyOrdersRoute
+  '/register': typeof RegisterRoute
   '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
+  '/shop/$slug': typeof ShopSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/binary-plan': typeof BinaryPlanRoute
+  '/checkout': typeof CheckoutRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
   '/my-orders': typeof MyOrdersRoute
+  '/register': typeof RegisterRoute
   '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
+  '/shop_/$slug': typeof ShopSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/binary-plan'
+    | '/checkout'
+    | '/forgot-password'
+    | '/login'
     | '/my-orders'
+    | '/register'
     | '/sell-with-us'
     | '/shop'
     | '/trading'
     | '/training'
+    | '/shop/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/binary-plan'
+    | '/checkout'
+    | '/forgot-password'
+    | '/login'
     | '/my-orders'
+    | '/register'
     | '/sell-with-us'
     | '/shop'
     | '/trading'
     | '/training'
+    | '/shop/$slug'
   id:
     | '__root__'
     | '/'
     | '/binary-plan'
+    | '/checkout'
+    | '/forgot-password'
+    | '/login'
     | '/my-orders'
+    | '/register'
     | '/sell-with-us'
     | '/shop'
     | '/trading'
     | '/training'
+    | '/shop_/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BinaryPlanRoute: typeof BinaryPlanRoute
+  CheckoutRoute: typeof CheckoutRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LoginRoute: typeof LoginRoute
   MyOrdersRoute: typeof MyOrdersRoute
+  RegisterRoute: typeof RegisterRoute
   SellWithUsRoute: typeof SellWithUsRoute
   ShopRoute: typeof ShopRoute
   TradingRoute: typeof TradingRoute
   TrainingRoute: typeof TrainingRoute
+  ShopSlugRoute: typeof ShopSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -137,11 +202,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BinaryPlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/my-orders': {
       id: '/my-orders'
       path: '/my-orders'
       fullPath: '/my-orders'
       preLoaderRoute: typeof MyOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sell-with-us': {
@@ -172,17 +265,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shop_/$slug': {
+      id: '/shop_/$slug'
+      path: '/shop/$slug'
+      fullPath: '/shop/$slug'
+      preLoaderRoute: typeof ShopSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BinaryPlanRoute: BinaryPlanRoute,
+  CheckoutRoute: CheckoutRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  LoginRoute: LoginRoute,
   MyOrdersRoute: MyOrdersRoute,
+  RegisterRoute: RegisterRoute,
   SellWithUsRoute: SellWithUsRoute,
   ShopRoute: ShopRoute,
   TradingRoute: TradingRoute,
   TrainingRoute: TrainingRoute,
+  ShopSlugRoute: ShopSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

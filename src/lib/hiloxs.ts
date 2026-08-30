@@ -70,7 +70,33 @@ export type Product = {
   blurb: string;
   emoji: string;
   badge?: "FLASH SALE" | "BEST SELLER" | "HOT DEAL" | "TOP RATED";
+  images?: ProductImage[];
 };
+
+export type ProductImage = {
+  src: string;
+  alt: string;
+};
+
+export function productSlug(product: Pick<Product, "name">): string {
+  return product.name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function productImages(product: Product): ProductImage[] {
+  if (product.images?.length) return product.images;
+  const legacyImage = (product as Product & { image?: string }).image;
+  return legacyImage ? [{ src: legacyImage, alt: `${product.name} product photo` }] : [];
+}
+
+export function findProductBySlug(slug: string): Product | undefined {
+  return PRODUCTS.find((product) => productSlug(product) === slug);
+}
 
 export const PRODUCTS: Product[] = [
   {

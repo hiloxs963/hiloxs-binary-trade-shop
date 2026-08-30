@@ -12,25 +12,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import heroImage from "@/assets/hiloxs-brand-hero.jpg";
-import { PLAN, PRODUCTS, dual, kes } from "@/lib/hiloxs";
+import { PLAN, PRODUCTS, dual, kes, productSlug } from "@/lib/hiloxs";
+import { absoluteUrl, pageSeo, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "HILOXS — Electronics Shop, Binary Plan & Trading Desk" },
-      {
-        name: "description",
-        content:
-          "HILOXS brings together an electronics shop, a binary referral plan paying direct and matching bonuses, a demo trading desk and a video training academy.",
-      },
-      { property: "og:title", content: "HILOXS — Shop. Refer. Trade. Learn." },
-      {
-        property: "og:description",
-        content:
-          "Laptops, screens and woofers, a binary marketing plan with automatic bonuses, and a live-style demo trading desk.",
-      },
-    ],
-  }),
+  head: () =>
+    pageSeo({
+      title: "HILOXS | Shop, Learn and Explore the Binary Plan",
+      description:
+        "Explore the HILOXS product catalog, training library, binary-plan prototype and clearly labelled practice trading simulation.",
+      path: "/",
+      structuredData: [
+        {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: SITE_NAME,
+          url: SITE_URL,
+          logo: absoluteUrl("/favicon.png"),
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: SITE_NAME,
+          url: SITE_URL,
+        },
+      ],
+    }),
   component: Index,
 });
 
@@ -39,7 +46,7 @@ const PILLARS = [
     icon: ShoppingBag,
     title: "Shop",
     to: "/shop" as const,
-    body: "Laptops, screens, woofers and accessories with till, PayPal or MiniPay checkout.",
+    body: "Browse product details, compare listed prices and keep items in your cart.",
   },
   {
     icon: GraduationCap,
@@ -57,13 +64,13 @@ const PILLARS = [
     icon: Activity,
     title: "Trading",
     to: "/trading" as const,
-    body: "A demo desk with live candles, expiry timers and real-time market movement.",
+    body: "A practice desk with simulated candles, virtual balance and selectable expiry timers.",
   },
   {
     icon: Store,
     title: "Sell With Us",
     to: "/sell-with-us" as const,
-    body: "Vendors list verified electronics and get paid straight to their accounts.",
+    body: "Review the information future sellers will need before submitting an application.",
   },
   {
     icon: Laptop,
@@ -114,6 +121,8 @@ function Index() {
             width={1254}
             height={1254}
             className="h-full w-full object-cover"
+            fetchPriority="high"
+            decoding="async"
           />
         </div>
       </section>
@@ -121,7 +130,7 @@ function Index() {
       <section className="mx-auto max-w-7xl px-4 py-6">
         <h2 className="text-2xl font-bold sm:text-3xl">What is inside HILOXS</h2>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Six sections, one login. Here is what each one does.
+          Six focused sections covering the catalog, learning resources and current prototypes.
         </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PILLARS.map((p) => (
@@ -176,13 +185,19 @@ function Index() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {featured.map((p) => (
-              <div key={p.id} className="rounded-xl border border-border bg-background/40 p-4">
+              <Link
+                key={p.id}
+                to="/shop/$slug"
+                params={{ slug: productSlug(p) }}
+                className="rounded-xl border border-border bg-background/40 p-4 transition-colors hover:border-primary"
+                aria-label={`View ${p.name}`}
+              >
                 <span className="text-3xl" aria-hidden>
                   {p.emoji}
                 </span>
                 <p className="mt-2 text-sm font-semibold leading-tight">{p.name}</p>
                 <p className="mt-1 text-sm font-bold text-primary">{kes(p.priceKes)}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

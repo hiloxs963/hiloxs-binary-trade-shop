@@ -9,26 +9,18 @@ import { CandleChart } from "@/components/hiloxs/CandleChart";
 import { makeSeed, stepCandles, type Candle } from "@/components/hiloxs/CandleChart.helpers";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { type Trade } from "@/lib/hiloxs-store";
-import { MERCHANT_NAME, TILL_NUMBER, SUPPORT } from "@/lib/hiloxs";
+import { SUPPORT } from "@/lib/hiloxs";
 import { ADMIN_KEY, useAdminMode } from "@/lib/admin";
+import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/trading")({
-  head: () => ({
-    meta: [
-      { title: "HILOXS Binary Trading — Live Candles, Expiry Timers & Payouts" },
-      {
-        name: "description",
-        content:
-          "Place real binary UP/DOWN calls on HILOXS with live candlestick charts, expiry timers and winnings withdrawable to PayPal, MiniPay or M-Pesa.",
-      },
-      { property: "og:title", content: "HILOXS Binary Trading" },
-      {
-        property: "og:description",
-        content:
-          "Live candles, expiry timers and withdrawable winnings, settled through the HILOXS till.",
-      },
-    ],
-  }),
+  head: () =>
+    pageSeo({
+      title: "Practice Trading Simulation with Virtual Funds | HILOXS",
+      description:
+        "Use the HILOXS browser-based practice trading simulation with generated candles, virtual funds and selectable expiry timers.",
+      path: "/trading",
+    }),
   component: TradingPage,
 });
 
@@ -85,7 +77,7 @@ function TradingPage() {
     if (Date.now() >= openTrade.endsAt) {
       settleTrade(openTrade.id, priceRef.current);
       setOpenTrade(null);
-      toast.info("Trade expired — result posted to your history");
+      toast.info("Demo trade expired — result posted to your history");
     }
   }, [now, openTrade, settleTrade]);
 
@@ -120,19 +112,21 @@ function TradingPage() {
     };
     recordTrade(trade);
     setOpenTrade({ id: trade.id, endsAt: Date.now() + expiry.sec * 1000 });
-    toast.success(`${direction} ${asset.symbol} · $${stakeUsd} · ${expiry.label}`);
+    toast.success(`Demo ${direction} ${asset.symbol} · $${stakeUsd} · ${expiry.label}`);
   };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <div className="flex items-center gap-2 text-accent">
         <Activity className="size-5" />
-        <span className="text-xs font-semibold uppercase tracking-widest">Live binary desk</span>
+        <span className="text-xs font-semibold uppercase tracking-widest">
+          Practice trading simulation
+        </span>
       </div>
-      <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Binary Trading</h1>
+      <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Demo Trading</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        Real binary trading on HILOXS. Stakes are funded through the HILOXS till, and won trades can
-        be withdrawn to your PayPal, MiniPay or M-Pesa account.
+        Practice UP and DOWN decisions with generated price movement and a virtual balance. This
+        simulation does not execute market orders, accept deposits or transfer real money.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -142,6 +136,7 @@ function TradingPage() {
             size="sm"
             variant={i === assetIndex ? "default" : "outline"}
             onClick={() => setAssetIndex(i)}
+            aria-pressed={i === assetIndex}
           >
             {a.symbol}
           </Button>
@@ -181,13 +176,13 @@ function TradingPage() {
 
         <aside className="panel h-fit p-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Trading balance
+            Virtual balance
           </p>
           <p className="text-3xl font-bold">
             ${hydrated ? state.demoBalanceUsd.toFixed(2) : "1000.00"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Fund or cash out via {MERCHANT_NAME} · Buy Goods Till {TILL_NUMBER}
+            Demo credits only · no deposit or cash value
           </p>
 
           <p className="mt-5 text-sm font-medium">Expiry timer</p>
@@ -198,6 +193,7 @@ function TradingPage() {
                 size="sm"
                 variant={e.sec === expiry.sec ? "default" : "outline"}
                 onClick={() => setExpiry(e)}
+                aria-pressed={e.sec === expiry.sec}
               >
                 {e.label}
               </Button>
@@ -214,15 +210,15 @@ function TradingPage() {
 
           <div className="mt-5 grid gap-2">
             <Button variant="up" onClick={() => place("UP")} disabled={!!openTrade}>
-              <TrendingUp /> UP · {Math.round((state.admin.payoutRate - 1) * 100)}% payout
+              <TrendingUp /> UP · {Math.round((state.admin.payoutRate - 1) * 100)}% demo return
             </Button>
             <Button variant="down" onClick={() => place("DOWN")} disabled={!!openTrade}>
-              <TrendingDown /> DOWN · {Math.round((state.admin.payoutRate - 1) * 100)}% payout
+              <TrendingDown /> DOWN · {Math.round((state.admin.payoutRate - 1) * 100)}% demo return
             </Button>
           </div>
 
           <div className="mt-6 border-t border-border pt-4">
-            <p className="text-sm font-medium">Withdraw winnings (USD)</p>
+            <p className="text-sm font-medium">Practice balance reduction (virtual USD)</p>
             <Input
               className="mt-2"
               value={payout}
@@ -240,17 +236,20 @@ function TradingPage() {
                     const err = withdrawTrading(Number(payout), to);
                     if (err) toast.error(err);
                     else {
-                      toast.success(`Withdrawal sent to ${to}`);
+                      toast.success(
+                        `Demo withdrawal recorded for ${to}; no funds were transferred`,
+                      );
                       setPayout("");
                     }
                   }}
                 >
-                  Withdraw to {to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"}
+                  Simulate to {to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"}
                 </Button>
               ))}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              Support: {SUPPORT.hours} · {SUPPORT.email} · {SUPPORT.phone}
+              This control changes virtual demo state only. Support: {SUPPORT.hours} ·{" "}
+              {SUPPORT.email} · {SUPPORT.phone}
             </p>
           </div>
         </aside>
@@ -273,8 +272,13 @@ function TradingPage() {
                       size="sm"
                       variant={state.admin.outcome === o ? "default" : "outline"}
                       onClick={() => setAdmin({ outcome: o })}
+                      aria-pressed={state.admin.outcome === o}
                     >
-                      {o === "market" ? "Follow market" : o === "win" ? "Force WIN" : "Force LOSS"}
+                      {o === "market"
+                        ? "Follow simulation"
+                        : o === "win"
+                          ? "Force demo WIN"
+                          : "Force demo LOSS"}
                     </Button>
                   ))}
                 </div>
@@ -295,12 +299,12 @@ function TradingPage() {
                 </p>
               </div>
               <div>
-                <p className="text-sm font-medium">Till float</p>
+                <p className="text-sm font-medium">Virtual house balance</p>
                 <p className="mt-2 font-display text-2xl font-bold text-primary">
                   ${state.paybillFloatUsd.toFixed(2)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Lost stakes settle into till {TILL_NUMBER}; paid winnings are deducted here.
+                  Lost demo stakes increase this virtual counter; demo returns reduce it.
                 </p>
                 <Button
                   size="sm"
@@ -338,7 +342,7 @@ function TradingPage() {
         </section>
       )}
 
-      <h2 className="mt-10 text-xl font-semibold">Trade history</h2>
+      <h2 className="mt-10 text-xl font-semibold">Demo trade history</h2>
       <div className="panel mt-3 divide-y divide-border">
         {hydrated && state.trades.length > 0 ? (
           state.trades.map((t) => (

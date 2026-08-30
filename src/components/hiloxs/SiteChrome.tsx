@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Menu, ShieldCheck, ShoppingCart, X } from "lucide-react";
+import { Menu, ShieldCheck, ShoppingCart, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +55,12 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-2">
-          <Button asChild variant="outline" size="icon" aria-label="Cart">
+          <Button
+            asChild
+            variant="outline"
+            size="icon"
+            aria-label={cartCount ? `View cart with ${cartCount} items` : "View cart"}
+          >
             <Link to="/shop" hash="cart" className="relative">
               <ShoppingCart />
               {cartCount > 0 && (
@@ -63,6 +68,11 @@ export function SiteHeader() {
                   {cartCount}
                 </span>
               )}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="icon" aria-label="Log in">
+            <Link to="/login">
+              <UserRound aria-hidden />
             </Link>
           </Button>
           <Button asChild variant="hero" size="sm" className="hidden sm:inline-flex">
@@ -73,6 +83,8 @@ export function SiteHeader() {
             size="icon"
             className="lg:hidden"
             aria-label="Toggle menu"
+            aria-expanded={open}
+            aria-controls="mobile-navigation"
             onClick={() => setOpen((v) => !v)}
           >
             {open ? <X /> : <Menu />}
@@ -81,7 +93,10 @@ export function SiteHeader() {
       </div>
 
       {open && (
-        <nav className="border-t border-border bg-background px-4 pb-4 pt-2 lg:hidden">
+        <nav
+          id="mobile-navigation"
+          className="border-t border-border bg-background px-4 pb-4 pt-2 lg:hidden"
+        >
           {NAV.map((item) => (
             <Link
               key={item.to}
@@ -160,6 +175,16 @@ export function SiteFooter() {
                 My orders
               </Link>
             </li>
+            <li>
+              <Link to="/login" className="hover:text-foreground">
+                Log in
+              </Link>
+            </li>
+            <li>
+              <Link to="/register" className="hover:text-foreground">
+                Create an account
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
@@ -176,14 +201,14 @@ export function SiteFooter() {
                 {SUPPORT.phone}
               </a>
             </li>
-            <li className="pt-1">PayPal · MiniPay · M-Pesa payouts</li>
+            <li className="pt-1">Planned options: PayPal · MiniPay · M-Pesa</li>
           </ul>
         </div>
       </div>
       <div className="border-t border-border px-4 py-5">
         <AdminKeyBox />
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} HILOXS. Trading carries risk of loss.
+          © {new Date().getFullYear()} HILOXS. Practice trading uses virtual funds.
         </p>
       </div>
     </footer>
