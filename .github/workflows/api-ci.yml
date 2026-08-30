@@ -1,0 +1,73 @@
+name: API CI
+
+on:
+  pull_request:
+    paths:
+      - "api/**"
+      - "docs/adr/0001-backend-trust-boundary.md"
+      - ".github/workflows/api-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - "docs/adr/0001-backend-trust-boundary.md"
+      - ".github/workflows/api-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: hiloxs
+          POSTGRES_PASSWORD: hiloxs_test
+          POSTGRES_DB: hiloxs_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hiloxs -d hiloxs_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: api
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://hiloxs:hiloxs_test@localhost:5432/hiloxs_test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Lint API
+        run: npm run lint
+
+      - name: Typecheck API
+        run: npm run typecheck
+
+      - name: Run API unit tests
+        run: npm run test
+
+      - name: Run API PostgreSQL integration tests
+        run: npm run test:integration
+
+      - name: Build API
+        run: npm run build

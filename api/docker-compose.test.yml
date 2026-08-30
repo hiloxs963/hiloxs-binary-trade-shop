@@ -1,0 +1,16 @@
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hiloxs
+      POSTGRES_PASSWORD: hiloxs_test
+      POSTGRES_DB: hiloxs_test
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hiloxs -d hiloxs_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data

@@ -1,0 +1,41 @@
+{
+  "name": "@hiloxs/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Infrastructure-only API foundation for HILOXS",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch --import tsx src/server.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run test/unit",
+    "test:integration": "vitest run test/integration --maxWorkers=1",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts",
+    "db:check": "drizzle-kit check --config=drizzle.config.ts"
+  },
+  "dependencies": {
+    "@fastify/helmet": "13.1.1",
+    "drizzle-orm": "0.45.2",
+    "fastify": "5.12.1",
+    "pg": "8.23.0",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.10",
+    "eslint": "10.9.1",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.68.0",
+    "vitest": "4.1.11"
+  }
+}
