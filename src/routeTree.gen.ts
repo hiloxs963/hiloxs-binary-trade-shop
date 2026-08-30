@@ -16,10 +16,12 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MyOrdersRouteImport } from './routes/my-orders'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SellWithUsRouteImport } from './routes/sell-with-us'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as TradingRouteImport } from './routes/trading'
 import { Route as TrainingRouteImport } from './routes/training'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as ShopSlugRouteImport } from './routes/shop_.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -57,6 +59,11 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SellWithUsRoute = SellWithUsRouteImport.update({
   id: '/sell-with-us',
   path: '/sell-with-us',
@@ -77,6 +84,11 @@ const TrainingRoute = TrainingRouteImport.update({
   path: '/training',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShopSlugRoute = ShopSlugRouteImport.update({
   id: '/shop_/$slug',
   path: '/shop/$slug',
@@ -91,10 +103,12 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/my-orders': typeof MyOrdersRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/shop/$slug': typeof ShopSlugRoute
 }
 export interface FileRoutesByTo {
@@ -105,10 +119,12 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/my-orders': typeof MyOrdersRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/shop/$slug': typeof ShopSlugRoute
 }
 export interface FileRoutesById {
@@ -120,10 +136,12 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/my-orders': typeof MyOrdersRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sell-with-us': typeof SellWithUsRoute
   '/shop': typeof ShopRoute
   '/trading': typeof TradingRoute
   '/training': typeof TrainingRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/shop_/$slug': typeof ShopSlugRoute
 }
 export interface FileRouteTypes {
@@ -136,10 +154,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/my-orders'
     | '/register'
+    | '/reset-password'
     | '/sell-with-us'
     | '/shop'
     | '/trading'
     | '/training'
+    | '/verify-email'
     | '/shop/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -150,10 +170,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/my-orders'
     | '/register'
+    | '/reset-password'
     | '/sell-with-us'
     | '/shop'
     | '/trading'
     | '/training'
+    | '/verify-email'
     | '/shop/$slug'
   id:
     | '__root__'
@@ -164,10 +186,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/my-orders'
     | '/register'
+    | '/reset-password'
     | '/sell-with-us'
     | '/shop'
     | '/trading'
     | '/training'
+    | '/verify-email'
     | '/shop_/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -179,10 +203,12 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MyOrdersRoute: typeof MyOrdersRoute
   RegisterRoute: typeof RegisterRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SellWithUsRoute: typeof SellWithUsRoute
   ShopRoute: typeof ShopRoute
   TradingRoute: typeof TradingRoute
   TrainingRoute: typeof TrainingRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
   ShopSlugRoute: typeof ShopSlugRoute
 }
 
@@ -237,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sell-with-us': {
       id: '/sell-with-us'
       path: '/sell-with-us'
@@ -265,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shop_/$slug': {
       id: '/shop_/$slug'
       path: '/shop/$slug'
@@ -283,10 +323,12 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MyOrdersRoute: MyOrdersRoute,
   RegisterRoute: RegisterRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SellWithUsRoute: SellWithUsRoute,
   ShopRoute: ShopRoute,
   TradingRoute: TradingRoute,
   TrainingRoute: TrainingRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   ShopSlugRoute: ShopSlugRoute,
 }
 export const routeTree = rootRouteImport

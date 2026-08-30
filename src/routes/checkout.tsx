@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AuthRequired } from "@/components/hiloxs/AuthRequired";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { pageSeo } from "@/lib/seo";
@@ -17,8 +17,16 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutPage() {
   const auth = useAuth();
+  const navigate = Route.useNavigate();
   const { state } = useHiloxs();
   const itemCount = Object.values(state.cart).reduce((sum, quantity) => sum + quantity, 0);
+
+  useEffect(() => {
+    if (!auth.isLoading && !auth.isAuthenticated) {
+      void navigate({ to: "/login", search: { returnTo: "/checkout" }, replace: true });
+    }
+  }, [auth.isAuthenticated, auth.isLoading, navigate]);
+
   if (auth.isLoading)
     return (
       <p className="mx-auto max-w-xl px-4 py-16 text-center text-muted-foreground">
@@ -27,10 +35,10 @@ function CheckoutPage() {
     );
   if (!auth.isAuthenticated)
     return (
-      <AuthRequired
-        title="Log in to checkout"
-        description={`${itemCount || "Your"} cart item${itemCount === 1 ? "" : "s"} will remain available. Secure checkout will require a verified HILOXS account once authentication is connected.`}
-      />
+      <p className="mx-auto max-w-xl px-4 py-16 text-center text-muted-foreground">
+        Redirecting to login. {itemCount || "Your"} cart item{itemCount === 1 ? "" : "s"} will
+        remain available.
+      </p>
     );
   return (
     <section className="mx-auto max-w-xl px-4 py-16 text-center">

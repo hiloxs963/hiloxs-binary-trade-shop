@@ -36,6 +36,15 @@ export function redactText(value: string): string {
     );
 }
 
+export function redactRequestUrl(value: string): string {
+  const url = new URL(value, "http://localhost");
+  url.pathname = url.pathname.replace(/^(\/api\/auth\/reset-password\/)[^/]+$/i, "$1REDACTED");
+  for (const key of url.searchParams.keys()) {
+    if (isSensitiveKey(key)) url.searchParams.set(key, "REDACTED");
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 export function redactSensitive(value: unknown): unknown {
   if (typeof value === "string") return redactText(value);
   if (Array.isArray(value)) return value.map((item) => redactSensitive(item));

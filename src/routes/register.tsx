@@ -4,13 +4,14 @@ import { AuthFormLayout, FormNotice, PasswordField } from "@/components/hiloxs/A
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { registerWithEmail } from "@/lib/auth-api";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/register")({
   head: () =>
     pageSeo({
       title: "Create an Account | HILOXS",
-      description: "Future account registration for HILOXS customers.",
+      description: "Create a verified HILOXS customer account.",
       path: "/register",
       noindex: true,
     }),
@@ -22,15 +23,18 @@ function RegisterPage() {
   const [errors, setErrors] = useState<{
     name?: string;
     email?: string;
+    phone?: string;
     password?: string;
     confirm?: string;
   }>({});
-  const [notice, setNotice] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   return (
     <AuthFormLayout
       title="Create an account"
-      description="Registration will connect to verified email and secure server sessions in the backend phase."
+      description="Register with your email and phone number, then verify your email before logging in."
       footer={
         <>
           Already have an account?{" "}
@@ -43,15 +47,43 @@ function RegisterPage() {
       <form
         noValidate
         className="space-y-4"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           const nextErrors: typeof errors = {};
           if (form.name.trim().length < 2) nextErrors.name = "Enter your full name.";
           if (!/^\S+@\S+\.\S+$/.test(form.email)) nextErrors.email = "Enter a valid email address.";
-          if (form.password.length < 10) nextErrors.password = "Use at least 10 characters.";
+          if (!/^\+?[\d\s().-]{8,20}$/.test(form.phone))
+            nextErrors.phone = "Enter a valid phone number.";
+          if (
+            form.password.length < 12 ||
+            !/[a-z]/.test(form.password) ||
+            !/[A-Z]/.test(form.password) ||
+            !/[0-9]/.test(form.password) ||
+            !/[^A-Za-z0-9]/.test(form.password)
+          )
+            nextErrors.password = "Use 12+ characters with upper, lower, number and symbol.";
           if (form.confirm !== form.password) nextErrors.confirm = "Passwords do not match.";
           setErrors(nextErrors);
-          setNotice(Object.keys(nextErrors).length === 0);
+          if (Object.keys(nextErrors).length > 0) return;
+
+          setSubmitting(true);
+          setNotice("");
+          try {
+            await registerWithEmail({
+              name: form.name,
+              email: form.email,
+              phone: form.phone,
+              password: form.password,
+            });
+            setRegistered(true);
+            setNotice("Check your email for the verification link before logging in.");
+          } catch {
+            setNotice(
+              "Unable to complete registration. Check your details or try again in a few minutes.",
+            );
+          } finally {
+            setSubmitting(false);
+          }
         }}
       >
         <TextField
@@ -73,9 +105,10 @@ function RegisterPage() {
         />
         <TextField
           id="register-phone"
-          label="Phone number (optional for now)"
+          label="Phone number"
           value={form.phone}
           onChange={(phone) => setForm({ ...form, phone })}
+          error={errors.phone}
           autoComplete="tel"
           type="tel"
         />
@@ -94,14 +127,9 @@ function RegisterPage() {
           error={errors.confirm}
           autoComplete="new-password"
         />
-        {notice && (
-          <FormNotice>
-            Registration is not connected yet. No account was created and no details were sent or
-            stored.
-          </FormNotice>
-        )}
-        <Button type="submit" variant="hero" className="w-full">
-          Continue
+        {notice && <FormNotice>{notice}</FormNotice>}
+        <Button type="submit" variant="hero" className="w-full" disabled={submitting || registered}>
+          {submitting ? "Creating account..." : registered ? "Verification email sent" : "Continue"}
         </Button>
       </form>
     </AuthFormLayout>

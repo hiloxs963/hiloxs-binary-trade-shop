@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { redactSensitive, redactText, safeErrorForLog } from "../../src/lib/redact.js";
+import {
+  redactRequestUrl,
+  redactSensitive,
+  redactText,
+  safeErrorForLog,
+} from "../../src/lib/redact.js";
 
 describe("log redaction", () => {
   it("redacts database credentials and bearer tokens in text", () => {
@@ -45,6 +50,15 @@ describe("log redaction", () => {
       "x-api-key": "[REDACTED]",
       nested: { xApiKey: "[REDACTED]" },
     });
+  });
+
+  it("redacts verification and reset tokens embedded in request URLs", () => {
+    expect(redactRequestUrl("/api/auth/verify-email?token=verification-secret&callbackURL=/")).toBe(
+      "/api/auth/verify-email?token=REDACTED&callbackURL=%2F",
+    );
+    expect(
+      redactRequestUrl("/api/auth/reset-password/reset-secret?callbackURL=/reset-password"),
+    ).toBe("/api/auth/reset-password/REDACTED?callbackURL=/reset-password");
   });
 
   it("preserves benign structured values", () => {

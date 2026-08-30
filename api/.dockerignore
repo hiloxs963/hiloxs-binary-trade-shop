@@ -6,6 +6,7 @@ dist
 .env.*
 !.env.example
 coverage
+.dev-emails
 test
 docker-compose.test.yml
 *.log

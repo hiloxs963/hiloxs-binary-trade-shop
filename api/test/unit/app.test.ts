@@ -47,4 +47,41 @@ describe("API application", () => {
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
     expect(response.headers["x-powered-by"]).toBeUndefined();
   });
+
+  it("allows only configured browser origins with credentials", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    const allowed = await app.inject({
+      method: "OPTIONS",
+      url: "/health",
+      headers: {
+        origin: "http://localhost:8080",
+        "access-control-request-method": "GET",
+      },
+    });
+    const rejected = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: "https://attacker.example" },
+    });
+
+    expect(allowed.statusCode).toBe(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe("http://localhost:8080");
+    expect(allowed.headers["access-control-allow-credentials"]).toBe("true");
+    expect(rejected.statusCode).toBe(403);
+    expect(rejected.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("requires a trusted Origin on authentication mutations", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    const missing = await app.inject({ method: "POST", url: "/api/auth/sign-out", payload: {} });
+    const trusted = await app.inject({
+      method: "POST",
+      url: "/api/auth/sign-out",
+      headers: { origin: "http://localhost:8080" },
+      payload: {},
+    });
+
+    expect(missing.statusCode).toBe(403);
+    expect(trusted.statusCode).toBe(404);
+  });
 });

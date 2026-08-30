@@ -4,9 +4,18 @@ import { AuthFormLayout, FormNotice, PasswordField } from "@/components/hiloxs/A
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthApiError } from "@/lib/auth-api";
+import { useAuth } from "@/lib/auth-context";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => {
+    const result: { returnTo?: "/checkout" | "/my-orders"; verified?: boolean } = {};
+    if (search["returnTo"] === "/checkout" || search["returnTo"] === "/my-orders")
+      result.returnTo = search["returnTo"];
+    if (search["verified"] === true || search["verified"] === "true") result.verified = true;
+    return result;
+  },
   head: () =>
     pageSeo({
       title: "Log In | HILOXS",
@@ -18,15 +27,21 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
+  const auth = useAuth();
+  const navigate = Route.useNavigate();
+  const search = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [notice, setNotice] = useState(false);
+  const [notice, setNotice] = useState(
+    search.verified ? "Email verified. You can now log in." : "",
+  );
+  const [submitting, setSubmitting] = useState(false);
 
   return (
     <AuthFormLayout
       title="Log in"
-      description="Account access is being prepared for secure server-backed sessions."
+      description="Access your HILOXS account with a verified email address."
       footer={
         <>
           New to HILOXS?{" "}
@@ -39,13 +54,28 @@ function LoginPage() {
       <form
         noValidate
         className="space-y-4"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           const nextErrors: typeof errors = {};
           if (!/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Enter a valid email address.";
           if (!password) nextErrors.password = "Enter your password.";
           setErrors(nextErrors);
-          setNotice(Object.keys(nextErrors).length === 0);
+          if (Object.keys(nextErrors).length > 0) return;
+
+          setSubmitting(true);
+          setNotice("");
+          try {
+            await auth.login(email, password);
+            await navigate({ to: search.returnTo ?? "/" });
+          } catch (error) {
+            setNotice(
+              error instanceof AuthApiError && error.status === 403
+                ? "Verify your email before logging in."
+                : "The email or password could not be verified.",
+            );
+          } finally {
+            setSubmitting(false);
+          }
         }}
       >
         <div className="space-y-1.5">
@@ -78,11 +108,9 @@ function LoginPage() {
             Forgot password?
           </Link>
         </div>
-        {notice && (
-          <FormNotice>Login is not connected yet. No credentials were sent or stored.</FormNotice>
-        )}
-        <Button type="submit" variant="hero" className="w-full">
-          Continue
+        {notice && <FormNotice>{notice}</FormNotice>}
+        <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
+          {submitting ? "Logging in..." : "Continue"}
         </Button>
       </form>
     </AuthFormLayout>

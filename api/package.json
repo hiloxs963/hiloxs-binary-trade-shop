@@ -2,7 +2,7 @@
   "name": "@hiloxs/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Infrastructure-only API foundation for HILOXS",
+  "description": "Backend API foundation for HILOXS",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -21,7 +21,9 @@
     "db:check": "drizzle-kit check --config=drizzle.config.ts"
   },
   "dependencies": {
+    "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.1",
+    "better-auth": "1.7.2",
     "drizzle-orm": "0.45.2",
     "fastify": "5.12.1",
     "pg": "8.23.0",
