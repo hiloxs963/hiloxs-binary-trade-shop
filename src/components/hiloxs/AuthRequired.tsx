@@ -14,10 +14,7 @@ export function AuthRequired({ title, description }: { title: string; descriptio
       <p className="mt-3 text-muted-foreground">{description}</p>
       <div className="mt-7 flex flex-wrap justify-center gap-3">
         <Button asChild variant="hero">
-          <Link to="/login">Log in</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link to="/register">Create an account</Link>
+          <Link to="/login">Account access</Link>
         </Button>
       </div>
       <Button asChild variant="ghost" className="mt-3">

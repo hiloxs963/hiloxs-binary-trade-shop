@@ -76,18 +76,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "HILOXS — Electronics, Binary Marketing & Trading" },
+      { title: "HILOXS — Electronics and Browser-Based Prototypes" },
       {
         name: "description",
         content:
-          "HILOXS combines an electronics marketplace, a binary network marketing plan, a demo trading desk and video training.",
+          "HILOXS combines an electronics catalog with clearly labelled binary-plan and practice-trading prototypes.",
       },
       { name: "author", content: "HILOXS" },
       { name: "theme-color", content: "#080b12" },
       { property: "og:title", content: "HILOXS" },
       {
         property: "og:description",
-        content: "Shop electronics, build your binary team, learn to trade.",
+        content: "Browse electronics and explore clearly labelled browser-based prototypes.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

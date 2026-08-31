@@ -261,7 +261,7 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
           {
             id: `wd-${uid()}`,
             kind: "withdrawal",
-            label: `Withdrawal to ${to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"} · ${destination}`,
+            label: `Demo balance reduction to ${to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"}; no funds transferred · ${destination}`,
             amountKes: -amountKes,
             at: Date.now(),
           },
@@ -366,7 +366,7 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
           {
             id: `tw-${uid()}`,
             kind: "trading",
-            label: `Trading withdrawal to ${to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"} · ${destination}`,
+            label: `Demo trading balance reduction to ${to === "paypal" ? "PayPal" : to === "minipay" ? "MiniPay" : "M-Pesa"}; no funds transferred · ${destination}`,
             amountKes: 0,
             at: Date.now(),
           },
