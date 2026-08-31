@@ -603,106 +603,12 @@ export const discountPct = (p: Product) =>
 
 export type TrainingTrack = "Binary Network Marketing" | "Trading" | "Shopping" | "Getting Started";
 
-export type Training = {
-  id: string;
-  title: string;
-  track: TrainingTrack;
-  youtubeId: string;
-  duration: string;
-  summary: string;
-};
-
-/** Replace youtubeId with your own uploads — the player reads it directly. */
-export const TRAININGS: Training[] = [
-  {
-    id: "t1",
-    title: "HILOXS Binary Plan explained on a whiteboard",
-    track: "Binary Network Marketing",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "18:42",
-    summary:
-      "How the left and right legs fill up, what counts as a pair, and when the matching bonus releases.",
-  },
-  {
-    id: "t2",
-    title: "Registering your first two referrals correctly",
-    track: "Binary Network Marketing",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "11:05",
-    summary:
-      "Live walkthrough of the referral form, leg placement and the KSh 8,000 first-pair payout.",
-  },
-  {
-    id: "t3",
-    title: "Withdrawing to PayPal, MiniPay and M-Pesa",
-    track: "Binary Network Marketing",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "09:31",
-    summary: "Linking payout accounts under your own name and cashing out safely.",
-  },
-  {
-    id: "t4",
-    title: "Reading candlesticks before an expiry",
-    track: "Trading",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "22:18",
-    summary: "Wicks, bodies and momentum — how I decide UP or DOWN on the demo desk.",
-  },
-  {
-    id: "t5",
-    title: "Choosing expiry timers that fit your setup",
-    track: "Trading",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "14:50",
-    summary: "30s vs 5m: matching the timer to the market movement you actually see.",
-  },
-  {
-    id: "t6",
-    title: "Risk rules I never break",
-    track: "Trading",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "16:07",
-    summary: "Stake sizing, daily stop, and why demo comes before anything else.",
-  },
-  {
-    id: "t7",
-    title: "Sourcing electronics that actually resell",
-    track: "Shopping",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "13:22",
-    summary: "Picking laptops, screens and woofers buyers keep coming back for.",
-  },
-  {
-    id: "t8",
-    title: "Ordering, delivery and till payments",
-    track: "Shopping",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "07:44",
-    summary: "Checkout end-to-end, tracking your order and paying to the HILOXS till.",
-  },
-  {
-    id: "t9",
-    title: "Your first 7 days on HILOXS",
-    track: "Getting Started",
-    youtubeId: "dQw4w9WgXcQ",
-    duration: "20:03",
-    summary: "Activate, learn, refer, trade — the exact order I recommend.",
-  },
-];
-
 export const TRACKS: TrainingTrack[] = [
   "Binary Network Marketing",
   "Trading",
   "Shopping",
   "Getting Started",
 ];
-
-/** Every payment in or out of HILOXS runs through this single Buy Goods till. */
-export const MERCHANT_NAME = "HILOXS";
-export const TILL_NUMBER = "1628777";
-export const TILL_LABEL = "HILOXS Buy Goods Till";
-/** What a client sees on the M-Pesa prompt / receipt. */
-export const TILL_DISPLAY = `${MERCHANT_NAME} · Buy Goods Till ${TILL_NUMBER}`;
 
 export const SUPPORT = {
   hours: "Mon–Sat, 8am–7pm EAT",
