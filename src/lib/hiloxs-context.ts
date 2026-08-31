@@ -5,7 +5,6 @@ import type {
   CustomProduct,
   HiloxsState,
   Leg,
-  Order,
   PayoutAccounts,
   TrainingLevel,
   Trade,
@@ -24,7 +23,6 @@ export type HiloxsContextValue = {
   addToCart: (productId: string, qty?: number) => void;
   setCartQty: (productId: string, qty: number) => void;
   clearCart: () => void;
-  checkout: (method: Order["method"]) => Order | null;
   recordTrade: (trade: Trade) => void;
   settleTrade: (id: string, exit: number) => void;
   setAdmin: (patch: Partial<AdminTrading>) => void;

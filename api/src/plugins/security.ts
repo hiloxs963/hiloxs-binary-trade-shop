@@ -11,10 +11,10 @@ export async function securityPlugin(
 
   app.addHook("onRequest", (request, _reply, done) => {
     const origin = request.headers.origin;
-    const authMutation =
+    const protectedMutation =
       request.method === "POST" &&
-      (request.url.startsWith("/api/auth/") || request.url.startsWith("/api/v1/auth/"));
-    if ((authMutation && !origin) || (origin && !allowed.has(origin))) {
+      (request.url.startsWith("/api/auth/") || request.url.startsWith("/api/v1/"));
+    if ((protectedMutation && !origin) || (origin && !allowed.has(origin))) {
       done(new OriginNotAllowedError());
       return;
     }
@@ -25,7 +25,7 @@ export async function securityPlugin(
     origin: [...allowed],
     credentials: true,
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "X-Requested-With", "Idempotency-Key"],
     maxAge: 86_400,
   });
 

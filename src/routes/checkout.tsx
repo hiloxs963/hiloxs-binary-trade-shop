@@ -1,6 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { AlertTriangle, CheckCircle2, Loader2, ShoppingCart } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import {
+  createOrder,
+  formatMoneyMinor,
+  getCheckoutQuote,
+  type CheckoutQuote,
+} from "@/lib/commerce-api";
+import { PRODUCTS } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { pageSeo } from "@/lib/seo";
 
@@ -18,8 +27,17 @@ export const Route = createFileRoute("/checkout")({
 function CheckoutPage() {
   const auth = useAuth();
   const navigate = Route.useNavigate();
-  const { state } = useHiloxs();
-  const itemCount = Object.values(state.cart).reduce((sum, quantity) => sum + quantity, 0);
+  const { state, hydrated, clearCart } = useHiloxs();
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+  const [quoteError, setQuoteError] = useState("");
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const idempotencyKey = useRef<string | null>(null);
+  const items = useMemo(
+    () => Object.entries(state.cart).map(([productId, quantity]) => ({ productId, quantity })),
+    [state.cart],
+  );
 
   useEffect(() => {
     if (!auth.isLoading && !auth.isAuthenticated) {
@@ -27,25 +45,156 @@ function CheckoutPage() {
     }
   }, [auth.isAuthenticated, auth.isLoading, navigate]);
 
-  if (auth.isLoading)
+  useEffect(() => {
+    idempotencyKey.current = null;
+  }, [items]);
+
+  useEffect(() => {
+    if (!hydrated || auth.isLoading || !auth.isAuthenticated || items.length === 0) return;
+    let active = true;
+    setQuoteLoading(true);
+    setQuoteError("");
+    void getCheckoutQuote(items)
+      .then((nextQuote) => {
+        if (active) setQuote(nextQuote);
+      })
+      .catch(() => {
+        if (active) {
+          setQuote(null);
+          setQuoteError("Current prices could not be confirmed. Review the cart and try again.");
+        }
+      })
+      .finally(() => {
+        if (active) setQuoteLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.isAuthenticated, auth.isLoading, hydrated, items]);
+
+  if (auth.isLoading || !hydrated) {
+    return <PageStatus>Checking account and cart...</PageStatus>;
+  }
+  if (!auth.isAuthenticated) {
+    return <PageStatus>Redirecting to login. Your cart will remain available.</PageStatus>;
+  }
+  if (items.length === 0) {
     return (
-      <p className="mx-auto max-w-xl px-4 py-16 text-center text-muted-foreground">
-        Checking account access...
-      </p>
+      <section className="mx-auto max-w-xl px-4 py-16 text-center">
+        <ShoppingCart className="mx-auto size-10 text-muted-foreground" aria-hidden />
+        <h1 className="mt-4 text-3xl font-bold">Your cart is empty</h1>
+        <Button asChild variant="hero" className="mt-6">
+          <Link to="/shop">Browse products</Link>
+        </Button>
+      </section>
     );
-  if (!auth.isAuthenticated)
-    return (
-      <p className="mx-auto max-w-xl px-4 py-16 text-center text-muted-foreground">
-        Redirecting to login. {itemCount || "Your"} cart item{itemCount === 1 ? "" : "s"} will
-        remain available.
-      </p>
-    );
+  }
+
+  const changedPrices = quote?.items.filter((item) => {
+    const local = PRODUCTS.find((product) => product.id === item.productId);
+    return local ? BigInt(item.unitPriceMinor) !== BigInt(local.priceKes) * 100n : false;
+  });
+
   return (
-    <section className="mx-auto max-w-xl px-4 py-16 text-center">
-      <h1 className="text-3xl font-bold">Checkout connection pending</h1>
-      <p className="mt-3 text-muted-foreground">
-        Payment and order creation will be connected to the production backend in a later phase.
+    <section className="mx-auto max-w-3xl px-4 py-10">
+      <h1 className="text-3xl font-bold sm:text-4xl">Checkout</h1>
+      <p className="mt-2 text-muted-foreground">
+        Prices below are confirmed by the HILOXS server. Payment is not available yet.
+      </p>
+
+      <div className="panel mt-8 p-5 sm:p-6">
+        {quoteLoading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+            <Loader2 className="size-4 animate-spin" aria-hidden /> Confirming current prices...
+          </div>
+        )}
+        {quoteError && (
+          <div className="flex items-start gap-2 text-sm text-destructive" role="alert">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden /> {quoteError}
+          </div>
+        )}
+        {quote && (
+          <>
+            {changedPrices && changedPrices.length > 0 && (
+              <div className="mb-5 rounded-md border border-border bg-secondary/60 p-3 text-sm">
+                <p className="flex items-center gap-2 font-medium">
+                  <AlertTriangle className="size-4 text-primary" aria-hidden /> Price updated
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  The server price differs from the catalog display for {changedPrices.length} item
+                  {changedPrices.length === 1 ? "" : "s"}. The confirmed total is shown below.
+                </p>
+              </div>
+            )}
+            <ul className="divide-y divide-border">
+              {quote.items.map((item) => (
+                <li key={item.productId} className="flex gap-4 py-4 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{item.name}</p>
+                    <p className="mt-1 text-muted-foreground">
+                      {formatMoneyMinor(item.unitPriceMinor, quote.currency)} × {item.quantity}
+                    </p>
+                  </div>
+                  <p className="font-semibold">
+                    {formatMoneyMinor(item.lineTotalMinor, quote.currency)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5 flex items-center justify-between border-t border-border pt-5">
+              <span className="font-medium">Server-confirmed total</span>
+              <span className="text-xl font-bold text-primary">
+                {formatMoneyMinor(quote.totalMinor, quote.currency)}
+              </span>
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <CheckCircle2 className="size-4 text-success" aria-hidden />
+              Currency and line totals were calculated from active PostgreSQL products.
+            </div>
+          </>
+        )}
+      </div>
+
+      {createError && (
+        <p className="mt-4 text-sm text-destructive" role="alert">
+          {createError}
+        </p>
+      )}
+      <Button
+        variant="hero"
+        size="lg"
+        className="mt-5 w-full"
+        disabled={!quote || quoteLoading || creating}
+        onClick={async () => {
+          if (!quote) return;
+          setCreating(true);
+          setCreateError("");
+          idempotencyKey.current ??= crypto.randomUUID();
+          try {
+            const order = await createOrder(items, idempotencyKey.current);
+            clearCart();
+            await navigate({ to: "/my-orders", search: { created: order.orderNumber } });
+          } catch {
+            setCreateError("The pending order could not be created. No payment was taken.");
+          } finally {
+            setCreating(false);
+          }
+        }}
+      >
+        {creating ? <Loader2 className="animate-spin" aria-hidden /> : <ShoppingCart aria-hidden />}
+        {creating ? "Creating order..." : "Create pending order"}
+      </Button>
+      <p className="mt-3 text-center text-xs text-muted-foreground">
+        This creates a pending-payment order only. It does not charge or reserve funds.
       </p>
     </section>
+  );
+}
+
+function PageStatus({ children }: { children: string }) {
+  return (
+    <p className="mx-auto max-w-xl px-4 py-16 text-center text-muted-foreground" role="status">
+      {children}
+    </p>
   );
 }
