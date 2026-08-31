@@ -1,11 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, Package, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Loader2, Package, RefreshCw, Smartphone, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { AuthRequired } from "@/components/hiloxs/AuthRequired";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { cancelOrder, formatMoneyMinor, getOrders, type CommerceOrder } from "@/lib/commerce-api";
+import {
+  cancelOrder,
+  formatMoneyMinor,
+  getOrderPaymentStatus,
+  getOrders,
+  initiateMpesaPayment,
+  refreshMpesaPayment,
+  type CommerceOrder,
+  type OrderPaymentStatus,
+} from "@/lib/commerce-api";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/my-orders")({
@@ -33,6 +43,7 @@ function MyOrdersPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState("");
+  const [paymentBlocking, setPaymentBlocking] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (auth.isLoading || !auth.isAuthenticated) return;
@@ -133,7 +144,7 @@ function MyOrdersPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={cancelling === order.id}
+                      disabled={cancelling === order.id || paymentBlocking[order.id]}
                       onClick={async () => {
                         setCancelling(order.id);
                         setError("");
@@ -159,12 +170,186 @@ function MyOrdersPage() {
                   )}
                 </div>
               </div>
+              {(order.status === "PENDING_PAYMENT" || order.status === "PAID") && (
+                <OrderPaymentControls
+                  order={order}
+                  initialPhone={auth.currentUser?.phone ?? ""}
+                  onPayment={(payment) => {
+                    setPaymentBlocking((current) => ({
+                      ...current,
+                      [order.id]: isBlockingPayment(payment.paymentStatus),
+                    }));
+                    if (payment.orderStatus !== order.status) {
+                      setOrders((current) =>
+                        current.map((item) =>
+                          item.id === order.id ? { ...item, status: payment.orderStatus } : item,
+                        ),
+                      );
+                    }
+                  }}
+                />
+              )}
             </li>
           ))}
         </ul>
       )}
     </section>
   );
+}
+
+function OrderPaymentControls({
+  order,
+  initialPhone,
+  onPayment,
+}: {
+  order: CommerceOrder;
+  initialPhone: string;
+  onPayment: (payment: OrderPaymentStatus) => void;
+}) {
+  const [payment, setPayment] = useState<OrderPaymentStatus | null>(null);
+  const [phone, setPhone] = useState(initialPhone);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const key = useRef<string | null>(null);
+
+  const applyPayment = (next: OrderPaymentStatus) => {
+    setPayment(next);
+    onPayment(next);
+  };
+
+  useEffect(() => {
+    let active = true;
+    void getOrderPaymentStatus(order.id)
+      .then((next) => {
+        if (active) applyPayment(next);
+      })
+      .catch(() => {
+        if (active) setError("M-Pesa status is currently unavailable.");
+      });
+    return () => {
+      active = false;
+    };
+    // Loading is keyed to the immutable server order identifier.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
+
+  useEffect(() => {
+    if (!payment || !isPollingPayment(payment.paymentStatus)) return;
+    let active = true;
+    const timer = window.setInterval(() => {
+      void getOrderPaymentStatus(order.id)
+        .then((next) => {
+          if (active) applyPayment(next);
+        })
+        .catch(() => undefined);
+    }, 7_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+    // Polling follows the current server status and stops on terminal states.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id, payment?.paymentStatus]);
+
+  const canInitiate =
+    order.status === "PENDING_PAYMENT" &&
+    (!payment || payment.paymentStatus === null || payment.paymentStatus === "FAILED");
+
+  return (
+    <div className="mt-5 border-t border-border pt-4">
+      {canInitiate && (
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Input
+            aria-label={`M-Pesa phone for order ${order.orderNumber}`}
+            inputMode="tel"
+            value={phone}
+            onChange={(event) => {
+              setPhone(event.target.value);
+              key.current = null;
+            }}
+            placeholder="0712 345 678"
+          />
+          <Button
+            disabled={busy || !phone.trim()}
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              if (payment?.paymentStatus === "FAILED") key.current = null;
+              key.current ??= crypto.randomUUID();
+              try {
+                applyPayment(await initiateMpesaPayment(order.id, phone, key.current));
+              } catch {
+                setError("The M-Pesa prompt could not be confirmed. Check status before retrying.");
+                try {
+                  applyPayment(await getOrderPaymentStatus(order.id));
+                } catch {
+                  // Reuse the key while the initiation outcome is unknown.
+                }
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Smartphone aria-hidden />}
+            Pay with M-Pesa
+          </Button>
+        </div>
+      )}
+
+      {payment?.paymentStatus === "SUCCEEDED" && (
+        <p className="text-sm font-medium text-success">
+          Paid{payment.receiptNumber ? ` · M-Pesa receipt ${payment.receiptNumber}` : ""}
+        </p>
+      )}
+      {payment && isPollingPayment(payment.paymentStatus) && (
+        <p className="text-sm text-muted-foreground">
+          Waiting for M-Pesa confirmation. Check your phone and enter your M-Pesa PIN.
+        </p>
+      )}
+      {payment?.paymentStatus === "UNKNOWN" && (
+        <p className="text-sm text-muted-foreground">
+          Confirmation is unresolved. Do not send a duplicate payment.
+        </p>
+      )}
+      {payment?.paymentStatus === "REVIEW_REQUIRED" && (
+        <p className="text-sm text-destructive">Payment confirmation requires support review.</p>
+      )}
+      {payment && isRefreshablePayment(payment.paymentStatus) && (
+        <Button
+          className="mt-3"
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              applyPayment(await refreshMpesaPayment(order.id));
+            } catch {
+              setError("Payment confirmation is still unavailable. Please check again later.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <RefreshCw aria-hidden /> Check payment status
+        </Button>
+      )}
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function isPollingPayment(status: OrderPaymentStatus["paymentStatus"]): boolean {
+  return status === "INITIATING" || status === "PENDING" || status === "CONFIRMING";
+}
+
+function isRefreshablePayment(status: OrderPaymentStatus["paymentStatus"]): boolean {
+  return isPollingPayment(status) || status === "UNKNOWN";
+}
+
+function isBlockingPayment(status: OrderPaymentStatus["paymentStatus"]): boolean {
+  return isRefreshablePayment(status) || status === "REVIEW_REQUIRED";
 }
 
 function PageStatus({ children }: { children: string }) {

@@ -11,8 +11,12 @@ export async function securityPlugin(
 
   app.addHook("onRequest", (request, _reply, done) => {
     const origin = request.headers.origin;
+    const providerCallback =
+      request.method === "POST" &&
+      /^\/api\/v1\/payments\/mpesa\/callback\/[^/?]+(?:\?.*)?$/.test(request.url);
     const protectedMutation =
       request.method === "POST" &&
+      !providerCallback &&
       (request.url.startsWith("/api/auth/") || request.url.startsWith("/api/v1/"));
     if ((protectedMutation && !origin) || (origin && !allowed.has(origin))) {
       done(new OriginNotAllowedError());

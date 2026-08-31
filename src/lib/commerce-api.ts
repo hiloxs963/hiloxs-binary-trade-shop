@@ -39,6 +39,20 @@ export type CommerceOrder = {
   }>;
 };
 
+export type PaymentAttemptStatus =
+  "INITIATING" | "PENDING" | "CONFIRMING" | "SUCCEEDED" | "FAILED" | "UNKNOWN" | "REVIEW_REQUIRED";
+
+export type OrderPaymentStatus = {
+  orderId: string;
+  orderStatus: CommerceOrder["status"];
+  paymentAttemptId: string | null;
+  paymentStatus: PaymentAttemptStatus | null;
+  amountMinor?: string;
+  currency?: "KES";
+  updatedAt?: string;
+  receiptNumber?: string;
+};
+
 type ApiErrorBody = {
   error?: { code?: string; message?: string };
 };
@@ -93,6 +107,37 @@ export async function cancelOrder(orderId: string): Promise<CommerceOrder> {
   });
   if (!response.ok) throw await toCommerceError(response, "Unable to cancel the order");
   return ((await response.json()) as { order: CommerceOrder }).order;
+}
+
+export async function initiateMpesaPayment(
+  orderId: string,
+  phone: string,
+  idempotencyKey: string,
+): Promise<OrderPaymentStatus> {
+  const response = await request(`/api/v1/orders/${encodeURIComponent(orderId)}/payments/mpesa`, {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ phone }),
+  });
+  if (!response.ok) throw await toCommerceError(response, "Unable to send the M-Pesa prompt");
+  return ((await response.json()) as { payment: OrderPaymentStatus }).payment;
+}
+
+export async function getOrderPaymentStatus(orderId: string): Promise<OrderPaymentStatus> {
+  const response = await request(`/api/v1/orders/${encodeURIComponent(orderId)}/payment`, {
+    method: "GET",
+  });
+  if (!response.ok) throw await toCommerceError(response, "Unable to load payment status");
+  return ((await response.json()) as { payment: OrderPaymentStatus }).payment;
+}
+
+export async function refreshMpesaPayment(orderId: string): Promise<OrderPaymentStatus> {
+  const response = await request(
+    `/api/v1/orders/${encodeURIComponent(orderId)}/payments/mpesa/refresh`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  if (!response.ok) throw await toCommerceError(response, "Unable to check the M-Pesa status");
+  return ((await response.json()) as { payment: OrderPaymentStatus }).payment;
 }
 
 export function formatMoneyMinor(value: string, currency: string): string {

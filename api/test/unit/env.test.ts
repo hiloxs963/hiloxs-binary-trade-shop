@@ -4,6 +4,7 @@ import {
   parseEnv,
   requireDatabaseUrl,
   resolveAuthRuntimeConfig,
+  resolveMpesaRuntimeConfig,
   resolveProductionEmailConfig,
 } from "../../src/config/env.js";
 import { ConfigurationError } from "../../src/lib/errors.js";
@@ -15,6 +16,7 @@ describe("environment configuration", () => {
       HOST: "127.0.0.1",
       PORT: 3000,
       LOG_LEVEL: "info",
+      MPESA_REQUEST_TIMEOUT_MS: 10_000,
     });
   });
 
@@ -117,6 +119,64 @@ describe("environment configuration", () => {
         }),
       ),
     ).toEqual({ apiKey, from: "HILOXS <auth@mail.hiloxs.co.ke>" });
+  });
+
+  it("requires complete M-Pesa configuration and selects the configured environment", () => {
+    expect(resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "test" }))).toBeUndefined();
+    expect(() => resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production" }))).toThrow(
+      "All M-Pesa environment variables are required together",
+    );
+    expect(() => resolveMpesaRuntimeConfig(parseEnv({ MPESA_ENV: "sandbox" }))).toThrow(
+      ConfigurationError,
+    );
+
+    const config = resolveMpesaRuntimeConfig(
+      parseEnv({
+        NODE_ENV: "test",
+        MPESA_ENV: "sandbox",
+        MPESA_CONSUMER_KEY: "test-consumer-key",
+        MPESA_CONSUMER_SECRET: "test-consumer-secret",
+        MPESA_SHORTCODE: "174379",
+        MPESA_PASSKEY: "test-passkey",
+        MPESA_TRANSACTION_TYPE: "CustomerPayBillOnline",
+        MPESA_PARTY_B: "174379",
+        MPESA_CALLBACK_BASE_URL: "http://localhost:3000",
+        MPESA_MAX_AMOUNT_KES: "100000",
+      }),
+    );
+
+    expect(config).toMatchObject({
+      environment: "sandbox",
+      baseURL: "https://sandbox.safaricom.co.ke",
+      maxAmountKes: 100_000n,
+    });
+  });
+
+  it("requires HTTPS for the production M-Pesa callback", () => {
+    const base = {
+      NODE_ENV: "production",
+      MPESA_ENV: "production",
+      MPESA_CONSUMER_KEY: "test-consumer-key",
+      MPESA_CONSUMER_SECRET: "test-consumer-secret",
+      MPESA_SHORTCODE: "123456",
+      MPESA_PASSKEY: "test-passkey",
+      MPESA_TRANSACTION_TYPE: "CustomerBuyGoodsOnline",
+      MPESA_PARTY_B: "654321",
+      MPESA_MAX_AMOUNT_KES: "100000",
+    };
+    expect(() =>
+      resolveMpesaRuntimeConfig(
+        parseEnv({ ...base, MPESA_CALLBACK_BASE_URL: "http://api.example.test" }),
+      ),
+    ).toThrow("must use HTTPS");
+    expect(
+      resolveMpesaRuntimeConfig(
+        parseEnv({ ...base, MPESA_CALLBACK_BASE_URL: "https://api.example.test" }),
+      ),
+    ).toMatchObject({
+      environment: "production",
+      baseURL: "https://api.safaricom.co.ke",
+    });
   });
 });
 
