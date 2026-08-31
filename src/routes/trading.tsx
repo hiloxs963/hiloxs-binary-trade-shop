@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Activity, Lock, ShieldCheck, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,6 @@ import { makeSeed, stepCandles, type Candle } from "@/components/hiloxs/CandleCh
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { type Trade } from "@/lib/hiloxs-store";
 import { SUPPORT } from "@/lib/hiloxs";
-import { ADMIN_KEY, useAdminMode } from "@/lib/admin";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/trading")({
@@ -40,8 +39,7 @@ const EXPIRIES = [
 ];
 
 function TradingPage() {
-  const { state, hydrated, recordTrade, settleTrade, setAdmin, withdrawTrading } = useHiloxs();
-  const adminMode = useAdminMode();
+  const { state, hydrated, recordTrade, settleTrade, withdrawTrading } = useHiloxs();
   const [assetIndex, setAssetIndex] = useState(0);
   const asset = ASSETS[assetIndex]!;
   const [candles, setCandles] = useState<Candle[]>(() => makeSeed(asset.base));
@@ -49,7 +47,6 @@ function TradingPage() {
   const [stake, setStake] = useState("10");
   const [openTrade, setOpenTrade] = useState<{ id: string; endsAt: number } | null>(null);
   const [now, setNow] = useState(0);
-  const [adminPin, setAdminPin] = useState("");
   const [payout, setPayout] = useState("");
   const tick = useRef(0);
   const priceRef = useRef(asset.base);
@@ -254,93 +251,6 @@ function TradingPage() {
           </div>
         </aside>
       </div>
-
-      {adminMode && (
-        <section className="panel mt-8 p-5">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-5 text-primary" />
-            <h2 className="text-lg font-semibold">Admin control</h2>
-          </div>
-          {state.admin.unlocked ? (
-            <div className="mt-4 grid gap-5 lg:grid-cols-3">
-              <div>
-                <p className="text-sm font-medium">Trade outcome</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(["market", "win", "loss"] as const).map((o) => (
-                    <Button
-                      key={o}
-                      size="sm"
-                      variant={state.admin.outcome === o ? "default" : "outline"}
-                      onClick={() => setAdmin({ outcome: o })}
-                      aria-pressed={state.admin.outcome === o}
-                    >
-                      {o === "market"
-                        ? "Follow simulation"
-                        : o === "win"
-                          ? "Force demo WIN"
-                          : "Force demo LOSS"}
-                    </Button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Applies to every trade settled from now on.
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Payout multiplier</p>
-                <Input
-                  className="mt-2"
-                  value={String(state.admin.payoutRate)}
-                  inputMode="decimal"
-                  onChange={(e) => setAdmin({ payoutRate: Number(e.target.value) || 1 })}
-                />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  1.85 pays 85% on top of the stake.
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Virtual house balance</p>
-                <p className="mt-2 font-display text-2xl font-bold text-primary">
-                  ${state.paybillFloatUsd.toFixed(2)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Lost demo stakes increase this virtual counter; demo returns reduce it.
-                </p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="mt-2"
-                  onClick={() => setAdmin({ unlocked: false })}
-                >
-                  Lock admin
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <form
-              className="mt-3 flex max-w-sm gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (adminPin.trim() === ADMIN_KEY) {
-                  setAdmin({ unlocked: true });
-                  setAdminPin("");
-                  toast.success("Admin controls unlocked");
-                } else toast.error("Wrong admin key");
-              }}
-            >
-              <Input
-                value={adminPin}
-                onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Admin key"
-                type="password"
-              />
-              <Button type="submit" variant="outline">
-                <Lock /> Unlock
-              </Button>
-            </form>
-          )}
-        </section>
-      )}
 
       <h2 className="mt-10 text-xl font-semibold">Demo trade history</h2>
       <div className="panel mt-3 divide-y divide-border">

@@ -52,13 +52,13 @@ const PILLARS = [
     icon: GraduationCap,
     title: "Training",
     to: "/training" as const,
-    body: "My own YouTube classes sorted into binary, trading, shopping and getting started.",
+    body: "Review the topics planned for the future HILOXS training library.",
   },
   {
     icon: Network,
     title: "Binary Plan",
     to: "/binary-plan" as const,
-    body: "Register referrals yourself; direct and pairing bonuses release automatically.",
+    body: "Explore a browser-only prototype of referral and pairing calculations.",
   },
   {
     icon: Activity,
@@ -76,7 +76,7 @@ const PILLARS = [
     icon: Laptop,
     title: "My Orders",
     to: "/my-orders" as const,
-    body: "Track everything you have bought, its payment method and delivery status.",
+    body: "Order history will be available after secure account and checkout services launch.",
   },
 ];
 
@@ -96,22 +96,24 @@ function Index() {
           </h1>
           <p className="mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
             HILOXS is one platform with four engines: a marketplace for laptops, screens and
-            woofers; a binary network marketing plan that pays you for every referral and every
-            pair; a demo trading desk; and a training academy where I show you exactly how I work
-            each system.
+            woofers; a browser-only binary-plan prototype; a demo trading desk using virtual funds;
+            and a training library that is being prepared.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Button asChild variant="hero" size="lg">
-              <Link to="/binary-plan">Join the binary plan</Link>
+              <Link to="/binary-plan">Explore the binary prototype</Link>
             </Button>
             <Button asChild variant="outline" size="lg">
               <Link to="/shop">Browse the shop</Link>
             </Button>
           </div>
           <dl className="mt-8 grid max-w-md grid-cols-3 gap-4">
-            <HeroStat label="Per referral" value={dual(PLAN.directReferralKes).split(" (")[0]!} />
-            <HeroStat label="Per pair" value={dual(PLAN.pairMatchingKes).split(" (")[0]!} />
-            <HeroStat label="Entry package" value={dual(PLAN.entryPackageKes).split(" (")[0]!} />
+            <HeroStat
+              label="Prototype referral"
+              value={dual(PLAN.directReferralKes).split(" (")[0]!}
+            />
+            <HeroStat label="Prototype pair" value={dual(PLAN.pairMatchingKes).split(" (")[0]!} />
+            <HeroStat label="Proposed package" value={dual(PLAN.entryPackageKes).split(" (")[0]!} />
           </dl>
         </div>
         <div className="panel overflow-hidden">
@@ -153,34 +155,35 @@ function Index() {
             <div className="flex items-center gap-2 text-primary">
               <Wallet className="size-5" />
               <span className="text-xs font-semibold uppercase tracking-widest">
-                How the money works
+                Prototype assumptions
               </span>
             </div>
-            <h2 className="mt-3 text-2xl font-bold sm:text-3xl">The binary plan in plain words</h2>
+            <h2 className="mt-3 text-2xl font-bold sm:text-3xl">
+              The proposed binary plan in plain words
+            </h2>
             <ol className="mt-5 space-y-4 text-sm text-muted-foreground">
               <li>
-                <span className="font-semibold text-foreground">1. Activate.</span> Your entry
-                package is {dual(PLAN.entryPackageKes)}. {kes(PLAN.registrationFeeKes)} of it is
-                held as the registration fee and set aside; the rest becomes the profit pool.
+                <span className="font-semibold text-foreground">1. Proposed package.</span> The
+                model uses {dual(PLAN.entryPackageKes)}, with {kes(PLAN.registrationFeeKes)}{" "}
+                assigned as an illustrative registration fee.
               </li>
               <li>
-                <span className="font-semibold text-foreground">2. Refer.</span> Every referral you
-                register yourself pays you {dual(PLAN.directReferralKes)}. Bring in two and that is{" "}
-                {dual(PLAN.directReferralKes * 2)}.
+                <span className="font-semibold text-foreground">2. Demo referrals.</span> The
+                prototype assigns {dual(PLAN.directReferralKes)} to each simulated direct referral.
               </li>
               <li>
-                <span className="font-semibold text-foreground">3. Pair.</span> One person on your
-                left leg plus one on your right forms a pair, and each pair adds{" "}
-                {dual(PLAN.pairMatchingKes)} — again and again as new pairs form.
+                <span className="font-semibold text-foreground">3. Demo pairs.</span> One simulated
+                left referral plus one simulated right referral adds {dual(PLAN.pairMatchingKes)} to
+                the browser-only prototype ledger.
               </li>
               <li>
-                <span className="font-semibold text-foreground">4. Withdraw.</span> Bonuses land in
-                your wallet automatically and move to your PayPal or MiniPay account, then out to
-                M-Pesa.
+                <span className="font-semibold text-foreground">4. No withdrawals.</span> Prototype
+                balances have no cash value. PayPal, MiniPay and M-Pesa payouts are not currently
+                available.
               </li>
             </ol>
             <Button asChild variant="hero" className="mt-6">
-              <Link to="/binary-plan">Open my binary dashboard</Link>
+              <Link to="/binary-plan">Open the prototype dashboard</Link>
             </Button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
