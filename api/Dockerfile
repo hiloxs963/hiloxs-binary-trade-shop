@@ -7,6 +7,7 @@ RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN npm run build
+RUN test -f dist/db/migrations/meta/_journal.json
 
 FROM node:24-alpine AS runtime
 
