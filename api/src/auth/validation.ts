@@ -48,6 +48,10 @@ export const VerificationRequestSchema = z.object({
   callbackURL: z.url().optional(),
 });
 
+export const EmailVerificationSchema = z.object({
+  token: z.string().trim().min(1).max(4_096),
+});
+
 export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }

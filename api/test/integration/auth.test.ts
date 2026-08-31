@@ -18,7 +18,8 @@ import { session, user, verification } from "../../src/db/schema/auth.js";
 import { EmailDeliveryError } from "../../src/lib/errors.js";
 
 const FRONTEND_ORIGIN = "http://localhost:8080";
-const VERIFIED_CALLBACK = `${FRONTEND_ORIGIN}/verify-email?verified=true`;
+const VERIFICATION_PAGE = `${FRONTEND_ORIGIN}/verify-email`;
+const VERIFICATION_ENDPOINT = "/api/v1/auth/verify-email";
 const RESET_CALLBACK = `${FRONTEND_ORIGIN}/reset-password`;
 const ORIGINAL_PASSWORD = "StrongPassword!42";
 const NEW_PASSWORD = "NewStrongPassword!43";
@@ -81,16 +82,20 @@ describe("email and password authentication", () => {
     });
   });
 
-  it("replaces same-origin callback paths with the canonical frontend verification route", async () => {
+  it("builds verification links from the canonical frontend URL", async () => {
     const response = await post("/api/auth/sign-up/email", {
       ...registrationBody("canonical-verification@example.com"),
       callbackURL: `${FRONTEND_ORIGIN}/checkout`,
     });
     const message = emailSender.messages.find((email) => email.kind === "verification");
     const verificationUrl = new URL(message?.url ?? "");
+    const token = new URLSearchParams(verificationUrl.hash.slice(1)).get("token");
 
     expect(response.statusCode).toBe(200);
-    expect(verificationUrl.searchParams.get("callbackURL")).toBe(VERIFIED_CALLBACK);
+    expect(verificationUrl.origin).toBe(FRONTEND_ORIGIN);
+    expect(verificationUrl.pathname).toBe("/verify-email");
+    expect(verificationUrl.search).toBe("");
+    expect(token).toEqual(expect.any(String));
   });
 
   it("returns an enumeration-resistant response for duplicate registration", async () => {
@@ -122,24 +127,44 @@ describe("email and password authentication", () => {
     expect(authenticated.body).not.toContain("sessionToken");
   });
 
-  it("accepts an email verification token only once", async () => {
+  it("requires an explicit POST and resists scanner or prefetch GETs", async () => {
     await register("one-time-verification@example.com");
     const message = emailSender.messages.find((email) => email.kind === "verification");
     const verificationUrl = new URL(message?.url ?? "");
-    const rawToken = verificationUrl.searchParams.get("token") ?? "";
-    const path = `${verificationUrl.pathname}${verificationUrl.search}`;
+    const rawToken = verificationTokenFrom(message?.url);
     const [storedToken] = await database.db
       .select({ identifier: verification.identifier })
       .from(verification);
 
-    const first = await app.inject({ method: "GET", url: path });
-    const replay = await app.inject({ method: "GET", url: path });
-    const replayLocation = new URL(replay.headers.location ?? "", FRONTEND_ORIGIN);
+    const frontendPrefetch = await app.inject({ method: "GET", url: verificationUrl.pathname });
+    const repeatedPrefetch = await app.inject({ method: "GET", url: verificationUrl.pathname });
+    const legacyApiGet = await app.inject({
+      method: "GET",
+      url: `/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`,
+    });
+    const [beforeConfirmation] = await database.db
+      .select({ verified: user.emailVerified })
+      .from(user)
+      .where(eq(user.email, "one-time-verification@example.com"));
 
-    expect(first.statusCode).toBe(302);
+    const first = await post(VERIFICATION_ENDPOINT, { token: rawToken });
+    const replay = await post(VERIFICATION_ENDPOINT, { token: rawToken });
+    const [afterConfirmation] = await database.db
+      .select({ verified: user.emailVerified })
+      .from(user)
+      .where(eq(user.email, "one-time-verification@example.com"));
+
+    expect(verificationUrl.search).toBe("");
+    expect(verificationUrl.hash).toBe(`#token=${rawToken}`);
+    expect(frontendPrefetch.statusCode).toBe(404);
+    expect(repeatedPrefetch.statusCode).toBe(404);
+    expect(legacyApiGet.statusCode).toBe(405);
+    expect(beforeConfirmation).toEqual({ verified: false });
     expect(storedToken?.identifier).not.toContain(rawToken);
-    expect(replay.statusCode).toBe(302);
-    expect(replayLocation.searchParams.get("error")).toBe("INVALID_TOKEN");
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toEqual({ status: true });
+    expect(afterConfirmation).toEqual({ verified: true });
+    expect(replay.statusCode).toBe(400);
   });
 
   it("rejects invalid and expired email verification tokens", async () => {
@@ -148,25 +173,17 @@ describe("email and password authentication", () => {
     const verificationUrl = new URL(message?.url ?? "");
     await database.db.update(verification).set({ expiresAt: new Date(Date.now() - 1_000) });
 
-    const expired = await app.inject({
-      method: "GET",
-      url: `${verificationUrl.pathname}${verificationUrl.search}`,
+    const expired = await post(VERIFICATION_ENDPOINT, {
+      token: verificationTokenFrom(verificationUrl.href),
     });
-    const invalid = await app.inject({
-      method: "GET",
-      url: `/api/auth/verify-email?token=invalid-verification-token&callbackURL=${encodeURIComponent(VERIFIED_CALLBACK)}`,
-    });
+    const invalid = await post(VERIFICATION_ENDPOINT, { token: "invalid-verification-token" });
     const [stored] = await database.db
       .select({ verified: user.emailVerified })
       .from(user)
       .where(eq(user.email, "expired-verification@example.com"));
 
-    expect(new URL(expired.headers.location ?? "", FRONTEND_ORIGIN).searchParams.get("error")).toBe(
-      "INVALID_TOKEN",
-    );
-    expect(new URL(invalid.headers.location ?? "", FRONTEND_ORIGIN).searchParams.get("error")).toBe(
-      "INVALID_TOKEN",
-    );
+    expect(expired.statusCode).toBe(400);
+    expect(invalid.statusCode).toBe(400);
     expect(stored).toEqual({ verified: false });
   });
 
@@ -204,14 +221,16 @@ describe("email and password authentication", () => {
         headers,
         payload: {
           ...registrationBody("production-cookie@example.com"),
-          callbackURL: "https://hiloxs.co.ke/verify-email?verified=true",
+          callbackURL: "https://hiloxs.co.ke/verify-email",
         },
       });
       const message = productionEmailSender.messages[0];
       const verificationUrl = new URL(message?.url ?? "");
       await productionApp.inject({
-        method: "GET",
-        url: `${verificationUrl.pathname}${verificationUrl.search}`,
+        method: "POST",
+        url: VERIFICATION_ENDPOINT,
+        headers,
+        payload: { token: verificationTokenFrom(verificationUrl.href) },
       });
       const loginResponse = await productionApp.inject({
         method: "POST",
@@ -355,7 +374,7 @@ describe("email and password authentication", () => {
     await register("purpose-bound@example.com");
     const verificationMessage = emailSender.messages.find((email) => email.kind === "verification");
     const verificationLink = new URL(verificationMessage?.url ?? "");
-    const verificationToken = verificationLink.searchParams.get("token") ?? "";
+    const verificationToken = verificationTokenFrom(verificationLink.href);
     await post("/api/auth/request-password-reset", {
       email: "purpose-bound@example.com",
       redirectTo: RESET_CALLBACK,
@@ -368,26 +387,16 @@ describe("email and password authentication", () => {
       newPassword: NEW_PASSWORD,
       token: verificationToken,
     });
-    const resetAsVerification = await app.inject({
-      method: "GET",
-      url: `/api/auth/verify-email?token=${encodeURIComponent(resetToken)}&callbackURL=${encodeURIComponent(VERIFIED_CALLBACK)}`,
-    });
-    const intendedVerification = await app.inject({
-      method: "GET",
-      url: `${verificationLink.pathname}${verificationLink.search}`,
-    });
+    const resetAsVerification = await post(VERIFICATION_ENDPOINT, { token: resetToken });
+    const intendedVerification = await post(VERIFICATION_ENDPOINT, { token: verificationToken });
     const intendedReset = await post("/api/auth/reset-password", {
       newPassword: NEW_PASSWORD,
       token: resetToken,
     });
 
     expect(verificationAsReset.statusCode).toBeGreaterThanOrEqual(400);
-    expect(
-      new URL(resetAsVerification.headers.location ?? "", FRONTEND_ORIGIN).searchParams.get(
-        "error",
-      ),
-    ).toBe("INVALID_TOKEN");
-    expect(intendedVerification.statusCode).toBe(302);
+    expect(resetAsVerification.statusCode).toBe(400);
+    expect(intendedVerification.statusCode).toBe(200);
     expect(intendedReset.statusCode).toBe(200);
   });
 
@@ -525,7 +534,7 @@ describe("email and password authentication", () => {
       verificationResponses.push(
         await post(
           "/api/auth/send-verification-email",
-          { email: "email-rate-limit@example.com", callbackURL: VERIFIED_CALLBACK },
+          { email: "email-rate-limit@example.com", callbackURL: VERIFICATION_PAGE },
           { ip: "203.0.113.180" },
         ),
       );
@@ -553,20 +562,22 @@ function registrationBody(email: string, phone = "0712345678") {
     email,
     phone,
     password: ORIGINAL_PASSWORD,
-    callbackURL: VERIFIED_CALLBACK,
+    callbackURL: VERIFICATION_PAGE,
   };
 }
 
 async function verifyRegistrationEmail(): Promise<void> {
   const message = emailSender.messages.find((email) => email.kind === "verification");
   expect(message).toBeDefined();
-  const verificationUrl = new URL(message?.url ?? "");
-  const response = await app.inject({
-    method: "GET",
-    url: `${verificationUrl.pathname}${verificationUrl.search}`,
+  const response = await post(VERIFICATION_ENDPOINT, {
+    token: verificationTokenFrom(message?.url),
   });
-  expect(response.statusCode).toBe(302);
-  expect(response.headers.location).toContain(FRONTEND_ORIGIN);
+  expect(response.statusCode).toBe(200);
+}
+
+function verificationTokenFrom(url: string | undefined): string {
+  const verificationUrl = new URL(url ?? "");
+  return new URLSearchParams(verificationUrl.hash.slice(1)).get("token") ?? "";
 }
 
 async function login(email: string, password: string): Promise<InjectResponse> {

@@ -7,8 +7,7 @@ import { safeErrorForLog } from "../../src/lib/redact.js";
 
 const API_KEY = "re_test_key_with_safe_placeholder_characters";
 const FROM = "HILOXS <auth@mail.hiloxs.co.ke>";
-const VERIFICATION_URL =
-  "https://api.hiloxs.co.ke/api/auth/verify-email?token=test-token&callbackURL=https%3A%2F%2Fhiloxs.co.ke%2Fverify-email%3Fverified%3Dtrue";
+const VERIFICATION_URL = "https://hiloxs.co.ke/verify-email#token=test-token";
 const RESET_URL = "https://hiloxs.co.ke/reset-password#token=test-token";
 
 describe("authentication email delivery", () => {

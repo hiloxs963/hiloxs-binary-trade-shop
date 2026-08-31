@@ -11,7 +11,9 @@ export async function securityPlugin(
 
   app.addHook("onRequest", (request, _reply, done) => {
     const origin = request.headers.origin;
-    const authMutation = request.method === "POST" && request.url.startsWith("/api/auth/");
+    const authMutation =
+      request.method === "POST" &&
+      (request.url.startsWith("/api/auth/") || request.url.startsWith("/api/v1/auth/"));
     if ((authMutation && !origin) || (origin && !allowed.has(origin))) {
       done(new OriginNotAllowedError());
       return;

@@ -11,6 +11,7 @@ import { securityPlugin } from "./plugins/security.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerCurrentUserRoute } from "./routes/current-user.js";
 import { registerReadyRoute } from "./routes/ready.js";
+import { registerEmailVerificationRoute } from "./routes/verify-email.js";
 
 export type BuildAppOptions = {
   database?: DatabaseClient;
@@ -42,6 +43,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
       frontendURL: options.authRuntime.frontendURL,
       trustedOrigins: options.authRuntime.trustedOrigins,
     });
+    registerEmailVerificationRoute(app, { auth: options.auth });
     registerCurrentUserRoute(app, { auth: options.auth, database: options.database });
   }
 

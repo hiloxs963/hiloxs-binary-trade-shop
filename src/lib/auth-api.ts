@@ -54,7 +54,7 @@ export async function registerWithEmail(input: {
     method: "POST",
     body: JSON.stringify({
       ...input,
-      callbackURL: `${window.location.origin}/verify-email?verified=true`,
+      callbackURL: `${window.location.origin}/verify-email`,
     }),
   });
   if (!response.ok) throw await toAuthError(response, "Unable to create the account");
@@ -87,12 +87,20 @@ export async function resetPassword(token: string, newPassword: string): Promise
   if (!response.ok) throw await toAuthError(response, "Unable to reset the password");
 }
 
+export async function verifyEmail(token: string): Promise<void> {
+  const response = await request("/api/v1/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) throw await toAuthError(response, "Unable to verify the email address");
+}
+
 export async function resendVerification(email: string): Promise<void> {
   const response = await request("/api/auth/send-verification-email", {
     method: "POST",
     body: JSON.stringify({
       email,
-      callbackURL: `${window.location.origin}/verify-email?verified=true`,
+      callbackURL: `${window.location.origin}/verify-email`,
     }),
   });
   if (!response.ok) throw await toAuthError(response, "Unable to send a verification email");

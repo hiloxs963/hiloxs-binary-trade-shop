@@ -56,10 +56,14 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
       sendOnSignIn: true,
       autoSignInAfterVerification: false,
       expiresIn: EMAIL_VERIFICATION_TTL_SECONDS,
-      sendVerificationEmail: async ({ user: target, url, token }) => {
+      sendVerificationEmail: async ({ user: target, token }) => {
         try {
           await verificationTokens.issue(token, target.id, EMAIL_VERIFICATION_TTL_SECONDS);
-          await emailSender.send({ kind: "verification", recipient: target.email, url });
+          await emailSender.send({
+            kind: "verification",
+            recipient: target.email,
+            url: verificationFrontendURL(runtime.frontendURL, token),
+          });
         } catch (error) {
           const currentDelivery = deliveryState.getStore();
           if (currentDelivery) currentDelivery.verificationError = error;
@@ -143,12 +147,23 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
         }
         return response;
       }),
-    consumeEmailVerificationToken: (token: string) => verificationTokens.consume(token),
+    verifyEmailToken: (token: string, headers: Headers) =>
+      verificationTokens.consumeAfter(token, async () => {
+        const result = await service.api.verifyEmail({ query: { token }, headers });
+        if (!result?.status) throw new Error("Email verification did not complete");
+        return result;
+      }),
   });
 }
 
 function requiresConfirmedVerificationDelivery(path: string): boolean {
   return path.endsWith("/sign-up/email") || path.endsWith("/send-verification-email");
+}
+
+function verificationFrontendURL(frontendURL: string, token: string): string {
+  const url = new URL("/verify-email", frontendURL);
+  url.hash = new URLSearchParams({ token }).toString();
+  return url.href;
 }
 
 function passwordResetFrontendURL(frontendURL: string, token: string): string {

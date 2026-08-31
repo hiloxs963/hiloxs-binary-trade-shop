@@ -33,7 +33,12 @@ export function registerAuthRoutes(
         frontendURL,
         trustedOrigins,
       );
-      await enforceOneTimeEmailVerification(requestUrl, auth);
+      if (requestUrl.pathname.endsWith("/verify-email")) {
+        return reply
+          .header("allow", "POST")
+          .status(405)
+          .send({ code: "METHOD_NOT_ALLOWED", message: "Use explicit email verification" });
+      }
       const authRequest = new Request(requestUrl, {
         method: request.method,
         headers: fromNodeHeaders(request.headers),
@@ -56,15 +61,6 @@ export function registerAuthRoutes(
       return reply.send(payload);
     },
   });
-}
-
-async function enforceOneTimeEmailVerification(requestUrl: URL, auth: AuthService): Promise<void> {
-  if (!requestUrl.pathname.endsWith("/verify-email")) return;
-  const token = requestUrl.searchParams.get("token");
-  if (token && (await auth.consumeEmailVerificationToken(token))) return;
-
-  // Let Better Auth preserve its normal trusted callback and invalid-token response behavior.
-  requestUrl.searchParams.set("token", "invalid-or-consumed");
 }
 
 function normalizeAuthBody(
@@ -94,7 +90,7 @@ function withCanonicalAuthRedirect(path: string, value: unknown, frontendURL: st
   if (path.endsWith("/sign-up/email") || path.endsWith("/send-verification-email")) {
     return {
       ...value,
-      callbackURL: new URL("/verify-email?verified=true", frontendURL).href,
+      callbackURL: new URL("/verify-email", frontendURL).href,
     };
   }
   if (path.endsWith("/request-password-reset")) {

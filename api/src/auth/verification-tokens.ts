@@ -21,13 +21,25 @@ export class EmailVerificationTokenStore {
     });
   }
 
-  async consume(token: string): Promise<boolean> {
-    const [record] = await this.#database.db
-      .delete(verification)
-      .where(eq(verification.identifier, tokenIdentifier(token)))
-      .returning({ expiresAt: verification.expiresAt });
+  async consumeAfter<T>(token: string, verify: () => Promise<T>): Promise<T | null> {
+    return this.#database.db.transaction(async (transaction) => {
+      const identifier = tokenIdentifier(token);
+      const [record] = await transaction
+        .select({ expiresAt: verification.expiresAt })
+        .from(verification)
+        .where(eq(verification.identifier, identifier))
+        .for("update");
 
-    return Boolean(record && record.expiresAt > new Date());
+      if (!record) return null;
+      if (record.expiresAt <= new Date()) {
+        await transaction.delete(verification).where(eq(verification.identifier, identifier));
+        return null;
+      }
+
+      const result = await verify();
+      await transaction.delete(verification).where(eq(verification.identifier, identifier));
+      return result;
+    });
   }
 }
 

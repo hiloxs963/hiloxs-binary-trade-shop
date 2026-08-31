@@ -1,35 +1,55 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthFormLayout, FormNotice } from "@/components/hiloxs/AuthForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { resendVerification } from "@/lib/auth-api";
+import { resendVerification, verifyEmail } from "@/lib/auth-api";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/verify-email")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    verified: search["verified"] === "true",
-    error: typeof search["error"] === "string" ? search["error"] : "",
-  }),
-  head: () =>
-    pageSeo({
+  head: () => {
+    const seo = pageSeo({
       title: "Verify Email | HILOXS",
       description: "Verify the email address for a HILOXS account.",
       path: "/verify-email",
       noindex: true,
-    }),
+    });
+    return {
+      ...seo,
+      meta: [...seo.meta, { name: "referrer", content: "no-referrer" }],
+    };
+  },
   component: VerifyEmailPage,
 });
 
 function VerifyEmailPage() {
-  const search = Route.useSearch();
+  const [verificationToken, setVerificationToken] = useState("");
+  const [tokenCaptured, setTokenCaptured] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [verificationFailed, setVerificationFailed] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  if (search.verified) {
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("token")?.trim() ?? "";
+    setVerificationToken(token);
+    setTokenCaptured(true);
+
+    if (!window.location.hash) return;
+    const sanitized = new URL(window.location.href);
+    sanitized.hash = "";
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${sanitized.pathname}${sanitized.search}`,
+    );
+  }, []);
+
+  if (verified) {
     return (
       <AuthFormLayout
         title="Email verified"
@@ -59,6 +79,70 @@ function VerifyEmailPage() {
         </Link>
       }
     >
+      {tokenCaptured && verificationToken && !verificationFailed ? (
+        <Button
+          type="button"
+          variant="hero"
+          className="w-full"
+          disabled={verifying}
+          onClick={async () => {
+            setVerifying(true);
+            try {
+              await verifyEmail(verificationToken);
+              setVerificationToken("");
+              setVerified(true);
+            } catch {
+              setVerificationToken("");
+              setVerificationFailed(true);
+            } finally {
+              setVerifying(false);
+            }
+          }}
+        >
+          {verifying ? "Verifying..." : "Verify Email"}
+        </Button>
+      ) : !tokenCaptured ? (
+        <Button type="button" variant="hero" className="w-full" disabled>
+          Preparing verification...
+        </Button>
+      ) : (
+        <VerificationResendForm
+          email={email}
+          setEmail={setEmail}
+          error={error}
+          setError={setError}
+          notice={notice}
+          setNotice={setNotice}
+          submitting={submitting}
+          setSubmitting={setSubmitting}
+        />
+      )}
+    </AuthFormLayout>
+  );
+}
+
+function VerificationResendForm({
+  email,
+  setEmail,
+  error,
+  setError,
+  notice,
+  setNotice,
+  submitting,
+  setSubmitting,
+}: {
+  email: string;
+  setEmail: (value: string) => void;
+  error: string;
+  setError: (value: string) => void;
+  notice: string;
+  setNotice: (value: string) => void;
+  submitting: boolean;
+  setSubmitting: (value: boolean) => void;
+}) {
+  return (
+    <>
+      <FormNotice>The verification link is invalid, expired, or missing.</FormNotice>
       <form
         noValidate
         className="space-y-4"
@@ -79,7 +163,6 @@ function VerifyEmailPage() {
           }
         }}
       >
-        {search.error && <FormNotice>The verification link is invalid or has expired.</FormNotice>}
         <div className="space-y-1.5">
           <Label htmlFor="verification-email">Email address</Label>
           <Input
@@ -103,6 +186,6 @@ function VerifyEmailPage() {
           {submitting ? "Sending..." : "Resend verification"}
         </Button>
       </form>
-    </AuthFormLayout>
+    </>
   );
 }
