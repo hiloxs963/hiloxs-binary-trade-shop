@@ -16,6 +16,7 @@ describe("environment configuration", () => {
       HOST: "127.0.0.1",
       PORT: 3000,
       LOG_LEVEL: "info",
+      MPESA_PUBLIC_ENABLED: false,
       MPESA_REQUEST_TIMEOUT_MS: 10_000,
     });
   });
@@ -134,6 +135,7 @@ describe("environment configuration", () => {
       parseEnv({
         NODE_ENV: "test",
         MPESA_ENV: "sandbox",
+        MPESA_PUBLIC_ENABLED: "true",
         MPESA_CONSUMER_KEY: "test-consumer-key",
         MPESA_CONSUMER_SECRET: "test-consumer-secret",
         MPESA_SHORTCODE: "174379",
@@ -147,9 +149,18 @@ describe("environment configuration", () => {
 
     expect(config).toMatchObject({
       environment: "sandbox",
+      publicEnabled: true,
       baseURL: "https://sandbox.safaricom.co.ke",
       maxAmountKes: 100_000n,
     });
+  });
+
+  it("parses the public M-Pesa flag strictly and defaults it off", () => {
+    expect(parseEnv({}).MPESA_PUBLIC_ENABLED).toBe(false);
+    expect(parseEnv({ MPESA_PUBLIC_ENABLED: "false" }).MPESA_PUBLIC_ENABLED).toBe(false);
+    expect(parseEnv({ MPESA_PUBLIC_ENABLED: "true" }).MPESA_PUBLIC_ENABLED).toBe(true);
+    expect(() => parseEnv({ MPESA_PUBLIC_ENABLED: "1" })).toThrow(ConfigurationError);
+    expect(() => parseEnv({ MPESA_PUBLIC_ENABLED: "TRUE" })).toThrow(ConfigurationError);
   });
 
   it("requires HTTPS for the production M-Pesa callback", () => {

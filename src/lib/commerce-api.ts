@@ -1,3 +1,8 @@
+import type { PaymentConfig } from "./mpesa-availability";
+
+export { mpesaAvailabilityForOrder } from "./mpesa-availability";
+export type { MpesaOrderAvailability, PaymentConfig } from "./mpesa-availability";
+
 export type CartRequestItem = {
   productId: string;
   quantity: number;
@@ -98,6 +103,12 @@ export async function getOrders(): Promise<CommerceOrder[]> {
   const response = await request("/api/v1/orders", { method: "GET" });
   if (!response.ok) throw await toCommerceError(response, "Unable to load orders");
   return ((await response.json()) as { orders: CommerceOrder[] }).orders;
+}
+
+export async function getPaymentConfig(): Promise<PaymentConfig> {
+  const response = await request("/api/v1/payments/config", { method: "GET" });
+  if (!response.ok) throw await toCommerceError(response, "Unable to load payment availability");
+  return (await response.json()) as PaymentConfig;
 }
 
 export async function cancelOrder(orderId: string): Promise<CommerceOrder> {

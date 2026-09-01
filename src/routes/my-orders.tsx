@@ -11,10 +11,13 @@ import {
   formatMoneyMinor,
   getOrderPaymentStatus,
   getOrders,
+  getPaymentConfig,
   initiateMpesaPayment,
+  mpesaAvailabilityForOrder,
   refreshMpesaPayment,
   type CommerceOrder,
   type OrderPaymentStatus,
+  type PaymentConfig,
 } from "@/lib/commerce-api";
 import { pageSeo } from "@/lib/seo";
 
@@ -44,6 +47,7 @@ function MyOrdersPage() {
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState("");
   const [paymentBlocking, setPaymentBlocking] = useState<Record<string, boolean>>({});
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>();
 
   useEffect(() => {
     if (auth.isLoading || !auth.isAuthenticated) return;
@@ -59,6 +63,21 @@ function MyOrdersPage() {
       })
       .finally(() => {
         if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.isAuthenticated, auth.isLoading]);
+
+  useEffect(() => {
+    if (auth.isLoading || !auth.isAuthenticated) return;
+    let active = true;
+    void getPaymentConfig()
+      .then((config) => {
+        if (active) setPaymentConfig(config);
+      })
+      .catch(() => {
+        if (active) setPaymentConfig(null);
       });
     return () => {
       active = false;
@@ -174,6 +193,7 @@ function MyOrdersPage() {
                 <OrderPaymentControls
                   order={order}
                   initialPhone={auth.currentUser?.phone ?? ""}
+                  paymentConfig={paymentConfig}
                   onPayment={(payment) => {
                     setPaymentBlocking((current) => ({
                       ...current,
@@ -200,10 +220,12 @@ function MyOrdersPage() {
 function OrderPaymentControls({
   order,
   initialPhone,
+  paymentConfig,
   onPayment,
 }: {
   order: CommerceOrder;
   initialPhone: string;
+  paymentConfig: PaymentConfig | null | undefined;
   onPayment: (payment: OrderPaymentStatus) => void;
 }) {
   const [payment, setPayment] = useState<OrderPaymentStatus | null>(null);
@@ -251,49 +273,67 @@ function OrderPaymentControls({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id, payment?.paymentStatus]);
 
-  const canInitiate =
+  const paymentStateAllowsInitiation =
     order.status === "PENDING_PAYMENT" &&
     (!payment || payment.paymentStatus === null || payment.paymentStatus === "FAILED");
+  const availability = mpesaAvailabilityForOrder(paymentConfig, order.orderNumber);
 
   return (
     <div className="mt-5 border-t border-border pt-4">
-      {canInitiate && (
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <Input
-            aria-label={`M-Pesa phone for order ${order.orderNumber}`}
-            inputMode="tel"
-            value={phone}
-            onChange={(event) => {
-              setPhone(event.target.value);
-              key.current = null;
-            }}
-            placeholder="0712 345 678"
-          />
-          <Button
-            disabled={busy || !phone.trim()}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              if (payment?.paymentStatus === "FAILED") key.current = null;
-              key.current ??= crypto.randomUUID();
-              try {
-                applyPayment(await initiateMpesaPayment(order.id, phone, key.current));
-              } catch {
-                setError("The M-Pesa prompt could not be confirmed. Check status before retrying.");
+      {paymentStateAllowsInitiation && availability.canInitiate && (
+        <div className="space-y-3">
+          {availability.sandboxTest && (
+            <p className="text-sm text-muted-foreground">
+              Controlled sandbox testing only. This is not a live customer payment.
+            </p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <Input
+              aria-label={`M-Pesa phone for order ${order.orderNumber}`}
+              inputMode="tel"
+              value={phone}
+              onChange={(event) => {
+                setPhone(event.target.value);
+                key.current = null;
+              }}
+              placeholder="0712 345 678"
+            />
+            <Button
+              disabled={busy || !phone.trim()}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                if (payment?.paymentStatus === "FAILED") key.current = null;
+                key.current ??= crypto.randomUUID();
                 try {
-                  applyPayment(await getOrderPaymentStatus(order.id));
+                  applyPayment(await initiateMpesaPayment(order.id, phone, key.current));
                 } catch {
-                  // Reuse the key while the initiation outcome is unknown.
+                  setError(
+                    "The M-Pesa prompt could not be confirmed. Check status before retrying.",
+                  );
+                  try {
+                    applyPayment(await getOrderPaymentStatus(order.id));
+                  } catch {
+                    // Reuse the key while the initiation outcome is unknown.
+                  }
+                } finally {
+                  setBusy(false);
                 }
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Smartphone aria-hidden />}
-            Pay with M-Pesa
-          </Button>
+              }}
+            >
+              {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Smartphone aria-hidden />}
+              {availability.sandboxTest ? "Run sandbox M-Pesa test" : "Pay with M-Pesa"}
+            </Button>
+          </div>
         </div>
+      )}
+
+      {paymentStateAllowsInitiation && !availability.canInitiate && (
+        <p className="text-sm text-muted-foreground">
+          {paymentConfig === undefined
+            ? "Checking M-Pesa availability..."
+            : "M-Pesa payments are not currently available."}
+        </p>
       )}
 
       {payment?.paymentStatus === "SUCCEEDED" && (

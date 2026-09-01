@@ -9,6 +9,7 @@ export type ErrorCode =
   | "IDEMPOTENCY_KEY_REUSED"
   | "PAYMENT_ALREADY_IN_PROGRESS"
   | "PAYMENT_IN_PROGRESS"
+  | "MPESA_NOT_AVAILABLE"
   | "PAYMENT_PROVIDER_UNAVAILABLE"
   | "PAYMENT_REQUIRES_REVIEW"
   | "PAYLOAD_TOO_LARGE"
@@ -136,6 +137,16 @@ export class PaymentInProgressError extends AppError {
     super("This order cannot be cancelled while payment confirmation is pending", {
       code: "PAYMENT_IN_PROGRESS",
       statusCode: 409,
+      expose: true,
+    });
+  }
+}
+
+export class MpesaNotAvailableError extends AppError {
+  constructor() {
+    super("M-Pesa payments are not currently available", {
+      code: "MPESA_NOT_AVAILABLE",
+      statusCode: 503,
       expose: true,
     });
   }

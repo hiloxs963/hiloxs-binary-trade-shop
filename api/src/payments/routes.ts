@@ -11,6 +11,7 @@ import { orders } from "../db/schema/commerce.js";
 import { paymentAttempts, paymentEvents } from "../db/schema/payments.js";
 import {
   IdempotencyKeyReusedError,
+  MpesaNotAvailableError,
   NotFoundError,
   PaymentAlreadyInProgressError,
   PaymentProviderUnavailableError,
@@ -52,6 +53,13 @@ export function registerMpesaRoutes(
 ): void {
   const limiter = new FixedWindowRateLimiter();
 
+  app.get("/api/v1/payments/config", () => ({
+    mpesa: {
+      available: options.config.environment === "production" && options.config.publicEnabled,
+      mode: options.config.environment,
+    },
+  }));
+
   app.post("/api/v1/orders/:orderId/payments/mpesa", async (request, reply) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
     limiter.consume(`mpesa-initiate:${owner.id}`, 5, 60_000);
@@ -69,6 +77,7 @@ export function registerMpesaRoutes(
         .for("update")
         .limit(1);
       if (!order) throw new NotFoundError();
+      assertMpesaInitiationAvailable(options.config, order.orderNumber);
 
       const [existing] = await transaction
         .select()
@@ -215,6 +224,12 @@ export function registerMpesaRoutes(
     }
     return { received: true };
   });
+}
+
+function assertMpesaInitiationAvailable(config: MpesaRuntimeConfig, orderNumber: string): void {
+  const sandboxTestOrder = orderNumber.startsWith("HX-SBX-");
+  const available = config.environment === "sandbox" ? sandboxTestOrder : config.publicEnabled;
+  if (!available) throw new MpesaNotAvailableError();
 }
 
 async function persistAcceptedInitiation(
