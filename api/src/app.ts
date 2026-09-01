@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyServerOptions } from "fastify";
+import { ZodError } from "zod";
 import type { AuthService } from "./auth/auth.js";
 import { registerAuthRoutes } from "./auth/fastify.js";
 import type { AuthRuntimeConfig } from "./config/env.js";
@@ -12,6 +13,9 @@ import { registerHealthRoute } from "./routes/health.js";
 import { registerCurrentUserRoute } from "./routes/current-user.js";
 import { registerReadyRoute } from "./routes/ready.js";
 import { registerEmailVerificationRoute } from "./routes/verify-email.js";
+import { registerCheckoutRoute } from "./routes/checkout.js";
+import { registerOrderRoutes } from "./routes/orders.js";
+import { registerProductRoutes } from "./routes/products.js";
 
 export type BuildAppOptions = {
   database?: DatabaseClient;
@@ -45,9 +49,12 @@ export async function buildApp(options: BuildAppOptions = {}) {
     });
     registerEmailVerificationRoute(app, { auth: options.auth });
     registerCurrentUserRoute(app, { auth: options.auth, database: options.database });
+    registerCheckoutRoute(app, { auth: options.auth, database: options.database });
+    registerOrderRoutes(app, { auth: options.auth, database: options.database });
   }
 
   if (options.database) {
+    registerProductRoutes(app, options.database);
     app.addHook("onClose", async () => {
       await options.database?.close();
     });
@@ -59,9 +66,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   app.setErrorHandler((error, request, reply) => {
-    const normalized = isValidationFailure(error)
-      ? new ValidationError("The request is invalid", error)
-      : error;
+    const normalized =
+      isValidationFailure(error) || error instanceof ZodError
+        ? new ValidationError("The request is invalid", error)
+        : error;
     const serialized = serializeError(normalized, request.id);
     request.log.error(
       { error: safeErrorForLog(normalized), requestId: request.id },

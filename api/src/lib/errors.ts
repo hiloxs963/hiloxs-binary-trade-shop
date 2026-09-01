@@ -5,6 +5,9 @@ export type ErrorCode =
   | "EMAIL_DELIVERY_FAILED"
   | "UNAUTHENTICATED"
   | "ORIGIN_NOT_ALLOWED"
+  | "CONFLICT"
+  | "IDEMPOTENCY_KEY_REUSED"
+  | "RATE_LIMITED"
   | "NOT_FOUND"
   | "INTERNAL_ERROR";
 
@@ -88,6 +91,36 @@ export class OriginNotAllowedError extends AppError {
     super("The request origin is not allowed", {
       code: "ORIGIN_NOT_ALLOWED",
       statusCode: 403,
+      expose: true,
+    });
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(message, {
+      code: "CONFLICT",
+      statusCode: 409,
+      expose: true,
+    });
+  }
+}
+
+export class IdempotencyKeyReusedError extends AppError {
+  constructor() {
+    super("The idempotency key was already used for a different order request", {
+      code: "IDEMPOTENCY_KEY_REUSED",
+      statusCode: 409,
+      expose: true,
+    });
+  }
+}
+
+export class RateLimitError extends AppError {
+  constructor() {
+    super("Too many requests", {
+      code: "RATE_LIMITED",
+      statusCode: 429,
       expose: true,
     });
   }

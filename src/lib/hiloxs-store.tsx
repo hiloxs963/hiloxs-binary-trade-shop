@@ -32,17 +32,6 @@ export type PayoutAccounts = {
   accountName: string;
 };
 
-export type OrderItem = { productId: string; name: string; qty: number; priceKes: number };
-
-export type Order = {
-  id: string;
-  items: OrderItem[];
-  totalKes: number;
-  method: "till" | "paybill" | "paypal" | "minipay";
-  status: "Processing" | "Shipped" | "Delivered";
-  at: number;
-};
-
 export type Trade = {
   id: string;
   asset: string;
@@ -81,7 +70,6 @@ export type HiloxsState = {
   paidPairs: number;
   accounts: PayoutAccounts;
   cart: Record<string, number>;
-  orders: Order[];
   trades: Trade[];
   demoBalanceUsd: number;
   admin: AdminTrading;
@@ -99,7 +87,6 @@ const initialState: HiloxsState = {
   paidPairs: 0,
   accounts: { paypalEmail: "", miniPayNumber: "", mpesaNumber: "", accountName: "" },
   cart: {},
-  orders: [],
   trades: [],
   demoBalanceUsd: 1000,
   admin: { unlocked: false, outcome: "market", payoutRate: 1.85 },
@@ -127,7 +114,11 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setState({ ...initialState, ...(JSON.parse(raw) as HiloxsState) });
+      if (raw) {
+        const stored = JSON.parse(raw) as Partial<HiloxsState> & { orders?: unknown };
+        delete stored.orders;
+        setState({ ...initialState, ...stored });
+      }
     } catch {
       /* ignore corrupt state */
     }
@@ -291,30 +282,6 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setState((prev) => ({ ...prev, cart: {} })), []);
 
-  const checkout: Ctx["checkout"] = useCallback(
-    (method) => {
-      const entries = Object.entries(state.cart);
-      if (entries.length === 0) return null;
-      const items: OrderItem[] = entries.map(([productId, qty]) => {
-        const product =
-          PRODUCTS.find((p) => p.id === productId) ??
-          state.customProducts.find((p) => p.id === productId)!;
-        return { productId, name: product.name, qty, priceKes: product.priceKes };
-      });
-      const order: Order = {
-        id: `HX-${Date.now().toString().slice(-6)}`,
-        items,
-        totalKes: items.reduce((s, i) => s + i.priceKes * i.qty, 0),
-        method,
-        status: "Processing",
-        at: Date.now(),
-      };
-      setState((prev) => ({ ...prev, orders: [order, ...prev.orders], cart: {} }));
-      return order;
-    },
-    [state.cart, state.customProducts],
-  );
-
   const recordTrade = useCallback((trade: Trade) => {
     setState((prev) => ({
       ...prev,
@@ -458,7 +425,6 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     addToCart,
     setCartQty,
     clearCart,
-    checkout,
     recordTrade,
     settleTrade,
     setAdmin,

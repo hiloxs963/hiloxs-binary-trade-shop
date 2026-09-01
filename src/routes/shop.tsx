@@ -227,7 +227,7 @@ function ShopPage() {
 
               <div className="mt-4 border-t border-border pt-4">
                 <p className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total</span>
+                  <span className="text-muted-foreground">Catalog estimate</span>
                   <span className="font-semibold">{dual(total)}</span>
                 </p>
                 <div className="mt-4 space-y-2">

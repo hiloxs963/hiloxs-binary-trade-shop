@@ -84,4 +84,22 @@ describe("API application", () => {
     expect(missing.statusCode).toBe(403);
     expect(trusted.statusCode).toBe(404);
   });
+
+  it("requires a trusted Origin on commerce mutations", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    const missing = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      payload: { items: [] },
+    });
+    const trusted = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { origin: "http://localhost:8080" },
+      payload: { items: [] },
+    });
+
+    expect(missing.statusCode).toBe(403);
+    expect(trusted.statusCode).toBe(404);
+  });
 });
