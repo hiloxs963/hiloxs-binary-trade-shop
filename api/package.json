@@ -2,7 +2,7 @@
   "name": "@hiloxs/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Infrastructure-only API foundation for HILOXS",
+  "description": "Backend API foundation for HILOXS",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "node --env-file-if-exists=.env --watch --import tsx src/server.ts",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "build": "npm run clean && tsc -p tsconfig.build.json && npm run copy:migrations",
+    "copy:migrations": "node -e \"require('node:fs').cpSync('src/db/migrations','dist/db/migrations',{recursive:true})\"",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -18,10 +19,13 @@
     "test:integration": "vitest run test/integration --maxWorkers=1",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts",
+    "db:migrate:prod": "node dist/db/migrate.js",
     "db:check": "drizzle-kit check --config=drizzle.config.ts"
   },
   "dependencies": {
+    "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.1",
+    "better-auth": "1.7.2",
     "drizzle-orm": "0.45.2",
     "fastify": "5.12.1",
     "pg": "8.23.0",

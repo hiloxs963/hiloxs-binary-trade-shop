@@ -1,4 +1,4 @@
-import { LOG_REDACT_PATHS, safeErrorForLog } from "./redact.js";
+import { LOG_REDACT_PATHS, redactRequestUrl, safeErrorForLog } from "./redact.js";
 
 export function createLoggerOptions(level: string) {
   return {
@@ -6,6 +6,14 @@ export function createLoggerOptions(level: string) {
     redact: {
       paths: [...LOG_REDACT_PATHS],
       censor: "[REDACTED]",
+    },
+    serializers: {
+      req(request: { method?: string; url?: string }) {
+        return {
+          method: request.method ?? "UNKNOWN",
+          url: request.url ? redactRequestUrl(request.url) : "",
+        };
+      },
     },
   };
 }

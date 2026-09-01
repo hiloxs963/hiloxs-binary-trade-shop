@@ -8,6 +8,13 @@
       "when": 1788083293615,
       "tag": "0000_glorious_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788092181967,
+      "tag": "0001_left_anthem",
+      "breakpoints": true
     }
   ]
 }

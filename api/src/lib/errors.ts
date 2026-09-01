@@ -2,6 +2,9 @@ export type ErrorCode =
   | "VALIDATION_ERROR"
   | "CONFIGURATION_ERROR"
   | "DATABASE_UNAVAILABLE"
+  | "EMAIL_DELIVERY_FAILED"
+  | "UNAUTHENTICATED"
+  | "ORIGIN_NOT_ALLOWED"
   | "NOT_FOUND"
   | "INTERNAL_ERROR";
 
@@ -59,6 +62,37 @@ export class DatabaseUnavailableError extends AppError {
   }
 }
 
+export class EmailDeliveryError extends AppError {
+  constructor(cause?: unknown) {
+    super("Authentication email delivery failed", {
+      code: "EMAIL_DELIVERY_FAILED",
+      statusCode: 503,
+      expose: false,
+      ...(cause === undefined ? {} : { cause }),
+    });
+  }
+}
+
+export class UnauthenticatedError extends AppError {
+  constructor() {
+    super("Authentication is required", {
+      code: "UNAUTHENTICATED",
+      statusCode: 401,
+      expose: true,
+    });
+  }
+}
+
+export class OriginNotAllowedError extends AppError {
+  constructor() {
+    super("The request origin is not allowed", {
+      code: "ORIGIN_NOT_ALLOWED",
+      statusCode: 403,
+      expose: true,
+    });
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor() {
     super("The requested resource was not found", {
@@ -109,6 +143,8 @@ export function serializeError(
 }
 
 function publicMessageFor(code: ErrorCode): string {
-  if (code === "DATABASE_UNAVAILABLE") return "Service temporarily unavailable";
+  if (code === "DATABASE_UNAVAILABLE" || code === "EMAIL_DELIVERY_FAILED") {
+    return "Service temporarily unavailable";
+  }
   return "An unexpected error occurred";
 }

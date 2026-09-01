@@ -1,5 +1,7 @@
 import { buildApp } from "./app.js";
-import { parseEnv, requireDatabaseUrl } from "./config/env.js";
+import { createAuthService } from "./auth/auth.js";
+import { createRuntimeEmailSender } from "./auth/email.js";
+import { parseEnv, requireDatabaseUrl, resolveAuthRuntimeConfig } from "./config/env.js";
 import { createDatabaseClient } from "./db/client.js";
 import { createLoggerOptions, writeFatalLog } from "./lib/logger.js";
 import { safeErrorForLog } from "./lib/redact.js";
@@ -7,7 +9,19 @@ import { safeErrorForLog } from "./lib/redact.js";
 async function start(): Promise<void> {
   const env = parseEnv(process.env);
   const database = createDatabaseClient(requireDatabaseUrl(env));
-  const app = await buildApp({ database, logger: createLoggerOptions(env.LOG_LEVEL) });
+  const authRuntime = resolveAuthRuntimeConfig(env);
+  const auth = createAuthService({
+    database,
+    emailSender: createRuntimeEmailSender(env),
+    runtime: authRuntime,
+  });
+  const app = await buildApp({
+    database,
+    auth,
+    authRuntime,
+    allowedOrigins: authRuntime.trustedOrigins,
+    logger: createLoggerOptions(env.LOG_LEVEL),
+  });
   let shuttingDown = false;
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {

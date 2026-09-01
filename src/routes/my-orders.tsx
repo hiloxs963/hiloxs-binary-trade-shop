@@ -31,6 +31,7 @@ function MyOrdersPage() {
       <AuthRequired
         title="Log in to view your orders"
         description="Order history will be private and loaded from your verified HILOXS account. Prototype browser orders are not shown as trusted customer records."
+        returnTo="/my-orders"
       />
     );
   }
@@ -41,7 +42,8 @@ function MyOrdersPage() {
       <div className="panel mt-8 grid place-items-center gap-4 p-12 text-center">
         <Package className="size-10 text-muted-foreground" aria-hidden />
         <p className="text-sm text-muted-foreground">
-          Your backend-controlled order history will appear here once the orders API is connected.
+          Orders backend coming next. No prototype browser orders are presented as authenticated
+          order history.
         </p>
       </div>
     </section>

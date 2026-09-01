@@ -1,15 +1,23 @@
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyServerOptions } from "fastify";
+import type { AuthService } from "./auth/auth.js";
+import { registerAuthRoutes } from "./auth/fastify.js";
+import type { AuthRuntimeConfig } from "./config/env.js";
 import type { DatabaseClient } from "./db/client.js";
 import { NotFoundError, serializeError, ValidationError } from "./lib/errors.js";
 import { safeErrorForLog } from "./lib/redact.js";
 import { requestContextPlugin } from "./plugins/request-context.js";
 import { securityPlugin } from "./plugins/security.js";
 import { registerHealthRoute } from "./routes/health.js";
+import { registerCurrentUserRoute } from "./routes/current-user.js";
 import { registerReadyRoute } from "./routes/ready.js";
+import { registerEmailVerificationRoute } from "./routes/verify-email.js";
 
 export type BuildAppOptions = {
   database?: DatabaseClient;
+  auth?: AuthService;
+  authRuntime?: AuthRuntimeConfig;
+  allowedOrigins?: readonly string[];
   logger?: FastifyServerOptions["logger"];
 };
 
@@ -24,9 +32,20 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   requestContextPlugin(app);
-  await securityPlugin(app);
+  await securityPlugin(app, options.allowedOrigins ?? ["http://localhost:8080"]);
   registerHealthRoute(app);
   registerReadyRoute(app, options.database);
+
+  if (options.auth && options.authRuntime && options.database) {
+    registerAuthRoutes(app, {
+      auth: options.auth,
+      baseURL: options.authRuntime.baseURL,
+      frontendURL: options.authRuntime.frontendURL,
+      trustedOrigins: options.authRuntime.trustedOrigins,
+    });
+    registerEmailVerificationRoute(app, { auth: options.auth });
+    registerCurrentUserRoute(app, { auth: options.auth, database: options.database });
+  }
 
   if (options.database) {
     app.addHook("onClose", async () => {

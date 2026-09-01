@@ -1,23 +1,13 @@
 import { createContext, useContext } from "react";
-
-export type AuthUser = {
-  id: string;
-  displayName: string;
-  email: string;
-};
+import type { AuthUser } from "./auth-api";
 
 export type AuthState = {
   currentUser: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  connectionStatus: "not-connected" | "connected";
-};
-
-export const DISCONNECTED_AUTH_STATE: AuthState = {
-  currentUser: null,
-  isAuthenticated: false,
-  isLoading: false,
-  connectionStatus: "not-connected",
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthState | null>(null);

@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Menu, ShoppingCart, UserRound, X } from "lucide-react";
+import { LogOut, Menu, ShoppingCart, UserRound, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import logoIcon from "@/assets/hiloxs-icon.png";
 import { SUPPORT } from "@/lib/hiloxs";
+import { useAuth } from "@/lib/auth-context";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -19,6 +21,7 @@ const NAV = [
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const { state, hydrated } = useHiloxs();
+  const auth = useAuth();
   const cartCount = hydrated ? Object.values(state.cart).reduce((s, q) => s + q, 0) : 0;
 
   return (
@@ -67,11 +70,31 @@ export function SiteHeader() {
               )}
             </Link>
           </Button>
-          <Button asChild variant="outline" size="icon" aria-label="Log in">
-            <Link to="/login">
+          <Button
+            asChild
+            variant="outline"
+            size="icon"
+            aria-label={auth.currentUser ? `Account for ${auth.currentUser.name}` : "Log in"}
+          >
+            <Link to={auth.currentUser ? "/my-orders" : "/login"}>
               <UserRound aria-hidden />
             </Link>
           </Button>
+          {auth.currentUser && (
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Log out"
+              onClick={() => {
+                void auth
+                  .logout()
+                  .then(() => toast.success("Logged out"))
+                  .catch(() => toast.error("Unable to log out"));
+              }}
+            >
+              <LogOut aria-hidden />
+            </Button>
+          )}
           <Button asChild variant="hero" size="sm" className="hidden sm:inline-flex">
             <Link to="/binary-plan">Explore the plan</Link>
           </Button>
@@ -175,6 +198,11 @@ export function SiteFooter() {
             <li>
               <Link to="/login" className="hover:text-foreground">
                 Log in
+              </Link>
+            </li>
+            <li>
+              <Link to="/register" className="hover:text-foreground">
+                Create an account
               </Link>
             </li>
           </ul>

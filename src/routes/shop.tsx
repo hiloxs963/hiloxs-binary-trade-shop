@@ -238,7 +238,7 @@ function ShopPage() {
                   </Button>
                   <p className="text-xs text-muted-foreground">
                     Account access will be required at checkout. Your cart stays available while you
-                    visit the temporary account-status page.
+                    sign in or register.
                   </p>
                   <Button variant="ghost" className="w-full" onClick={clearCart}>
                     Clear cart

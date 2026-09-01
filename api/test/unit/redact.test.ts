@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { redactSensitive, redactText, safeErrorForLog } from "../../src/lib/redact.js";
+import {
+  redactRequestUrl,
+  redactSensitive,
+  redactText,
+  safeErrorForLog,
+} from "../../src/lib/redact.js";
 
 describe("log redaction", () => {
   it("redacts database credentials and bearer tokens in text", () => {
     const text = redactText(
-      "postgresql://admin:secret@database:5432/hiloxs Bearer top-secret password=hunter2 apiKey=client-key x-api-key: header-key",
+      "postgresql://admin:secret@database:5432/hiloxs Bearer re_resend-secret password=hunter2 apiKey=client-key x-api-key: header-key RESEND_API_KEY=re_private-key",
     );
 
     expect(text).not.toContain("admin:secret");
-    expect(text).not.toContain("top-secret");
+    expect(text).not.toContain("re_resend-secret");
     expect(text).not.toContain("hunter2");
     expect(text).not.toContain("client-key");
     expect(text).not.toContain("header-key");
+    expect(text).not.toContain("re_private-key");
     expect(text).toContain("[REDACTED]");
   });
 
@@ -28,6 +34,7 @@ describe("log redaction", () => {
         apiKey: "api-key-value",
         api_key: "api-key-value",
         API_KEY: "api-key-value",
+        RESEND_API_KEY: "re_private-key",
         "x-api-key": "api-key-value",
         nested: { xApiKey: "api-key-value" },
       }),
@@ -42,9 +49,19 @@ describe("log redaction", () => {
       apiKey: "[REDACTED]",
       api_key: "[REDACTED]",
       API_KEY: "[REDACTED]",
+      RESEND_API_KEY: "[REDACTED]",
       "x-api-key": "[REDACTED]",
       nested: { xApiKey: "[REDACTED]" },
     });
+  });
+
+  it("redacts verification and reset tokens embedded in request URLs", () => {
+    expect(redactRequestUrl("/api/auth/verify-email?token=verification-secret&callbackURL=/")).toBe(
+      "/api/auth/verify-email?token=REDACTED&callbackURL=%2F",
+    );
+    expect(
+      redactRequestUrl("/api/auth/reset-password/reset-secret?callbackURL=/reset-password"),
+    ).toBe("/api/auth/reset-password/REDACTED?callbackURL=/reset-password");
   });
 
   it("preserves benign structured values", () => {
