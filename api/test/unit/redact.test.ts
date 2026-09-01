@@ -62,6 +62,27 @@ describe("log redaction", () => {
     expect(
       redactRequestUrl("/api/auth/reset-password/reset-secret?callbackURL=/reset-password"),
     ).toBe("/api/auth/reset-password/REDACTED?callbackURL=/reset-password");
+    expect(redactRequestUrl(`/api/v1/payments/mpesa/callback/${"callback-secret".repeat(4)}`)).toBe(
+      "/api/v1/payments/mpesa/callback/REDACTED",
+    );
+  });
+
+  it("redacts M-Pesa passkeys, generated passwords, and callback tokens", () => {
+    expect(
+      redactSensitive({
+        MPESA_CONSUMER_SECRET: "consumer-secret-value",
+        MPESA_PASSKEY: "passkey-value",
+        Password: "generated-password",
+        callbackToken: "callback-token",
+        safeReference: "HX-TEST",
+      }),
+    ).toEqual({
+      MPESA_CONSUMER_SECRET: "[REDACTED]",
+      MPESA_PASSKEY: "[REDACTED]",
+      Password: "[REDACTED]",
+      callbackToken: "[REDACTED]",
+      safeReference: "HX-TEST",
+    });
   });
 
   it("preserves benign structured values", () => {

@@ -102,4 +102,34 @@ describe("API application", () => {
     expect(missing.statusCode).toBe(403);
     expect(trusted.statusCode).toBe(404);
   });
+
+  it("allows provider callbacks without a browser Origin while protecting other payment posts", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    const callback = await app.inject({
+      method: "POST",
+      url: `/api/v1/payments/mpesa/callback/${"a".repeat(43)}`,
+      payload: {},
+    });
+    const payment = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders/00000000-0000-4000-8000-000000000001/payments/mpesa",
+      payload: {},
+    });
+
+    expect(callback.statusCode).toBe(404);
+    expect(payment.statusCode).toBe(403);
+  });
+
+  it("enforces the application body limit on provider callback paths", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/payments/mpesa/callback/${"a".repeat(43)}`,
+      headers: { "content-type": "application/json" },
+      payload: JSON.stringify("x".repeat(1_048_576)),
+    });
+
+    expect(response.statusCode).toBe(413);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe("PAYLOAD_TOO_LARGE");
+  });
 });

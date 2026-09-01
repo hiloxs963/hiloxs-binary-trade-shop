@@ -3,8 +3,9 @@ import { Pool } from "pg";
 import * as authSchema from "./schema/auth.js";
 import * as commerceSchema from "./schema/commerce.js";
 import * as metadataSchema from "./schema/system-metadata.js";
+import * as paymentSchema from "./schema/payments.js";
 
-const schema = { ...authSchema, ...commerceSchema, ...metadataSchema };
+const schema = { ...authSchema, ...commerceSchema, ...metadataSchema, ...paymentSchema };
 
 export type Database = NodePgDatabase<typeof schema>;
 

@@ -1,13 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Loader2, ShoppingCart } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  ShoppingCart,
+  Smartphone,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import {
   createOrder,
   formatMoneyMinor,
   getCheckoutQuote,
+  getOrderPaymentStatus,
+  initiateMpesaPayment,
+  refreshMpesaPayment,
+  type CommerceOrder,
   type CheckoutQuote,
+  type OrderPaymentStatus,
 } from "@/lib/commerce-api";
 import { PRODUCTS } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
@@ -33,6 +46,7 @@ function CheckoutPage() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [createdOrder, setCreatedOrder] = useState<CommerceOrder | null>(null);
   const idempotencyKey = useRef<string | null>(null);
   const items = useMemo(
     () => Object.entries(state.cart).map(([productId, quantity]) => ({ productId, quantity })),
@@ -78,6 +92,11 @@ function CheckoutPage() {
   if (!auth.isAuthenticated) {
     return <PageStatus>Redirecting to login. Your cart will remain available.</PageStatus>;
   }
+  if (createdOrder) {
+    return (
+      <CreatedOrderPayment order={createdOrder} initialPhone={auth.currentUser?.phone ?? ""} />
+    );
+  }
   if (items.length === 0) {
     return (
       <section className="mx-auto max-w-xl px-4 py-16 text-center">
@@ -99,7 +118,7 @@ function CheckoutPage() {
     <section className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-3xl font-bold sm:text-4xl">Checkout</h1>
       <p className="mt-2 text-muted-foreground">
-        Prices below are confirmed by the HILOXS server. Payment is not available yet.
+        Prices below are confirmed by the HILOXS server before an M-Pesa prompt can be sent.
       </p>
 
       <div className="panel mt-8 p-5 sm:p-6">
@@ -173,7 +192,7 @@ function CheckoutPage() {
           try {
             const order = await createOrder(items, idempotencyKey.current);
             clearCart();
-            await navigate({ to: "/my-orders", search: { created: order.orderNumber } });
+            setCreatedOrder(order);
           } catch {
             setCreateError("The pending order could not be created. No payment was taken.");
           } finally {
@@ -185,10 +204,156 @@ function CheckoutPage() {
         {creating ? "Creating order..." : "Create pending order"}
       </Button>
       <p className="mt-3 text-center text-xs text-muted-foreground">
-        This creates a pending-payment order only. It does not charge or reserve funds.
+        Creating the order does not charge you. You choose whether to send the M-Pesa prompt next.
       </p>
     </section>
   );
+}
+
+function CreatedOrderPayment({
+  order,
+  initialPhone,
+}: {
+  order: CommerceOrder;
+  initialPhone: string;
+}) {
+  const [phone, setPhone] = useState(initialPhone);
+  const [payment, setPayment] = useState<OrderPaymentStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const paymentKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!payment || !isPollingStatus(payment.paymentStatus)) return;
+    const timer = window.setInterval(() => {
+      void getOrderPaymentStatus(order.id)
+        .then(setPayment)
+        .catch(() => undefined);
+    }, 7_000);
+    return () => window.clearInterval(timer);
+  }, [order.id, payment]);
+
+  const canInitiate =
+    !payment || payment.paymentStatus === null || payment.paymentStatus === "FAILED";
+  return (
+    <section className="mx-auto max-w-2xl px-4 py-10">
+      <CheckCircle2 className="size-9 text-success" aria-hidden />
+      <h1 className="mt-3 text-3xl font-bold">Order {order.orderNumber} created</h1>
+      <p className="mt-2 text-muted-foreground">
+        Pending total: {formatMoneyMinor(order.totalMinor, order.currency)}. No payment has been
+        confirmed yet.
+      </p>
+
+      <div className="panel mt-8 p-5 sm:p-6">
+        <div className="flex items-center gap-2">
+          <Smartphone className="size-5 text-primary" aria-hidden />
+          <h2 className="font-semibold">Pay with M-Pesa</h2>
+        </div>
+        {canInitiate ? (
+          <div className="mt-4 space-y-3">
+            <Input
+              aria-label="M-Pesa phone number"
+              inputMode="tel"
+              value={phone}
+              onChange={(event) => {
+                setPhone(event.target.value);
+                paymentKey.current = null;
+              }}
+              placeholder="0712 345 678"
+            />
+            <Button
+              variant="hero"
+              disabled={busy || !phone.trim()}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                paymentKey.current ??= crypto.randomUUID();
+                try {
+                  setPayment(await initiateMpesaPayment(order.id, phone, paymentKey.current));
+                } catch {
+                  setError(
+                    "The M-Pesa prompt could not be confirmed. Check the order status before retrying.",
+                  );
+                  try {
+                    setPayment(await getOrderPaymentStatus(order.id));
+                  } catch {
+                    // Preserve the same idempotency key when the outcome cannot be checked.
+                  }
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Smartphone aria-hidden />}
+              {busy ? "Sending prompt..." : "Send M-Pesa prompt"}
+            </Button>
+          </div>
+        ) : (
+          <PaymentMessage payment={payment} />
+        )}
+        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        {payment && isRefreshableStatus(payment.paymentStatus) && (
+          <Button
+            className="mt-4"
+            variant="outline"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              try {
+                setPayment(await refreshMpesaPayment(order.id));
+              } catch {
+                setError("Payment confirmation is still unavailable. Please check again later.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <RefreshCw aria-hidden /> Check payment status
+          </Button>
+        )}
+      </div>
+      <Button asChild variant="outline" className="mt-5">
+        <Link to="/my-orders">View my orders</Link>
+      </Button>
+    </section>
+  );
+}
+
+function PaymentMessage({ payment }: { payment: OrderPaymentStatus }) {
+  if (payment.paymentStatus === "SUCCEEDED") {
+    return (
+      <p className="mt-4 text-sm font-medium text-success">
+        Paid{payment.receiptNumber ? ` · Receipt ${payment.receiptNumber}` : ""}
+      </p>
+    );
+  }
+  if (payment.paymentStatus === "UNKNOWN") {
+    return (
+      <p className="mt-4 text-sm text-muted-foreground">
+        The prompt outcome is unresolved. Do not send another payment; check the status below.
+      </p>
+    );
+  }
+  if (payment.paymentStatus === "REVIEW_REQUIRED") {
+    return (
+      <p className="mt-4 text-sm text-destructive">Payment confirmation requires support review.</p>
+    );
+  }
+  return (
+    <p className="mt-4 text-sm text-muted-foreground">
+      Check your phone and enter your M-Pesa PIN. Your order will be marked paid only after payment
+      is confirmed.
+    </p>
+  );
+}
+
+function isPollingStatus(status: OrderPaymentStatus["paymentStatus"]): boolean {
+  return status === "INITIATING" || status === "PENDING" || status === "CONFIRMING";
+}
+
+function isRefreshableStatus(status: OrderPaymentStatus["paymentStatus"]): boolean {
+  return isPollingStatus(status) || status === "UNKNOWN";
 }
 
 function PageStatus({ children }: { children: string }) {

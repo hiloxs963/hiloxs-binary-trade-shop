@@ -1,15 +1,22 @@
 import { buildApp } from "./app.js";
 import { createAuthService } from "./auth/auth.js";
 import { createRuntimeEmailSender } from "./auth/email.js";
-import { parseEnv, requireDatabaseUrl, resolveAuthRuntimeConfig } from "./config/env.js";
+import {
+  parseEnv,
+  requireDatabaseUrl,
+  resolveAuthRuntimeConfig,
+  resolveMpesaRuntimeConfig,
+} from "./config/env.js";
 import { createDatabaseClient } from "./db/client.js";
 import { createLoggerOptions, writeFatalLog } from "./lib/logger.js";
 import { safeErrorForLog } from "./lib/redact.js";
+import { DarajaClient } from "./payments/daraja-client.js";
 
 async function start(): Promise<void> {
   const env = parseEnv(process.env);
   const database = createDatabaseClient(requireDatabaseUrl(env));
   const authRuntime = resolveAuthRuntimeConfig(env);
+  const mpesaConfig = resolveMpesaRuntimeConfig(env);
   const auth = createAuthService({
     database,
     emailSender: createRuntimeEmailSender(env),
@@ -21,6 +28,9 @@ async function start(): Promise<void> {
     authRuntime,
     allowedOrigins: authRuntime.trustedOrigins,
     logger: createLoggerOptions(env.LOG_LEVEL),
+    ...(mpesaConfig
+      ? { mpesa: { provider: new DarajaClient(mpesaConfig), config: mpesaConfig } }
+      : {}),
   });
   let shuttingDown = false;
 

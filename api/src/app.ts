@@ -3,12 +3,19 @@ import Fastify, { type FastifyServerOptions } from "fastify";
 import { ZodError } from "zod";
 import type { AuthService } from "./auth/auth.js";
 import { registerAuthRoutes } from "./auth/fastify.js";
-import type { AuthRuntimeConfig } from "./config/env.js";
+import type { AuthRuntimeConfig, MpesaRuntimeConfig } from "./config/env.js";
 import type { DatabaseClient } from "./db/client.js";
-import { NotFoundError, serializeError, ValidationError } from "./lib/errors.js";
+import {
+  NotFoundError,
+  PayloadTooLargeError,
+  serializeError,
+  ValidationError,
+} from "./lib/errors.js";
 import { safeErrorForLog } from "./lib/redact.js";
 import { requestContextPlugin } from "./plugins/request-context.js";
 import { securityPlugin } from "./plugins/security.js";
+import type { MpesaProvider } from "./payments/provider.js";
+import { registerMpesaRoutes } from "./payments/routes.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerCurrentUserRoute } from "./routes/current-user.js";
 import { registerReadyRoute } from "./routes/ready.js";
@@ -23,6 +30,7 @@ export type BuildAppOptions = {
   authRuntime?: AuthRuntimeConfig;
   allowedOrigins?: readonly string[];
   logger?: FastifyServerOptions["logger"];
+  mpesa?: { provider: MpesaProvider; config: MpesaRuntimeConfig };
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -51,6 +59,14 @@ export async function buildApp(options: BuildAppOptions = {}) {
     registerCurrentUserRoute(app, { auth: options.auth, database: options.database });
     registerCheckoutRoute(app, { auth: options.auth, database: options.database });
     registerOrderRoutes(app, { auth: options.auth, database: options.database });
+    if (options.mpesa) {
+      registerMpesaRoutes(app, {
+        auth: options.auth,
+        database: options.database,
+        provider: options.mpesa.provider,
+        config: options.mpesa.config,
+      });
+    }
   }
 
   if (options.database) {
@@ -66,8 +82,9 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   app.setErrorHandler((error, request, reply) => {
-    const normalized =
-      isValidationFailure(error) || error instanceof ZodError
+    const normalized = isPayloadTooLarge(error)
+      ? new PayloadTooLargeError(error)
+      : isValidationFailure(error) || isInvalidJsonBody(error) || error instanceof ZodError
         ? new ValidationError("The request is invalid", error)
         : error;
     const serialized = serializeError(normalized, request.id);
@@ -79,6 +96,24 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   return app;
+}
+
+function isPayloadTooLarge(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "FST_ERR_CTP_BODY_TOO_LARGE"
+  );
+}
+
+function isInvalidJsonBody(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "FST_ERR_CTP_INVALID_JSON_BODY"
+  );
 }
 
 function isValidationFailure(error: unknown): error is { validation: unknown } {

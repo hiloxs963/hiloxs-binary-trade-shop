@@ -14,7 +14,14 @@ import {
 } from "../commerce/validation.js";
 import type { Database, DatabaseClient } from "../db/client.js";
 import { orderItems, orders } from "../db/schema/commerce.js";
-import { ConflictError, IdempotencyKeyReusedError, NotFoundError } from "../lib/errors.js";
+import { paymentAttempts } from "../db/schema/payments.js";
+import {
+  ConflictError,
+  IdempotencyKeyReusedError,
+  NotFoundError,
+  PaymentInProgressError,
+} from "../lib/errors.js";
+import { ACTIVE_PAYMENT_STATUSES } from "../payments/state.js";
 
 type SelectExecutor = Pick<Database, "select">;
 type OrderRow = typeof orders.$inferSelect;
@@ -136,6 +143,30 @@ export function registerOrderRoutes(
     EmptyBodySchema.parse(request.body ?? {});
 
     const order = await options.database.db.transaction(async (transaction) => {
+      const [existing] = await transaction
+        .select()
+        .from(orders)
+        .where(and(eq(orders.id, orderId), eq(orders.userId, owner.id)))
+        .for("update")
+        .limit(1);
+      if (!existing) throw new NotFoundError();
+      if (existing.status === "CANCELLED") return loadOrder(transaction, existing);
+      if (existing.status !== "PENDING_PAYMENT") {
+        throw new ConflictError("Only pending-payment orders can be cancelled");
+      }
+
+      const [activePayment] = await transaction
+        .select({ id: paymentAttempts.id })
+        .from(paymentAttempts)
+        .where(
+          and(
+            eq(paymentAttempts.orderId, existing.id),
+            inArray(paymentAttempts.status, ACTIVE_PAYMENT_STATUSES),
+          ),
+        )
+        .limit(1);
+      if (activePayment) throw new PaymentInProgressError();
+
       const [cancelled] = await transaction
         .update(orders)
         .set({ status: "CANCELLED", updatedAt: new Date() })
@@ -148,17 +179,7 @@ export function registerOrderRoutes(
         )
         .returning();
       if (cancelled) return loadOrder(transaction, cancelled);
-
-      const [existing] = await transaction
-        .select()
-        .from(orders)
-        .where(and(eq(orders.id, orderId), eq(orders.userId, owner.id)))
-        .limit(1);
-      if (!existing) throw new NotFoundError();
-      if (existing.status !== "CANCELLED") {
-        throw new ConflictError("Only pending-payment orders can be cancelled");
-      }
-      return loadOrder(transaction, existing);
+      throw new ConflictError("The order could not be cancelled safely");
     });
 
     return { order };

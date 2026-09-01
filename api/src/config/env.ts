@@ -19,6 +19,16 @@ const EnvironmentSchema = z.object({
     .optional(),
   AUTH_EMAIL_FROM: z.string().trim().min(1).optional(),
   FRONTEND_URL: z.url().optional(),
+  MPESA_ENV: z.enum(["sandbox", "production"]).optional(),
+  MPESA_CONSUMER_KEY: z.string().trim().min(1).optional(),
+  MPESA_CONSUMER_SECRET: z.string().trim().min(1).optional(),
+  MPESA_SHORTCODE: z.string().trim().regex(/^\d+$/).optional(),
+  MPESA_PASSKEY: z.string().trim().min(1).optional(),
+  MPESA_TRANSACTION_TYPE: z.enum(["CustomerPayBillOnline", "CustomerBuyGoodsOnline"]).optional(),
+  MPESA_PARTY_B: z.string().trim().regex(/^\d+$/).optional(),
+  MPESA_CALLBACK_BASE_URL: z.url().optional(),
+  MPESA_MAX_AMOUNT_KES: z.coerce.bigint().positive().optional(),
+  MPESA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });
 
@@ -37,11 +47,29 @@ export type ProductionEmailConfig = {
   from: string;
 };
 
+export type MpesaRuntimeConfig = {
+  environment: "sandbox" | "production";
+  baseURL: string;
+  consumerKey: string;
+  consumerSecret: string;
+  shortcode: string;
+  passkey: string;
+  transactionType: "CustomerPayBillOnline" | "CustomerBuyGoodsOnline";
+  partyB: string;
+  callbackBaseURL: string;
+  maxAmountKes: bigint;
+  requestTimeoutMs: number;
+};
+
 const PRODUCTION_FRONTEND_ORIGIN = "https://hiloxs.co.ke";
 const PRODUCTION_API_ORIGIN = "https://api.hiloxs.co.ke";
 const LOCAL_FRONTEND_ORIGIN = "http://localhost:8080";
 const DEVELOPMENT_AUTH_SECRET = "development-only-hiloxs-auth-secret-change-me";
 const PRODUCTION_AUTH_EMAIL_FROM = "HILOXS <auth@mail.hiloxs.co.ke>";
+const MPESA_BASE_URLS = {
+  sandbox: "https://sandbox.safaricom.co.ke",
+  production: "https://api.safaricom.co.ke",
+} as const;
 
 export function parseEnv(input: Record<string, string | undefined>): AppEnv {
   const result = EnvironmentSchema.safeParse(input);
@@ -108,6 +136,48 @@ export function resolveProductionEmailConfig(env: AppEnv): ProductionEmailConfig
   }
 
   return { apiKey: env.RESEND_API_KEY, from: env.AUTH_EMAIL_FROM };
+}
+
+export function resolveMpesaRuntimeConfig(env: AppEnv): MpesaRuntimeConfig | undefined {
+  const values = [
+    env.MPESA_ENV,
+    env.MPESA_CONSUMER_KEY,
+    env.MPESA_CONSUMER_SECRET,
+    env.MPESA_SHORTCODE,
+    env.MPESA_PASSKEY,
+    env.MPESA_TRANSACTION_TYPE,
+    env.MPESA_PARTY_B,
+    env.MPESA_CALLBACK_BASE_URL,
+    env.MPESA_MAX_AMOUNT_KES,
+  ];
+  const configured = values.some((value) => value !== undefined);
+  if (!configured && env.NODE_ENV !== "production") return undefined;
+  if (values.some((value) => value === undefined)) {
+    throw new ConfigurationError("All M-Pesa environment variables are required together");
+  }
+
+  const callbackBaseURL = new URL(env.MPESA_CALLBACK_BASE_URL as string);
+  if (env.NODE_ENV === "production" && callbackBaseURL.protocol !== "https:") {
+    throw new ConfigurationError("Production MPESA_CALLBACK_BASE_URL must use HTTPS");
+  }
+  if (callbackBaseURL.search || callbackBaseURL.hash) {
+    throw new ConfigurationError("MPESA_CALLBACK_BASE_URL cannot include a query or fragment");
+  }
+
+  const environment = env.MPESA_ENV as MpesaRuntimeConfig["environment"];
+  return {
+    environment,
+    baseURL: MPESA_BASE_URLS[environment],
+    consumerKey: env.MPESA_CONSUMER_KEY as string,
+    consumerSecret: env.MPESA_CONSUMER_SECRET as string,
+    shortcode: env.MPESA_SHORTCODE as string,
+    passkey: env.MPESA_PASSKEY as string,
+    transactionType: env.MPESA_TRANSACTION_TYPE as MpesaRuntimeConfig["transactionType"],
+    partyB: env.MPESA_PARTY_B as string,
+    callbackBaseURL: callbackBaseURL.origin,
+    maxAmountKes: env.MPESA_MAX_AMOUNT_KES as bigint,
+    requestTimeoutMs: env.MPESA_REQUEST_TIMEOUT_MS,
+  };
 }
 
 export function assertSafeTestDatabaseUrl(databaseUrl: string, nodeEnv: string): void {

@@ -7,6 +7,11 @@ export type ErrorCode =
   | "ORIGIN_NOT_ALLOWED"
   | "CONFLICT"
   | "IDEMPOTENCY_KEY_REUSED"
+  | "PAYMENT_ALREADY_IN_PROGRESS"
+  | "PAYMENT_IN_PROGRESS"
+  | "PAYMENT_PROVIDER_UNAVAILABLE"
+  | "PAYMENT_REQUIRES_REVIEW"
+  | "PAYLOAD_TOO_LARGE"
   | "RATE_LIMITED"
   | "NOT_FOUND"
   | "INTERNAL_ERROR";
@@ -112,6 +117,58 @@ export class IdempotencyKeyReusedError extends AppError {
       code: "IDEMPOTENCY_KEY_REUSED",
       statusCode: 409,
       expose: true,
+    });
+  }
+}
+
+export class PaymentAlreadyInProgressError extends AppError {
+  constructor() {
+    super("A payment is already in progress for this order", {
+      code: "PAYMENT_ALREADY_IN_PROGRESS",
+      statusCode: 409,
+      expose: true,
+    });
+  }
+}
+
+export class PaymentInProgressError extends AppError {
+  constructor() {
+    super("This order cannot be cancelled while payment confirmation is pending", {
+      code: "PAYMENT_IN_PROGRESS",
+      statusCode: 409,
+      expose: true,
+    });
+  }
+}
+
+export class PaymentProviderUnavailableError extends AppError {
+  constructor(cause?: unknown) {
+    super("M-Pesa is temporarily unavailable", {
+      code: "PAYMENT_PROVIDER_UNAVAILABLE",
+      statusCode: 503,
+      expose: true,
+      ...(cause === undefined ? {} : { cause }),
+    });
+  }
+}
+
+export class PaymentRequiresReviewError extends AppError {
+  constructor() {
+    super("Payment confirmation requires review", {
+      code: "PAYMENT_REQUIRES_REVIEW",
+      statusCode: 409,
+      expose: true,
+    });
+  }
+}
+
+export class PayloadTooLargeError extends AppError {
+  constructor(cause?: unknown) {
+    super("The request payload is too large", {
+      code: "PAYLOAD_TOO_LARGE",
+      statusCode: 413,
+      expose: true,
+      ...(cause === undefined ? {} : { cause }),
     });
   }
 }
