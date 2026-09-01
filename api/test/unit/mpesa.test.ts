@@ -8,6 +8,10 @@ import {
 } from "../../src/payments/daraja-client.js";
 import { hashCanonical } from "../../src/payments/hash.js";
 import { minorKesToWholeKes } from "../../src/payments/money.js";
+import {
+  accountReferenceForOrder,
+  MPESA_TRANSACTION_DESCRIPTION,
+} from "../../src/payments/provider.js";
 import { canTransitionPayment, isActivePaymentStatus } from "../../src/payments/state.js";
 import {
   normalizeKenyanMpesaPhone,
@@ -75,6 +79,22 @@ describe("M-Pesa primitives", () => {
       expect(ProviderResultCodeSchema.safeParse(value).success).toBe(false);
     }
   });
+
+  it("derives bounded deterministic Daraja display fields from the order identity", () => {
+    const normalOrderId = "11111111-2222-4333-8444-555555555555";
+    const sandboxOrderId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const normalReference = accountReferenceForOrder(normalOrderId);
+    const sandboxReference = accountReferenceForOrder(sandboxOrderId);
+
+    expect(normalReference).toBe(accountReferenceForOrder(normalOrderId));
+    expect(normalReference).toHaveLength(12);
+    expect(sandboxReference).toHaveLength(12);
+    expect(normalReference).toMatch(/^HX[0-9A-F]{10}$/);
+    expect(sandboxReference).toMatch(/^HX[0-9A-F]{10}$/);
+    expect(normalReference).not.toBe(sandboxReference);
+    expect(MPESA_TRANSACTION_DESCRIPTION).toBe("HILOXS ORDER");
+    expect(MPESA_TRANSACTION_DESCRIPTION.length).toBeLessThanOrEqual(13);
+  });
 });
 
 describe("DarajaClient", () => {
@@ -104,7 +124,8 @@ describe("DarajaClient", () => {
       PartyB: "174379",
       PhoneNumber: "254712345678",
       CallBackURL: "https://api.example.test/callback/token",
-      AccountReference: "HX-TEST",
+      AccountReference: "HX0123456789",
+      TransactionDesc: MPESA_TRANSACTION_DESCRIPTION,
     });
     expect(request["Password"]).toEqual(expect.any(String));
   });
@@ -258,8 +279,8 @@ function initiationInput() {
     amountKes: 78_500n,
     phoneE164: "+254712345678",
     callbackURL: "https://api.example.test/callback/token",
-    accountReference: "HX-TEST",
-    transactionDescription: "HILOXS order payment",
+    accountReference: "HX0123456789",
+    transactionDescription: MPESA_TRANSACTION_DESCRIPTION,
   };
 }
 

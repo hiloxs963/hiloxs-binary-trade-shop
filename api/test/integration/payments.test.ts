@@ -20,6 +20,8 @@ import { user } from "../../src/db/schema/auth.js";
 import { orders, products } from "../../src/db/schema/commerce.js";
 import { paymentAttempts, paymentEvents } from "../../src/db/schema/payments.js";
 import {
+  accountReferenceForOrder,
+  MPESA_TRANSACTION_DESCRIPTION,
   MpesaProviderError,
   type MpesaInitiationInput,
   type MpesaProvider,
@@ -94,6 +96,8 @@ describe("M-Pesa payment initiation", () => {
     expect(provider.initiations[0]).toMatchObject({
       amountKes: approvedProduct.priceMinor / 100n,
       phoneE164: "+254712345678",
+      accountReference: accountReferenceForOrder(owner.orderId),
+      transactionDescription: MPESA_TRANSACTION_DESCRIPTION,
     });
     expect(provider.initiations[0]?.callbackURL).toMatch(
       /^https:\/\/api\.example\.test\/api\/v1\/payments\/mpesa\/callback\/[A-Za-z0-9_-]{43}$/,
@@ -102,6 +106,52 @@ describe("M-Pesa payment initiation", () => {
     expect(response.body).not.toContain("merchant-");
     expect(response.body).not.toContain("callback");
     expect(response.body).not.toContain("+254");
+    expect(owner.orderNumber).toMatch(/^HX-[0-9A-F]{16}$/);
+    expect(owner.orderNumber).toHaveLength(19);
+    const [storedOrder] = await database.db
+      .select({ orderNumber: orders.orderNumber })
+      .from(orders)
+      .where(eq(orders.id, owner.orderId));
+    expect(storedOrder?.orderNumber).toBe(owner.orderNumber);
+  });
+
+  it("uses a bounded reference without changing a full HX-SBX order number", async () => {
+    const owner = await ownerWithOrder("payment-sandbox-reference@example.com");
+    const sandboxOrderNumber = `HX-SBX-${owner.orderId.replaceAll("-", "").toUpperCase()}`;
+    await database.db
+      .update(orders)
+      .set({ orderNumber: sandboxOrderNumber })
+      .where(eq(orders.id, owner.orderId));
+
+    const response = await initiate(owner.cookie, owner.orderId, "sandbox-reference-key-0001");
+    const [storedOrder] = await database.db
+      .select({ orderNumber: orders.orderNumber })
+      .from(orders)
+      .where(eq(orders.id, owner.orderId));
+
+    expect(response.statusCode).toBe(202);
+    expect(sandboxOrderNumber).toHaveLength(39);
+    expect(provider.initiations[0]?.accountReference).toBe(accountReferenceForOrder(owner.orderId));
+    expect(provider.initiations[0]?.accountReference).toMatch(/^HX[0-9A-F]{10}$/);
+    expect(provider.initiations[0]?.accountReference).toHaveLength(12);
+    expect(provider.initiations[0]?.transactionDescription).toBe("HILOXS ORDER");
+    expect(storedOrder?.orderNumber).toBe(sandboxOrderNumber);
+  });
+
+  it("rejects browser-supplied Daraja display fields", async () => {
+    const owner = await ownerWithOrder("payment-display-fields@example.com");
+    const response = await post(
+      `/api/v1/orders/${owner.orderId}/payments/mpesa`,
+      {
+        phone: "0712345678",
+        accountReference: "BROWSER-REF",
+        transactionDescription: "Browser supplied",
+      },
+      { cookie: owner.cookie, idempotencyKey: "display-fields-key-0001" },
+    );
+
+    expect(response.statusCode).toBe(400);
+    expect(provider.initiations).toHaveLength(0);
   });
 
   it("binds idempotency to order and normalized phone", async () => {
@@ -186,6 +236,8 @@ describe("M-Pesa payment initiation", () => {
         status: "PAID",
         CheckoutRequestID: "forged",
         receipt: "forged",
+        accountReference: "BROWSER-REF",
+        transactionDescription: "Browser supplied",
       },
       { cookie: owner.cookie, idempotencyKey: "injected-key-0001" },
     );
@@ -863,7 +915,8 @@ async function ownerWithOrder(email: string) {
     { cookie, idempotencyKey: `order-${email.replace(/[^a-z0-9]/gi, "-")}` },
   );
   expect(response.statusCode).toBe(201);
-  return { cookie, orderId: response.json<{ order: { id: string } }>().order.id };
+  const order = response.json<{ order: { id: string; orderNumber: string } }>().order;
+  return { cookie, orderId: order.id, orderNumber: order.orderNumber };
 }
 
 async function createVerifiedSession(email: string): Promise<string> {

@@ -19,7 +19,12 @@ import {
 } from "../lib/errors.js";
 import { hashCanonical, sha256 } from "./hash.js";
 import { minorKesToWholeKes } from "./money.js";
-import { MpesaProviderError, type MpesaProvider } from "./provider.js";
+import {
+  accountReferenceForOrder,
+  MPESA_TRANSACTION_DESCRIPTION,
+  MpesaProviderError,
+  type MpesaProvider,
+} from "./provider.js";
 import {
   ACTIVE_PAYMENT_STATUSES,
   canTransitionPayment,
@@ -131,8 +136,8 @@ export function registerMpesaRoutes(
         amountKes: prepared.amountKes,
         phoneE164: prepared.attempt.phoneE164,
         callbackURL,
-        accountReference: await orderNumberForAttempt(options.database, prepared.attempt),
-        transactionDescription: "HILOXS order payment",
+        accountReference: accountReferenceForOrder(prepared.attempt.orderId),
+        transactionDescription: MPESA_TRANSACTION_DESCRIPTION,
       });
       const attempt = await persistAcceptedInitiation(
         options.database,
@@ -210,19 +215,6 @@ export function registerMpesaRoutes(
     }
     return { received: true };
   });
-}
-
-async function orderNumberForAttempt(
-  database: DatabaseClient,
-  attempt: PaymentAttempt,
-): Promise<string> {
-  const [order] = await database.db
-    .select({ orderNumber: orders.orderNumber })
-    .from(orders)
-    .where(eq(orders.id, attempt.orderId))
-    .limit(1);
-  if (!order) throw new NotFoundError();
-  return order.orderNumber;
 }
 
 async function persistAcceptedInitiation(

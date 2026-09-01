@@ -60,6 +60,14 @@ initiation and query. Sandbox and production hosts, merchant identifiers, creden
 type, callback origin, amount limit, and request timeout are validated server configuration. No
 Daraja secret is present in the frontend.
 
+Daraja's display-only `AccountReference` is `HX` plus the first ten uppercase hexadecimal
+characters of a SHA-256 hash of the normalized server-side order UUID. It is deterministic,
+ASCII-safe, and always 12 characters for both normal and sandbox orders. `TransactionDesc` is the
+fixed server-generated value `HILOXS ORDER`, which is 12 characters. Neither field is accepted from
+the browser or used for authorization or callback correlation; the full HILOXS order number remains
+in PostgreSQL, while payment correlation continues to use the payment attempt, callback token,
+provider request identifiers, and order foreign key.
+
 STK initiation and manual reconciliation use the existing fixed-window in-memory limiter. This is a
 single-instance safeguard; horizontally scaled API processes will require a shared limiter. Provider
 callbacks are not subjected to that user limiter.
