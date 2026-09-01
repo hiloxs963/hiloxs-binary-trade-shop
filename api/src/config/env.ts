@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { ConfigurationError } from "../lib/errors.js";
 
+const BooleanEnvironmentSchema = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((value) => value === "true");
+
 const EnvironmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().trim().min(1).default("127.0.0.1"),
@@ -20,6 +25,7 @@ const EnvironmentSchema = z.object({
   AUTH_EMAIL_FROM: z.string().trim().min(1).optional(),
   FRONTEND_URL: z.url().optional(),
   MPESA_ENV: z.enum(["sandbox", "production"]).optional(),
+  MPESA_PUBLIC_ENABLED: BooleanEnvironmentSchema,
   MPESA_CONSUMER_KEY: z.string().trim().min(1).optional(),
   MPESA_CONSUMER_SECRET: z.string().trim().min(1).optional(),
   MPESA_SHORTCODE: z.string().trim().regex(/^\d+$/).optional(),
@@ -49,6 +55,7 @@ export type ProductionEmailConfig = {
 
 export type MpesaRuntimeConfig = {
   environment: "sandbox" | "production";
+  publicEnabled: boolean;
   baseURL: string;
   consumerKey: string;
   consumerSecret: string;
@@ -167,6 +174,7 @@ export function resolveMpesaRuntimeConfig(env: AppEnv): MpesaRuntimeConfig | und
   const environment = env.MPESA_ENV as MpesaRuntimeConfig["environment"];
   return {
     environment,
+    publicEnabled: env.MPESA_PUBLIC_ENABLED,
     baseURL: MPESA_BASE_URLS[environment],
     consumerKey: env.MPESA_CONSUMER_KEY as string,
     consumerSecret: env.MPESA_CONSUMER_SECRET as string,

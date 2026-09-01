@@ -281,6 +281,7 @@ describe("DarajaClient", () => {
 function config(): MpesaRuntimeConfig {
   return {
     environment: "sandbox",
+    publicEnabled: false,
     baseURL: "https://sandbox.safaricom.co.ke",
     consumerKey: "test-consumer-key",
     consumerSecret: "test-consumer-secret",

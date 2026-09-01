@@ -16,11 +16,14 @@ import {
   formatMoneyMinor,
   getCheckoutQuote,
   getOrderPaymentStatus,
+  getPaymentConfig,
   initiateMpesaPayment,
+  mpesaAvailabilityForOrder,
   refreshMpesaPayment,
   type CommerceOrder,
   type CheckoutQuote,
   type OrderPaymentStatus,
+  type PaymentConfig,
 } from "@/lib/commerce-api";
 import { PRODUCTS } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
@@ -221,7 +224,22 @@ function CreatedOrderPayment({
   const [payment, setPayment] = useState<OrderPaymentStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>();
   const paymentKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getPaymentConfig()
+      .then((config) => {
+        if (active) setPaymentConfig(config);
+      })
+      .catch(() => {
+        if (active) setPaymentConfig(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!payment || !isPollingStatus(payment.paymentStatus)) return;
@@ -233,8 +251,9 @@ function CreatedOrderPayment({
     return () => window.clearInterval(timer);
   }, [order.id, payment]);
 
-  const canInitiate =
+  const paymentStateAllowsInitiation =
     !payment || payment.paymentStatus === null || payment.paymentStatus === "FAILED";
+  const availability = mpesaAvailabilityForOrder(paymentConfig, order.orderNumber);
   return (
     <section className="mx-auto max-w-2xl px-4 py-10">
       <CheckCircle2 className="size-9 text-success" aria-hidden />
@@ -247,10 +266,21 @@ function CreatedOrderPayment({
       <div className="panel mt-8 p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Smartphone className="size-5 text-primary" aria-hidden />
-          <h2 className="font-semibold">Pay with M-Pesa</h2>
+          <h2 className="font-semibold">
+            {availability.sandboxTest
+              ? "M-Pesa sandbox test"
+              : availability.canInitiate
+                ? "Pay with M-Pesa"
+                : "M-Pesa payment"}
+          </h2>
         </div>
-        {canInitiate ? (
+        {paymentStateAllowsInitiation && availability.canInitiate ? (
           <div className="mt-4 space-y-3">
+            {availability.sandboxTest && (
+              <p className="text-sm text-muted-foreground">
+                Controlled sandbox testing only. This is not a live customer payment.
+              </p>
+            )}
             <Input
               aria-label="M-Pesa phone number"
               inputMode="tel"
@@ -285,9 +315,19 @@ function CreatedOrderPayment({
               }}
             >
               {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Smartphone aria-hidden />}
-              {busy ? "Sending prompt..." : "Send M-Pesa prompt"}
+              {busy
+                ? "Sending prompt..."
+                : availability.sandboxTest
+                  ? "Send sandbox test prompt"
+                  : "Send M-Pesa prompt"}
             </Button>
           </div>
+        ) : paymentStateAllowsInitiation ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            {paymentConfig === undefined
+              ? "Checking M-Pesa availability..."
+              : "M-Pesa payments are not currently available."}
+          </p>
         ) : (
           <PaymentMessage payment={payment} />
         )}

@@ -42,8 +42,9 @@ let requestCounter = 0;
 const emailSender = new InMemoryAuthEmailSender();
 const approvedProduct = INITIAL_CATALOG[0];
 const mpesaConfig: MpesaRuntimeConfig = {
-  environment: "sandbox",
-  baseURL: "https://sandbox.safaricom.co.ke",
+  environment: "production",
+  publicEnabled: true,
+  baseURL: "https://api.safaricom.co.ke",
   consumerKey: "test-consumer-key",
   consumerSecret: "test-consumer-secret",
   shortcode: "174379",
@@ -80,10 +81,105 @@ beforeEach(async () => {
     .where(eq(products.catalogKey, approvedProduct.catalogKey));
   emailSender.messages.length = 0;
   provider.reset();
+  mpesaConfig.environment = "production";
+  mpesaConfig.publicEnabled = true;
 });
 
 afterAll(async () => {
   await app.close();
+});
+
+describe("M-Pesa availability gate", () => {
+  it("allows only controlled HX-SBX orders in sandbox", async () => {
+    mpesaConfig.environment = "sandbox";
+    mpesaConfig.publicEnabled = false;
+    const owner = await ownerWithOrder("sandbox-gate@example.com");
+    const sandboxOrderNumber = `HX-SBX-${owner.orderId.replaceAll("-", "").toUpperCase()}`;
+    await database.db
+      .update(orders)
+      .set({ orderNumber: sandboxOrderNumber })
+      .where(eq(orders.id, owner.orderId));
+
+    const response = await initiate(owner.cookie, owner.orderId, "sandbox-gate-key-0001");
+
+    expect(response.statusCode).toBe(202);
+    expect(provider.initiations).toHaveLength(1);
+  });
+
+  it("rejects ordinary orders in sandbox with a safe response", async () => {
+    mpesaConfig.environment = "sandbox";
+    mpesaConfig.publicEnabled = false;
+    const owner = await ownerWithOrder("sandbox-blocked@example.com");
+
+    const response = await initiate(owner.cookie, owner.orderId, "sandbox-blocked-key-0001");
+    const rows = await database.db.select({ value: count() }).from(paymentAttempts);
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json<{ error: { code: string; message: string } }>().error).toMatchObject({
+      code: "MPESA_NOT_AVAILABLE",
+      message: "M-Pesa payments are not currently available",
+    });
+    expect(provider.initiations).toHaveLength(0);
+    expect(rows[0]?.value).toBe(0);
+    expect(response.body).not.toContain("consumer");
+    expect(response.body).not.toContain("passkey");
+  });
+
+  it("does not let the public flag override the sandbox restriction", async () => {
+    mpesaConfig.environment = "sandbox";
+    mpesaConfig.publicEnabled = true;
+    const owner = await ownerWithOrder("sandbox-flag-blocked@example.com");
+
+    const response = await initiate(owner.cookie, owner.orderId, "sandbox-flag-key-0001");
+
+    expect(response.statusCode).toBe(503);
+    expect(provider.initiations).toHaveLength(0);
+  });
+
+  it("rejects ordinary production orders while the public flag is disabled", async () => {
+    mpesaConfig.environment = "production";
+    mpesaConfig.publicEnabled = false;
+    const owner = await ownerWithOrder("production-disabled@example.com");
+
+    const response = await initiate(owner.cookie, owner.orderId, "production-off-key-0001");
+
+    expect(response.statusCode).toBe(503);
+    expect(provider.initiations).toHaveLength(0);
+  });
+
+  it("allows ordinary production orders only when the public flag is enabled", async () => {
+    mpesaConfig.environment = "production";
+    mpesaConfig.publicEnabled = true;
+    const owner = await ownerWithOrder("production-enabled@example.com");
+
+    const response = await initiate(owner.cookie, owner.orderId, "production-on-key-0001");
+
+    expect(response.statusCode).toBe(202);
+    expect(provider.initiations).toHaveLength(1);
+  });
+
+  it("reports only safe public M-Pesa capability information", async () => {
+    for (const testCase of [
+      { environment: "sandbox", publicEnabled: false, available: false },
+      { environment: "sandbox", publicEnabled: true, available: false },
+      { environment: "production", publicEnabled: false, available: false },
+      { environment: "production", publicEnabled: true, available: true },
+    ] as const) {
+      mpesaConfig.environment = testCase.environment;
+      mpesaConfig.publicEnabled = testCase.publicEnabled;
+
+      const response = await app.inject({ method: "GET", url: "/api/v1/payments/config" });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        mpesa: { available: testCase.available, mode: testCase.environment },
+      });
+      expect(response.body).not.toContain(mpesaConfig.consumerKey);
+      expect(response.body).not.toContain(mpesaConfig.consumerSecret);
+      expect(response.body).not.toContain(mpesaConfig.passkey);
+      expect(response.body).not.toContain(mpesaConfig.shortcode);
+    }
+  });
 });
 
 describe("M-Pesa payment initiation", () => {
