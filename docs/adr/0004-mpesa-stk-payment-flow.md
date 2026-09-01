@@ -45,9 +45,13 @@ request paths independently. Token secrecy is therefore not the basis for author
 A callback records evidence and moves an unresolved attempt to `CONFIRMING`, regardless of whether
 it reports success or failure. A public failure callback cannot unlock a retry. A callback is not
 browser proof and does not mark the order paid. The authenticated refresh endpoint loads the stored
-`CheckoutRequestID` and performs an STK status query. Only result code zero for the stored attempt,
-with matching order, KES currency, amount snapshot, pending order state, and no contradictory prior
-success, can atomically move the attempt to `SUCCEEDED` and the order to `PAID`.
+`CheckoutRequestID` and performs an STK status query, which is the terminal-result authority. A
+structurally valid response with matching provider identifiers and normalized result code zero is a
+success candidate; the existing order, amount, currency, and contradiction checks must also pass
+before the attempt can become `SUCCEEDED` and the order `PAID`. Any valid normalized nonzero result
+code definitively makes the attempt `FAILED` while the order remains `PENDING_PAYMENT`, without
+requiring per-code semantic interpretation. Malformed, incomplete, or transport-ambiguous query
+responses remain `UNKNOWN`, and identifier contradictions remain `REVIEW_REQUIRED`.
 
 If query confirmation arrives before a receipt-bearing callback, success may be recorded with a
 temporarily null receipt. A later matching callback may fill the receipt. Receipt numbers are unique

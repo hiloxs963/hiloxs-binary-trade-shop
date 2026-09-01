@@ -484,8 +484,8 @@ async function reconcileQueryResult(
     }
 
     if (result.resultCode !== 0) {
-      const unresolved = await updateAttemptStatus(transaction, attempt, "UNKNOWN", result);
-      return { order, attempt: unresolved };
+      const failed = await updateAttemptStatus(transaction, attempt, "FAILED", result);
+      return { order, attempt: failed };
     }
 
     const [otherSuccess] = await transaction

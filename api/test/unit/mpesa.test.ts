@@ -174,25 +174,28 @@ describe("DarajaClient", () => {
     });
   });
 
-  it("returns a non-success query result without interpreting it as success", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ access_token: "test-oauth-token", expires_in: 3600 }))
-      .mockResolvedValueOnce(
-        jsonResponse({
-          MerchantRequestID: "merchant-1",
-          CheckoutRequestID: "checkout-1",
-          ResultCode: "9999",
-          ResultDesc: "Unrecognized test result",
-        }),
-      );
-    const client = new DarajaClient(config(), fetchMock, () => FIXED_DATE);
+  it.each([2001, "2001", 1032, "1032", 7777] as const)(
+    "normalizes trusted non-success query result %s without semantic mapping",
+    async (providerResultCode) => {
+      const fetchMock = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(jsonResponse({ access_token: "test-oauth-token", expires_in: 3600 }))
+        .mockResolvedValueOnce(
+          jsonResponse({
+            MerchantRequestID: "merchant-1",
+            CheckoutRequestID: "checkout-1",
+            ResultCode: providerResultCode,
+            ResultDesc: "Unrecognized test result",
+          }),
+        );
+      const client = new DarajaClient(config(), fetchMock, () => FIXED_DATE);
 
-    await expect(client.query("checkout-1")).resolves.toMatchObject({
-      checkoutRequestId: "checkout-1",
-      resultCode: 9999,
-    });
-  });
+      await expect(client.query("checkout-1")).resolves.toMatchObject({
+        checkoutRequestId: "checkout-1",
+        resultCode: Number(providerResultCode),
+      });
+    },
+  );
 
   it.each([
     ["HTTP 5xx", new Response("{}", { status: 503 })],
@@ -200,6 +203,23 @@ describe("DarajaClient", () => {
     [
       "incomplete response",
       jsonResponse({ CheckoutRequestID: "checkout-1", ResultDesc: "Still processing" }),
+    ],
+    [
+      "invalid result code",
+      jsonResponse({
+        MerchantRequestID: "merchant-1",
+        CheckoutRequestID: "checkout-1",
+        ResultCode: "not-a-code",
+        ResultDesc: "Invalid",
+      }),
+    ],
+    [
+      "missing checkout identifier",
+      jsonResponse({
+        MerchantRequestID: "merchant-1",
+        ResultCode: 2001,
+        ResultDesc: "Not successful",
+      }),
     ],
   ] as const)("keeps an ambiguous %s query unresolved", async (_label, providerResponse) => {
     const fetchMock = vi

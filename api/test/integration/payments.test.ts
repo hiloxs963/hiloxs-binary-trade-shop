@@ -396,20 +396,30 @@ describe("M-Pesa callbacks and reconciliation", () => {
     ).toBe("REVIEW_REQUIRED");
   });
 
-  it("persists a public failure callback without unlocking a retry", async () => {
-    const owner = await ownerWithOrder("payment-failure-callback@example.com");
-    await initiate(owner.cookie, owner.orderId, "failure-callback-key-0001");
-    const callbackURL = provider.initiations[0]?.callbackURL ?? "";
-    const failed = await callback(callbackURL, failureCallback(provider.lastCheckoutRequestId));
-    const status = await getPayment(owner.cookie, owner.orderId);
-    const retry = await initiate(owner.cookie, owner.orderId, "failure-callback-key-0002");
+  it.each([2001, 1032] as const)(
+    "persists public failure callback %s without unlocking a retry",
+    async (resultCode) => {
+      const owner = await ownerWithOrder(`payment-failure-callback-${resultCode}@example.com`);
+      await initiate(owner.cookie, owner.orderId, `failure-callback-${resultCode}-key-0001`);
+      const callbackURL = provider.initiations[0]?.callbackURL ?? "";
+      const failed = await callback(
+        callbackURL,
+        failureCallback(provider.lastCheckoutRequestId, resultCode),
+      );
+      const status = await getPayment(owner.cookie, owner.orderId);
+      const retry = await initiate(
+        owner.cookie,
+        owner.orderId,
+        `failure-callback-${resultCode}-key-0002`,
+      );
 
-    expect(failed.statusCode).toBe(200);
-    expect(
-      status.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
-    ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "CONFIRMING" });
-    expect(retry.statusCode).toBe(409);
-  });
+      expect(failed.statusCode).toBe(200);
+      expect(
+        status.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
+      ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "CONFIRMING" });
+      expect(retry.statusCode).toBe(409);
+    },
+  );
 
   it("rejects malformed and unknown-token callbacks without revealing an order", async () => {
     const owner = await ownerWithOrder("payment-invalid-callback@example.com");
@@ -746,23 +756,60 @@ describe("payment/order authority and races", () => {
     expect(injectedRefresh.statusCode).toBe(400);
   });
 
-  it("requires query identifiers to match the stored server-created identifier", async () => {
-    const owner = await ownerWithOrder("payment-query-identifier@example.com");
-    await initiate(owner.cookie, owner.orderId, "query-identifier-key-0001");
+  it.each([
+    ["checkout", 0],
+    ["checkout", 2001],
+    ["merchant", 2001],
+  ] as const)(
+    "requires the stored %s identifier to match with result code %s",
+    async (conflict, resultCode) => {
+      const owner = await ownerWithOrder(
+        `payment-query-identifier-${conflict}-${resultCode}@example.com`,
+      );
+      await initiate(
+        owner.cookie,
+        owner.orderId,
+        `query-identifier-${conflict}-${resultCode}-key-0001`,
+      );
+      const storedCheckout = provider.lastCheckoutRequestId;
+      const storedMerchant = provider.lastMerchantRequestId;
+      provider.queryResult = {
+        merchantRequestId: conflict === "merchant" ? "merchant-conflict" : storedMerchant,
+        checkoutRequestId: conflict === "checkout" ? "checkout-conflict" : storedCheckout,
+        resultCode,
+        resultDescription: resultCode === 0 ? "Processed successfully" : "Not successful",
+      };
+
+      const response = await refresh(owner.cookie, owner.orderId);
+
+      expect(provider.queries).toEqual([storedCheckout]);
+      expect(
+        response.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
+      ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "REVIEW_REQUIRED" });
+    },
+  );
+
+  it("reconciles an existing UNKNOWN attempt to FAILED and permits retry", async () => {
+    const owner = await ownerWithOrder("payment-live-recovery@example.com");
+    await initiate(owner.cookie, owner.orderId, "live-recovery-key-0001");
     const storedCheckout = provider.lastCheckoutRequestId;
-    provider.queryResult = {
-      merchantRequestId: "merchant-conflict",
-      checkoutRequestId: "checkout-conflict",
-      resultCode: 0,
-      resultDescription: "Processed successfully",
-    };
+    const storedMerchant = provider.lastMerchantRequestId;
+    provider.queryError = new MpesaProviderError("timeout", { ambiguous: true });
 
-    const response = await refresh(owner.cookie, owner.orderId);
+    const unresolved = await refresh(owner.cookie, owner.orderId);
+    provider.queryError = undefined;
+    provider.queryResult = queryResult(storedCheckout, 2001, storedMerchant);
+    const failed = await refresh(owner.cookie, owner.orderId);
+    const retry = await initiate(owner.cookie, owner.orderId, "live-recovery-key-0002");
 
-    expect(provider.queries).toEqual([storedCheckout]);
     expect(
-      response.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
-    ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "REVIEW_REQUIRED" });
+      unresolved.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
+    ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "UNKNOWN" });
+    expect(
+      failed.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
+    ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "FAILED" });
+    expect(provider.queries).toEqual([storedCheckout, storedCheckout]);
+    expect(retry.statusCode).toBe(202);
   });
 
   it("keeps transport-ambiguous queries blocking and non-successful", async () => {
@@ -796,18 +843,30 @@ describe("payment/order authority and races", () => {
     expect(forgedCancel.statusCode).toBe(400);
   });
 
-  it("keeps the order pending and blocks blind retry after an unknown non-success query", async () => {
-    const owner = await ownerWithOrder("payment-query-failed@example.com");
-    await initiate(owner.cookie, owner.orderId, "query-failed-key-0001");
-    provider.queryResult = queryResult(provider.lastCheckoutRequestId, 1032);
-    const refreshed = await refresh(owner.cookie, owner.orderId);
+  it.each([2001, 1032, 7777] as const)(
+    "marks trusted nonzero query result %s failed and permits a new attempt",
+    async (resultCode) => {
+      const owner = await ownerWithOrder(`payment-query-failed-${resultCode}@example.com`);
+      await initiate(owner.cookie, owner.orderId, `query-failed-${resultCode}-key-0001`);
+      provider.queryResult = queryResult(
+        provider.lastCheckoutRequestId,
+        resultCode,
+        provider.lastMerchantRequestId,
+      );
+      const refreshed = await refresh(owner.cookie, owner.orderId);
+      const retry = await initiate(
+        owner.cookie,
+        owner.orderId,
+        `query-failed-${resultCode}-key-0002`,
+      );
 
-    expect(
-      refreshed.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
-    ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "UNKNOWN" });
-    const retry = await initiate(owner.cookie, owner.orderId, "query-failed-key-0002");
-    expect(retry.statusCode).toBe(409);
-  });
+      expect(
+        refreshed.json<{ payment: { orderStatus: string; paymentStatus: string } }>().payment,
+      ).toMatchObject({ orderStatus: "PENDING_PAYMENT", paymentStatus: "FAILED" });
+      expect(retry.statusCode).toBe(202);
+      expect(provider.initiations).toHaveLength(2);
+    },
+  );
 
   it("maintains paid, succeeded, and cancelled database invariants", async () => {
     const paid = await ownerWithOrder("payment-invariant-paid@example.com");
@@ -1004,14 +1063,18 @@ function successCallback(
   };
 }
 
-function failureCallback(checkoutRequestId: string, merchantRequestId = providerMerchantId()) {
+function failureCallback(
+  checkoutRequestId: string,
+  resultCode = 1032,
+  merchantRequestId = providerMerchantId(),
+) {
   return {
     Body: {
       stkCallback: {
         MerchantRequestID: merchantRequestId,
         CheckoutRequestID: checkoutRequestId,
-        ResultCode: 1032,
-        ResultDesc: "Request cancelled by user",
+        ResultCode: resultCode,
+        ResultDesc: resultCode === 1032 ? "Request cancelled by user" : "Not successful",
       },
     },
   };
@@ -1021,8 +1084,13 @@ function providerMerchantId(): string {
   return provider.lastMerchantRequestId;
 }
 
-function queryResult(checkoutRequestId: string, resultCode: number): MpesaQueryResult {
+function queryResult(
+  checkoutRequestId: string,
+  resultCode: number,
+  merchantRequestId?: string,
+): MpesaQueryResult {
   return {
+    ...(merchantRequestId ? { merchantRequestId } : {}),
     checkoutRequestId,
     resultCode,
     resultDescription: resultCode === 0 ? "Processed successfully" : "Not successful",
