@@ -47,18 +47,19 @@ No payment, commerce-domain, cloud database, or backend-as-a-service SDK is inst
 Copy `.env.example` to an untracked `.env` for local development and change values only as needed.
 Never commit `.env`.
 
-| Variable             | Default                         | Notes                                                           |
-| -------------------- | ------------------------------- | --------------------------------------------------------------- |
-| `NODE_ENV`           | `development`                   | `development`, `test`, or `production`                          |
-| `HOST`               | `127.0.0.1`                     | Railway will typically use `0.0.0.0`                            |
-| `PORT`               | `3000`                          | Railway's injected `PORT` is respected                          |
-| `LOG_LEVEL`          | `info`                          | Pino log level                                                  |
-| `DATABASE_URL`       | none                            | Required by the server and migration command; never logged      |
-| `BETTER_AUTH_URL`    | `http://127.0.0.1:${PORT}`      | Required as `https://api.hiloxs.co.ke` in production            |
-| `BETTER_AUTH_SECRET` | development-only local fallback | Required in production; use a random value of at least 32 chars |
-| `FRONTEND_URL`       | `http://localhost:8080`         | Required as `https://hiloxs.co.ke` in production                |
-| `RESEND_API_KEY`     | none                            | Required in production; sending-only secret, never log it       |
-| `AUTH_EMAIL_FROM`    | none                            | Required as `HILOXS <auth@mail.hiloxs.co.ke>` in production     |
+| Variable               | Default                         | Notes                                                           |
+| ---------------------- | ------------------------------- | --------------------------------------------------------------- |
+| `NODE_ENV`             | `development`                   | `development`, `test`, or `production`                          |
+| `HOST`                 | `127.0.0.1`                     | Railway will typically use `0.0.0.0`                            |
+| `PORT`                 | `3000`                          | Railway's injected `PORT` is respected                          |
+| `LOG_LEVEL`            | `info`                          | Pino log level                                                  |
+| `DATABASE_URL`         | none                            | Required by the server and migration command; never logged      |
+| `BETTER_AUTH_URL`      | `http://127.0.0.1:${PORT}`      | Required as `https://api.hiloxs.co.ke` in production            |
+| `BETTER_AUTH_SECRET`   | development-only local fallback | Required in production; use a random value of at least 32 chars |
+| `FRONTEND_URL`         | `http://localhost:8080`         | Required as `https://hiloxs.co.ke` in production                |
+| `RESEND_API_KEY`       | none                            | Required in production; sending-only secret, never log it       |
+| `AUTH_EMAIL_FROM`      | none                            | Required as `HILOXS <auth@mail.hiloxs.co.ke>` in production     |
+| `STAFF_REVIEW_ENABLED` | `false`                         | Exact `true` enables authorized staff review mutations          |
 
 Production starts only with the canonical API origin, a supplied authentication secret, secure
 cookies, the canonical frontend origin, and complete Resend configuration. Missing production email
@@ -90,7 +91,13 @@ The server does not run migrations at startup. PostgreSQL may be down while the 
 - `POST /api/auth/request-password-reset` always gives an enumeration-resistant response.
 - `POST /api/auth/reset-password` consumes a one-time reset and revokes existing sessions.
 - `POST /api/auth/send-verification-email` sends or resends a verification message.
-- `GET /api/v1/users/me` returns only `id`, `name`, `email`, `emailVerified`, `phone`, and `status`.
+- `POST /api/auth/two-factor/enable` begins official Better Auth TOTP enrollment.
+- `POST /api/auth/two-factor/verify-totp` completes enrollment or a sign-in challenge.
+- `GET /api/v1/users/me` returns only `id`, `name`, `email`, `emailVerified`, `phone`, `status`, and
+  `mfaEnabled`.
+- `GET /api/v1/staff/me` returns safe database-backed staff capabilities.
+- `/api/v1/staff/seller-applications` and `/api/v1/staff/seller-products` expose bounded,
+  permission-specific review operations.
 
 Development and test email messages are written to the ignored `api/.dev-emails/` sink or captured
 in memory by tests. Production uses Resend's HTTPS API with Node's native `fetch`, a bounded timeout,

@@ -2,9 +2,17 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { eq } from "drizzle-orm";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { twoFactor as twoFactorPlugin } from "better-auth/plugins/two-factor";
 import type { AuthRuntimeConfig } from "../config/env.js";
 import type { DatabaseClient } from "../db/client.js";
-import { ACCOUNT_STATUSES, account, session, user, verification } from "../db/schema/auth.js";
+import {
+  ACCOUNT_STATUSES,
+  account,
+  session,
+  twoFactor,
+  user,
+  verification,
+} from "../db/schema/auth.js";
 import { EmailDeliveryError } from "../lib/errors.js";
 import type { AuthEmailSender } from "./email.js";
 import { PASSWORD_MIN_LENGTH } from "./validation.js";
@@ -33,7 +41,7 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
     trustedOrigins: runtime.trustedOrigins,
     database: drizzleAdapter(database.db, {
       provider: "pg",
-      schema: { user, session, account, verification },
+      schema: { user, session, account, verification, twoFactor },
     }),
     user: {
       additionalFields: {
@@ -51,6 +59,13 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
     },
+    plugins: [
+      twoFactorPlugin({
+        issuer: "HILOXS",
+        skipVerificationOnEnable: false,
+        trustDeviceMaxAge: 0,
+      }),
+    ],
     emailVerification: {
       sendOnSignUp: true,
       sendOnSignIn: true,

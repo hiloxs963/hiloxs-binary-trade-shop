@@ -39,6 +39,11 @@ describe("log redaction", () => {
         RESEND_API_KEY: "re_private-key",
         "x-api-key": "api-key-value",
         nested: { xApiKey: "api-key-value" },
+        totpCode: "123456",
+        totpURI: "otpauth://totp/HILOXS:test?secret=secret-value",
+        twoFactorCode: "654321",
+        twoFactorChallenge: "challenge-value",
+        backupCodes: ["backup-one", "backup-two"],
       }),
     ).toEqual({
       user: "safe",
@@ -54,6 +59,11 @@ describe("log redaction", () => {
       RESEND_API_KEY: "[REDACTED]",
       "x-api-key": "[REDACTED]",
       nested: { xApiKey: "[REDACTED]" },
+      totpCode: "[REDACTED]",
+      totpURI: "[REDACTED]",
+      twoFactorCode: "[REDACTED]",
+      twoFactorChallenge: "[REDACTED]",
+      backupCodes: "[REDACTED]",
     });
   });
 

@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { getCurrentUser, loginWithEmail, logoutCurrentSession, type AuthUser } from "./auth-api";
+import {
+  getCurrentUser,
+  loginWithEmail,
+  logoutCurrentSession,
+  verifyTwoFactorCode,
+  type AuthUser,
+} from "./auth-api";
 import { AuthContext } from "./auth-context";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -22,7 +28,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      await loginWithEmail(email, password);
+      const result = await loginWithEmail(email, password);
+      if (!result.requiresTwoFactor) await refresh();
+      return result;
+    },
+    [refresh],
+  );
+
+  const completeTwoFactor = useCallback(
+    async (code: string) => {
+      await verifyTwoFactorCode(code);
       await refresh();
     },
     [refresh],
@@ -43,10 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: currentUser !== null,
       isLoading,
       login,
+      completeTwoFactor,
       logout,
       refresh,
     }),
-    [currentUser, isLoading, login, logout, refresh],
+    [completeTwoFactor, currentUser, isLoading, login, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

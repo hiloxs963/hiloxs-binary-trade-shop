@@ -28,6 +28,7 @@ async function start(): Promise<void> {
     authRuntime,
     allowedOrigins: authRuntime.trustedOrigins,
     logger: createLoggerOptions(env.LOG_LEVEL),
+    staffReviewEnabled: env.STAFF_REVIEW_ENABLED,
     ...(mpesaConfig
       ? { mpesa: { provider: new DarajaClient(mpesaConfig), config: mpesaConfig } }
       : {}),

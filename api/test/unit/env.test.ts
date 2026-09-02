@@ -18,6 +18,7 @@ describe("environment configuration", () => {
       LOG_LEVEL: "info",
       MPESA_PUBLIC_ENABLED: false,
       MPESA_REQUEST_TIMEOUT_MS: 10_000,
+      STAFF_REVIEW_ENABLED: false,
     });
   });
 
@@ -161,6 +162,14 @@ describe("environment configuration", () => {
     expect(parseEnv({ MPESA_PUBLIC_ENABLED: "true" }).MPESA_PUBLIC_ENABLED).toBe(true);
     expect(() => parseEnv({ MPESA_PUBLIC_ENABLED: "1" })).toThrow(ConfigurationError);
     expect(() => parseEnv({ MPESA_PUBLIC_ENABLED: "TRUE" })).toThrow(ConfigurationError);
+  });
+
+  it("enables staff review only for the exact true value and otherwise fails closed", () => {
+    expect(parseEnv({}).STAFF_REVIEW_ENABLED).toBe(false);
+    expect(parseEnv({ STAFF_REVIEW_ENABLED: "false" }).STAFF_REVIEW_ENABLED).toBe(false);
+    expect(parseEnv({ STAFF_REVIEW_ENABLED: "true" }).STAFF_REVIEW_ENABLED).toBe(true);
+    expect(parseEnv({ STAFF_REVIEW_ENABLED: "TRUE" }).STAFF_REVIEW_ENABLED).toBe(false);
+    expect(parseEnv({ STAFF_REVIEW_ENABLED: "1" }).STAFF_REVIEW_ENABLED).toBe(false);
   });
 
   it("requires HTTPS for the production M-Pesa callback", () => {

@@ -5,6 +5,7 @@ export type AuthUser = {
   emailVerified: boolean;
   phone: string;
   status: "ACTIVE" | "SUSPENDED" | "DISABLED";
+  mfaEnabled: boolean;
 };
 
 type ApiErrorBody = {
@@ -36,12 +37,37 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return body.user;
 }
 
-export async function loginWithEmail(email: string, password: string): Promise<void> {
+export async function loginWithEmail(
+  email: string,
+  password: string,
+): Promise<{ requiresTwoFactor: boolean }> {
   const response = await request("/api/auth/sign-in/email", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
   if (!response.ok) throw await toAuthError(response, "Unable to log in");
+  const body = (await response.json()) as { twoFactorRedirect?: boolean };
+  return { requiresTwoFactor: body.twoFactorRedirect === true };
+}
+
+export async function verifyTwoFactorCode(code: string): Promise<void> {
+  const response = await request("/api/auth/two-factor/verify-totp", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) throw await toAuthError(response, "Unable to verify the authentication code");
+}
+
+export async function enableTwoFactor(password: string): Promise<{
+  totpURI: string;
+  backupCodes: string[];
+}> {
+  const response = await request("/api/auth/two-factor/enable", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+  if (!response.ok) throw await toAuthError(response, "Unable to begin two-factor enrollment");
+  return (await response.json()) as { totpURI: string; backupCodes: string[] };
 }
 
 export async function registerWithEmail(input: {

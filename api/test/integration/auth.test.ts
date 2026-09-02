@@ -1,11 +1,12 @@
 import { resolve } from "node:path";
+import { base32 } from "@better-auth/utils/base32";
 import { count, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
-import { createAuthService } from "../../src/auth/auth.js";
+import { createAuthService, type AuthService } from "../../src/auth/auth.js";
 import { InMemoryAuthEmailSender, type AuthEmailSender } from "../../src/auth/email.js";
 import {
   assertSafeTestDatabaseUrl,
@@ -14,7 +15,7 @@ import {
   resolveAuthRuntimeConfig,
 } from "../../src/config/env.js";
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
-import { session, user, verification } from "../../src/db/schema/auth.js";
+import { session, twoFactor, user, verification } from "../../src/db/schema/auth.js";
 import { EmailDeliveryError } from "../../src/lib/errors.js";
 
 const FRONTEND_ORIGIN = "http://localhost:8080";
@@ -30,6 +31,7 @@ assertSafeTestDatabaseUrl(databaseUrl, env.NODE_ENV);
 
 let app: FastifyInstance;
 let database: DatabaseClient;
+let auth: AuthService;
 let requestCounter = 0;
 const emailSender = new InMemoryAuthEmailSender();
 
@@ -37,7 +39,7 @@ beforeAll(async () => {
   database = createDatabaseClient(databaseUrl);
   await migrate(database.db, { migrationsFolder: resolve("src/db/migrations") });
   const runtime = resolveAuthRuntimeConfig(env);
-  const auth = createAuthService({ database, emailSender, runtime });
+  auth = createAuthService({ database, emailSender, runtime });
   app = await buildApp({
     database,
     auth,
@@ -287,6 +289,7 @@ describe("email and password authentication", () => {
       "email",
       "emailVerified",
       "id",
+      "mfaEnabled",
       "name",
       "phone",
       "status",
@@ -552,6 +555,154 @@ describe("email and password authentication", () => {
   });
 });
 
+describe("official Better Auth TOTP", () => {
+  it("requires verified enrollment and completes sign-in only after a valid TOTP", async () => {
+    const email = "totp-login@example.com";
+    const initialCookie = await createVerifiedSession(email);
+    const enabled = await post(
+      "/api/auth/two-factor/enable",
+      { password: ORIGINAL_PASSWORD },
+      { cookie: initialCookie },
+    );
+    const enrollment = enabled.json<{ totpURI: string; backupCodes: string[] }>();
+    const secret = totpSecretFromURI(enrollment.totpURI);
+    const enrollmentCode = (await auth.api.generateTOTP({ body: { secret } })).code;
+    const verified = await post(
+      "/api/auth/two-factor/verify-totp",
+      { code: enrollmentCode },
+      { cookie: initialCookie },
+    );
+    expect(verified.statusCode).toBe(200);
+    const enrolledCookie = sessionCookie(verified);
+    const [storedUser] = await database.db
+      .select({ enabled: user.twoFactorEnabled })
+      .from(user)
+      .where(eq(user.email, email));
+    const [storedFactor] = await database.db
+      .select({ verified: twoFactor.verified })
+      .from(twoFactor);
+
+    expect(enabled.statusCode).toBe(200);
+    expect(enrollment.totpURI).toMatch(/^otpauth:\/\/totp\//);
+    expect(enrollment.backupCodes.length).toBeGreaterThan(0);
+    expect(storedUser).toEqual({ enabled: true });
+    expect(storedFactor).toEqual({ verified: true });
+
+    await post("/api/auth/sign-out", {}, { cookie: enrolledCookie });
+    const challenged = await login(email, ORIGINAL_PASSWORD);
+    const challengeCookie = responseCookies(challenged)
+      .filter((value) => !value.includes("Max-Age=0"))
+      .map((value) => value.split(";", 1)[0])
+      .join("; ");
+    const challengeCookieHeader = responseCookies(challenged).find((value) =>
+      value.includes("two_factor"),
+    );
+    const beforeTotp = await app.inject({
+      method: "GET",
+      url: "/api/v1/users/me",
+      headers: { cookie: challengeCookie },
+    });
+    const failed = await post(
+      "/api/auth/two-factor/verify-totp",
+      { code: "000000" },
+      { cookie: challengeCookie },
+    );
+    const signInCode = (await auth.api.generateTOTP({ body: { secret } })).code;
+    const completed = await post(
+      "/api/auth/two-factor/verify-totp",
+      { code: signInCode },
+      { cookie: challengeCookie },
+    );
+
+    expect(challenged.statusCode).toBe(200);
+    expect(challenged.json()).toMatchObject({
+      twoFactorRedirect: true,
+      twoFactorMethods: ["totp"],
+    });
+    expect(
+      responseCookies(challenged).some(
+        (value) => value.includes("session_token") && !value.includes("Max-Age=0"),
+      ),
+    ).toBe(false);
+    expect(challengeCookieHeader).toMatch(/HttpOnly/i);
+    expect(challengeCookieHeader).toMatch(/SameSite=Lax/i);
+    expect(challengeCookieHeader).toMatch(/Max-Age=600/i);
+    expect(beforeTotp.statusCode).toBe(401);
+    expect(failed.statusCode).toBe(401);
+    expect(responseCookies(failed).some((value) => value.includes("session_token"))).toBe(false);
+    expect(completed.statusCode).toBe(200);
+    expect(sessionCookie(completed)).toContain("session_token");
+  });
+
+  it("uses protected single-use backup codes to complete the official second factor", async () => {
+    const email = "backup-code-login@example.com";
+    const initialCookie = await createVerifiedSession(email);
+    const enabled = await post(
+      "/api/auth/two-factor/enable",
+      { password: ORIGINAL_PASSWORD },
+      { cookie: initialCookie },
+    );
+    const enrollment = enabled.json<{ totpURI: string; backupCodes: string[] }>();
+    const secret = totpSecretFromURI(enrollment.totpURI);
+    const enrollmentCode = (await auth.api.generateTOTP({ body: { secret } })).code;
+    const verified = await post(
+      "/api/auth/two-factor/verify-totp",
+      { code: enrollmentCode },
+      { cookie: initialCookie },
+    );
+    const [storedFactor] = await database.db
+      .select({ secret: twoFactor.secret, backupCodes: twoFactor.backupCodes })
+      .from(twoFactor);
+
+    expect(storedFactor?.secret).not.toContain(secret);
+    for (const backupCode of enrollment.backupCodes) {
+      expect(storedFactor?.backupCodes).not.toContain(backupCode);
+    }
+
+    await post("/api/auth/sign-out", {}, { cookie: sessionCookie(verified) });
+    const challenged = await login(email, ORIGINAL_PASSWORD);
+    const challengeCookie = responseCookies(challenged)
+      .filter((value) => !value.includes("Max-Age=0"))
+      .map((value) => value.split(";", 1)[0])
+      .join("; ");
+    const completed = await post(
+      "/api/auth/two-factor/verify-backup-code",
+      { code: enrollment.backupCodes[0] },
+      { cookie: challengeCookie },
+    );
+    expect(completed.statusCode).toBe(200);
+    expect(sessionCookie(completed)).toContain("session_token");
+
+    await post("/api/auth/sign-out", {}, { cookie: sessionCookie(completed) });
+    const replayChallenge = await login(email, ORIGINAL_PASSWORD);
+    const replayCookie = responseCookies(replayChallenge)
+      .filter((value) => !value.includes("Max-Age=0"))
+      .map((value) => value.split(";", 1)[0])
+      .join("; ");
+    const replay = await post(
+      "/api/auth/two-factor/verify-backup-code",
+      { code: enrollment.backupCodes[0] },
+      { cookie: replayCookie },
+    );
+    expect(replay.statusCode).toBe(401);
+    expect(responseCookies(replay).some((value) => value.includes("session_token"))).toBe(false);
+  });
+
+  it("does not let the browser opt into a trusted-device bypass", async () => {
+    const response = await post("/api/auth/two-factor/verify-totp", {
+      code: "123456",
+      trustDevice: true,
+    });
+
+    expect(response.statusCode).toBe(400);
+    const backupResponse = await post("/api/auth/two-factor/verify-backup-code", {
+      code: "backup-code",
+      trustDevice: true,
+    });
+    expect(backupResponse.statusCode).toBe(400);
+  });
+});
+
 async function register(email: string, phone = "0712345678"): Promise<InjectResponse> {
   return post("/api/auth/sign-up/email", registrationBody(email, phone));
 }
@@ -652,8 +803,17 @@ function cookieHeaders(response: InjectResponse): string[] {
   return Array.isArray(header) ? header : [header];
 }
 
+function responseCookies(response: InjectResponse): string[] {
+  return cookieHeaders(response);
+}
+
 function sessionCookie(response: InjectResponse): string {
   const header = cookieHeaders(response).find((value) => value.includes("session_token"));
   expect(header).toBeDefined();
   return header?.split(";", 1)[0] ?? "";
+}
+
+function totpSecretFromURI(uri: string): string {
+  const encoded = new URL(uri).searchParams.get("secret") ?? "";
+  return new TextDecoder().decode(base32.decode(encoded));
 }

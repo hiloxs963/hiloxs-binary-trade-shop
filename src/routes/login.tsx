@@ -41,6 +41,8 @@ function LoginPage() {
     search.verified ? "Email verified. You can now log in." : "",
   );
   const [submitting, setSubmitting] = useState(false);
+  const [awaitingTwoFactor, setAwaitingTwoFactor] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
 
   return (
     <AuthFormLayout
@@ -60,6 +62,25 @@ function LoginPage() {
         className="space-y-4"
         onSubmit={async (event) => {
           event.preventDefault();
+          if (awaitingTwoFactor) {
+            if (!/^\d{6}$/.test(twoFactorCode)) {
+              setNotice("Enter the six-digit code from your authenticator app.");
+              return;
+            }
+            setSubmitting(true);
+            setNotice("");
+            try {
+              await auth.completeTwoFactor(twoFactorCode);
+              setTwoFactorCode("");
+              await navigate({ to: search.returnTo ?? "/" });
+            } catch {
+              setNotice("The authentication code could not be verified.");
+            } finally {
+              setSubmitting(false);
+            }
+            return;
+          }
+
           const nextErrors: typeof errors = {};
           if (!/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Enter a valid email address.";
           if (!password) nextErrors.password = "Enter your password.";
@@ -69,8 +90,13 @@ function LoginPage() {
           setSubmitting(true);
           setNotice("");
           try {
-            await auth.login(email, password);
-            await navigate({ to: search.returnTo ?? "/" });
+            const result = await auth.login(email, password);
+            if (result.requiresTwoFactor) {
+              setPassword("");
+              setAwaitingTwoFactor(true);
+            } else {
+              await navigate({ to: search.returnTo ?? "/" });
+            }
           } catch (error) {
             setNotice(
               error instanceof AuthApiError && error.status === 403
@@ -82,39 +108,59 @@ function LoginPage() {
           }
         }}
       >
-        <div className="space-y-1.5">
-          <Label htmlFor="login-email">Email address</Label>
-          <Input
-            id="login-email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            inputMode="email"
-            aria-invalid={Boolean(errors.email)}
-            aria-describedby={errors.email ? "login-email-error" : undefined}
-          />
-          {errors.email && (
-            <p id="login-email-error" className="text-xs text-destructive">
-              {errors.email}
-            </p>
-          )}
-        </div>
-        <PasswordField
-          id="login-password"
-          value={password}
-          onChange={setPassword}
-          error={errors.password}
-          autoComplete="current-password"
-        />
-        <div className="text-right">
-          <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-            Forgot password?
-          </Link>
-        </div>
+        {awaitingTwoFactor ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="login-totp">Authenticator code</Label>
+            <Input
+              id="login-totp"
+              type="text"
+              value={twoFactorCode}
+              onChange={(event) =>
+                setTwoFactorCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              maxLength={6}
+              autoFocus
+            />
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="login-email">Email address</Label>
+              <Input
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                inputMode="email"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? "login-email-error" : undefined}
+              />
+              {errors.email && (
+                <p id="login-email-error" className="text-xs text-destructive">
+                  {errors.email}
+                </p>
+              )}
+            </div>
+            <PasswordField
+              id="login-password"
+              value={password}
+              onChange={setPassword}
+              error={errors.password}
+              autoComplete="current-password"
+            />
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+          </>
+        )}
         {notice && <FormNotice>{notice}</FormNotice>}
         <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
-          {submitting ? "Logging in..." : "Continue"}
+          {submitting ? "Verifying..." : awaitingTwoFactor ? "Verify code" : "Continue"}
         </Button>
       </form>
     </AuthFormLayout>

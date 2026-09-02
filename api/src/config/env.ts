@@ -6,6 +6,11 @@ const BooleanEnvironmentSchema = z
   .default("false")
   .transform((value) => value === "true");
 
+const FailSafeBooleanEnvironmentSchema = z
+  .string()
+  .optional()
+  .transform((value) => value === "true");
+
 const EnvironmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().trim().min(1).default("127.0.0.1"),
@@ -26,6 +31,7 @@ const EnvironmentSchema = z.object({
   FRONTEND_URL: z.url().optional(),
   MPESA_ENV: z.enum(["sandbox", "production"]).optional(),
   MPESA_PUBLIC_ENABLED: BooleanEnvironmentSchema,
+  STAFF_REVIEW_ENABLED: FailSafeBooleanEnvironmentSchema,
   MPESA_CONSUMER_KEY: z.string().trim().min(1).optional(),
   MPESA_CONSUMER_SECRET: z.string().trim().min(1).optional(),
   MPESA_SHORTCODE: z.string().trim().regex(/^\d+$/).optional(),
