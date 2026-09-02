@@ -4,6 +4,7 @@ import * as authSchema from "./schema/auth.js";
 import * as commerceSchema from "./schema/commerce.js";
 import * as metadataSchema from "./schema/system-metadata.js";
 import * as paymentSchema from "./schema/payments.js";
+import * as sellerProductSchema from "./schema/seller-products.js";
 import * as sellerSchema from "./schema/sellers.js";
 
 const schema = {
@@ -11,6 +12,7 @@ const schema = {
   ...commerceSchema,
   ...metadataSchema,
   ...paymentSchema,
+  ...sellerProductSchema,
   ...sellerSchema,
 };
 

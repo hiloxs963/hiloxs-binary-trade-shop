@@ -36,6 +36,13 @@
       "when": 1788310061849,
       "tag": "0004_exotic_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788346588237,
+      "tag": "0005_premium_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

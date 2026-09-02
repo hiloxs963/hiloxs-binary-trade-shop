@@ -24,6 +24,7 @@ import { registerCheckoutRoute } from "./routes/checkout.js";
 import { registerOrderRoutes } from "./routes/orders.js";
 import { registerProductRoutes } from "./routes/products.js";
 import { registerSellerRoutes } from "./sellers/routes.js";
+import { registerSellerProductRoutes } from "./seller-products/routes.js";
 
 export type BuildAppOptions = {
   database?: DatabaseClient;
@@ -61,6 +62,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
     registerCheckoutRoute(app, { auth: options.auth, database: options.database });
     registerOrderRoutes(app, { auth: options.auth, database: options.database });
     registerSellerRoutes(app, { auth: options.auth, database: options.database });
+    registerSellerProductRoutes(app, { auth: options.auth, database: options.database });
     if (options.mpesa) {
       registerMpesaRoutes(app, {
         auth: options.auth,
