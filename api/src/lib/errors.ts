@@ -4,6 +4,7 @@ export type ErrorCode =
   | "DATABASE_UNAVAILABLE"
   | "EMAIL_DELIVERY_FAILED"
   | "UNAUTHENTICATED"
+  | "SELLER_NOT_APPROVED"
   | "ORIGIN_NOT_ALLOWED"
   | "CONFLICT"
   | "IDEMPOTENCY_KEY_REUSED"
@@ -87,6 +88,16 @@ export class UnauthenticatedError extends AppError {
     super("Authentication is required", {
       code: "UNAUTHENTICATED",
       statusCode: 401,
+      expose: true,
+    });
+  }
+}
+
+export class SellerNotApprovedError extends AppError {
+  constructor() {
+    super("An approved seller application is required", {
+      code: "SELLER_NOT_APPROVED",
+      statusCode: 403,
       expose: true,
     });
   }

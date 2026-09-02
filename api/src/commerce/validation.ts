@@ -46,7 +46,7 @@ export const EmptyBodySchema = z.object({}).strict();
 
 export const ProductListQuerySchema = z
   .object({
-    category: z.enum(CATALOG_CATEGORIES as [string, ...string[]]).optional(),
+    category: z.enum(CATALOG_CATEGORIES).optional(),
   })
   .strict();
 

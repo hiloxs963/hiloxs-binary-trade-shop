@@ -1,3 +1,5 @@
+import { PRODUCT_CATEGORIES } from "./categories.js";
+
 export const CATALOG_CURRENCY = "KES" as const;
 
 export type InitialCatalogProduct = {
@@ -429,4 +431,4 @@ export const INITIAL_CATALOG = [
   ),
 ] as const satisfies readonly InitialCatalogProduct[];
 
-export const CATALOG_CATEGORIES = [...new Set(INITIAL_CATALOG.map((item) => item.category))];
+export const CATALOG_CATEGORIES = PRODUCT_CATEGORIES;

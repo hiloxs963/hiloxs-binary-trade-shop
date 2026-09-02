@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
 import { pageSeo } from "@/lib/seo";
+import { SellerProducts } from "@/components/hiloxs/SellerProducts";
 import {
   createSellerApplication,
   getSellerApplication,
@@ -497,8 +498,8 @@ function SellerApplicationStatusView({
           <div className="mt-5 flex items-start gap-2 border-t border-border pt-5 text-sm">
             <BadgeCheck className="mt-0.5 size-5 shrink-0 text-success" aria-hidden />
             <p>
-              Seller product submission is not available yet. It is planned for Phase 6; approval
-              does not create products or payout access.
+              Approval enables private product submissions below. It does not publish products or
+              create payout access.
             </p>
           </div>
         )}
@@ -526,6 +527,7 @@ function SellerApplicationStatusView({
           </p>
         )}
       </div>
+      {application.status === "APPROVED" && <SellerProducts />}
     </section>
   );
 }
