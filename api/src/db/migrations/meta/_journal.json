@@ -29,6 +29,13 @@
       "when": 1788207958476,
       "tag": "0003_lame_tony_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788310061849,
+      "tag": "0004_exotic_warbound",
+      "breakpoints": true
     }
   ]
 }
