@@ -9,7 +9,7 @@ import {
 describe("log redaction", () => {
   it("redacts database credentials and bearer tokens in text", () => {
     const text = redactText(
-      "postgresql://admin:secret@database:5432/hiloxs Bearer re_resend-secret password=hunter2 apiKey=client-key x-api-key: header-key RESEND_API_KEY=re_private-key",
+      "postgresql://admin:secret@database:5432/hiloxs Bearer re_resend-secret password=hunter2 apiKey=client-key x-api-key: header-key RESEND_API_KEY=re_private-key kraPin=P123456789Z registration_number=BN-12345",
     );
 
     expect(text).not.toContain("admin:secret");
@@ -18,6 +18,8 @@ describe("log redaction", () => {
     expect(text).not.toContain("client-key");
     expect(text).not.toContain("header-key");
     expect(text).not.toContain("re_private-key");
+    expect(text).not.toContain("P123456789Z");
+    expect(text).not.toContain("BN-12345");
     expect(text).toContain("[REDACTED]");
   });
 
@@ -72,6 +74,10 @@ describe("log redaction", () => {
       redactSensitive({
         MPESA_CONSUMER_SECRET: "consumer-secret-value",
         MPESA_PASSKEY: "passkey-value",
+        kraPin: "A123456789Z",
+        kra_pin: "A123456789Z",
+        registrationNumber: "BN-12345",
+        registration_number: "BN-12345",
         Password: "generated-password",
         callbackToken: "callback-token",
         safeReference: "HX-TEST",
@@ -79,6 +85,10 @@ describe("log redaction", () => {
     ).toEqual({
       MPESA_CONSUMER_SECRET: "[REDACTED]",
       MPESA_PASSKEY: "[REDACTED]",
+      kraPin: "[REDACTED]",
+      kra_pin: "[REDACTED]",
+      registrationNumber: "[REDACTED]",
+      registration_number: "[REDACTED]",
       Password: "[REDACTED]",
       callbackToken: "[REDACTED]",
       safeReference: "HX-TEST",

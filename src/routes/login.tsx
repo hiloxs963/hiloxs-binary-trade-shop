@@ -6,13 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthApiError } from "@/lib/auth-api";
 import { useAuth } from "@/lib/auth-context";
+import { parseAuthReturnPath, type AuthReturnPath } from "@/lib/auth-return";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>) => {
-    const result: { returnTo?: "/checkout" | "/my-orders"; verified?: boolean } = {};
-    if (search["returnTo"] === "/checkout" || search["returnTo"] === "/my-orders")
-      result.returnTo = search["returnTo"];
+    const result: {
+      returnTo?: AuthReturnPath;
+      verified?: boolean;
+    } = {};
+    const returnTo = parseAuthReturnPath(search["returnTo"]);
+    if (returnTo) result.returnTo = returnTo;
     if (search["verified"] === true || search["verified"] === "true") result.verified = true;
     return result;
   },
