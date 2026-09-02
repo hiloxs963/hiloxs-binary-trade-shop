@@ -5,6 +5,10 @@ export type ErrorCode =
   | "EMAIL_DELIVERY_FAILED"
   | "UNAUTHENTICATED"
   | "SELLER_NOT_APPROVED"
+  | "STAFF_PERMISSION_REQUIRED"
+  | "STAFF_REAUTH_REQUIRED"
+  | "STAFF_RECENT_AUTH_REQUIRED"
+  | "STAFF_REVIEW_DISABLED"
   | "ORIGIN_NOT_ALLOWED"
   | "CONFLICT"
   | "IDEMPOTENCY_KEY_REUSED"
@@ -98,6 +102,46 @@ export class SellerNotApprovedError extends AppError {
     super("An approved seller application is required", {
       code: "SELLER_NOT_APPROVED",
       statusCode: 403,
+      expose: true,
+    });
+  }
+}
+
+export class StaffPermissionRequiredError extends AppError {
+  constructor() {
+    super("Staff permission is required", {
+      code: "STAFF_PERMISSION_REQUIRED",
+      statusCode: 403,
+      expose: true,
+    });
+  }
+}
+
+export class StaffReauthRequiredError extends AppError {
+  constructor() {
+    super("Please sign in again before accessing staff operations", {
+      code: "STAFF_REAUTH_REQUIRED",
+      statusCode: 403,
+      expose: true,
+    });
+  }
+}
+
+export class StaffRecentAuthRequiredError extends AppError {
+  constructor() {
+    super("Please sign in again before performing review actions", {
+      code: "STAFF_RECENT_AUTH_REQUIRED",
+      statusCode: 403,
+      expose: true,
+    });
+  }
+}
+
+export class StaffReviewDisabledError extends AppError {
+  constructor() {
+    super("Review actions are currently disabled", {
+      code: "STAFF_REVIEW_DISABLED",
+      statusCode: 503,
       expose: true,
     });
   }

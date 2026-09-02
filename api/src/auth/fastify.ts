@@ -1,5 +1,6 @@
 import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { ValidationError } from "../lib/errors.js";
 import type { AuthService } from "./auth.js";
 import {
@@ -75,6 +76,26 @@ function normalizeAuthBody(
     if (path.endsWith("/request-password-reset")) return PasswordResetRequestSchema.parse(body);
     if (path.endsWith("/reset-password")) return PasswordResetSchema.parse(body);
     if (path.endsWith("/send-verification-email")) return VerificationRequestSchema.parse(body);
+    if (path.endsWith("/two-factor/enable")) {
+      return z
+        .object({ password: z.string().min(1).max(128) })
+        .strict()
+        .parse(body);
+    }
+    if (path.endsWith("/two-factor/verify-totp")) {
+      const verified = z
+        .object({ code: z.string().regex(/^\d{6}$/) })
+        .strict()
+        .parse(body);
+      return { ...verified, trustDevice: false };
+    }
+    if (path.endsWith("/two-factor/verify-backup-code")) {
+      const verified = z
+        .object({ code: z.string().min(1).max(128) })
+        .strict()
+        .parse(body);
+      return { ...verified, disableSession: false, trustDevice: false };
+    }
     return body;
   })();
 

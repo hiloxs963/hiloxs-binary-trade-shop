@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 export const ACCOUNT_STATUSES = ["ACTIVE", "SUSPENDED", "DISABLED"] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
@@ -14,11 +23,31 @@ export const user = pgTable(
     image: text("image"),
     phone: text("phone").notNull(),
     status: text("status").$type<AccountStatus>().notNull().default("ACTIVE"),
+    twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     check("user_status_check", sql`${table.status} in ('ACTIVE', 'SUSPENDED', 'DISABLED')`),
+  ],
+);
+
+export const twoFactor = pgTable(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  },
+  (table) => [
+    index("two_factor_secret_idx").on(table.secret),
+    uniqueIndex("two_factor_user_id_uidx").on(table.userId),
   ],
 );
 

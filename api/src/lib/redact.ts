@@ -1,7 +1,7 @@
 import { AppError } from "./errors.js";
 
 const SENSITIVE_KEY =
-  /authorization|cookie|password|passphrase|passkey|token|secret|databaseurl|apikey|krapin|registrationnumber/i;
+  /authorization|cookie|password|passphrase|passkey|token|secret|databaseurl|apikey|krapin|registrationnumber|totp|backupcode|twofactor/i;
 
 const API_KEY_FIELDS = ["apiKey", "api_key", "API_KEY", "xApiKey"] as const;
 const HEADER_PATHS = ["req.headers", "request.headers", "headers"] as const;
@@ -30,6 +30,11 @@ export const LOG_REDACT_PATHS = [
   "kra_pin",
   "registrationNumber",
   "registration_number",
+  "totpURI",
+  "totpCode",
+  "twoFactorCode",
+  "twoFactorChallenge",
+  "backupCodes",
   ...API_KEY_FIELDS,
   ...HEADER_PATHS.map((path) => `${path}["x-api-key"]`),
 ] as const;
@@ -39,7 +44,7 @@ export function redactText(value: string): string {
     .replace(/(postgres(?:ql)?:\/\/)[^\s@]+@/gi, "$1[REDACTED]@")
     .replace(/(bearer\s+)[^\s]+/gi, "$1[REDACTED]")
     .replace(
-      /((?:password|passkey|token|secret|database[_-]?url|(?:resend[_-]?)?(?:x[_-]?)?api[_-]?key|kra[_-]?pin|registration[_-]?number)\s*[=:]\s*)[^\s,;]+/gi,
+      /((?:password|passkey|token|secret|database[_-]?url|(?:resend[_-]?)?(?:x[_-]?)?api[_-]?key|kra[_-]?pin|registration[_-]?number|totp(?:[_-]?(?:uri|code))?|backup[_-]?codes?|two[_-]?factor(?:[_-]?(?:uri|code|challenge))?)\s*[=:]\s*)[^\s,;]+/gi,
       "$1[REDACTED]",
     );
 }

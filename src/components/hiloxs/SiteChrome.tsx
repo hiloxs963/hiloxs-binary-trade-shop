@@ -1,12 +1,20 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { LogOut, Menu, ShoppingCart, UserRound, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { KeyRound, LogOut, Menu, ShoppingCart, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import logoIcon from "@/assets/hiloxs-icon.png";
 import { SUPPORT } from "@/lib/hiloxs";
 import { useAuth } from "@/lib/auth-context";
+import { getStaffProfile } from "@/lib/staff-api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -22,7 +30,26 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const { state, hydrated } = useHiloxs();
   const auth = useAuth();
+  const [hasStaffAccess, setHasStaffAccess] = useState(false);
   const cartCount = hydrated ? Object.values(state.cart).reduce((s, q) => s + q, 0) : 0;
+
+  useEffect(() => {
+    if (!auth.currentUser) {
+      setHasStaffAccess(false);
+      return;
+    }
+    let active = true;
+    void getStaffProfile()
+      .then((profile) => {
+        if (active) setHasStaffAccess(profile !== null);
+      })
+      .catch(() => {
+        if (active) setHasStaffAccess(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.currentUser]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
@@ -70,29 +97,53 @@ export function SiteHeader() {
               )}
             </Link>
           </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="icon"
-            aria-label={auth.currentUser ? `Account for ${auth.currentUser.name}` : "Log in"}
-          >
-            <Link to={auth.currentUser ? "/my-orders" : "/login"}>
-              <UserRound aria-hidden />
-            </Link>
-          </Button>
-          {auth.currentUser && (
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Log out"
-              onClick={() => {
-                void auth
-                  .logout()
-                  .then(() => toast.success("Logged out"))
-                  .catch(() => toast.error("Unable to log out"));
-              }}
-            >
-              <LogOut aria-hidden />
+          {auth.currentUser ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Account for ${auth.currentUser.name}`}
+                >
+                  <UserRound aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem asChild>
+                  <Link to="/my-orders">
+                    <ShoppingCart aria-hidden /> My Orders
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/account/security">
+                    <KeyRound aria-hidden /> Account Security
+                  </Link>
+                </DropdownMenuItem>
+                {hasStaffAccess && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/staff">
+                      <UserRound aria-hidden /> Staff Console
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => {
+                    void auth
+                      .logout()
+                      .then(() => toast.success("Logged out"))
+                      .catch(() => toast.error("Unable to log out"));
+                  }}
+                >
+                  <LogOut aria-hidden /> Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild variant="outline" size="icon" aria-label="Log in">
+              <Link to="/login">
+                <UserRound aria-hidden />
+              </Link>
             </Button>
           )}
           <Button asChild variant="hero" size="sm" className="hidden sm:inline-flex">

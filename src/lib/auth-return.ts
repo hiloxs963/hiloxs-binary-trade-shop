@@ -1,4 +1,4 @@
-export const AUTH_RETURN_PATHS = ["/checkout", "/my-orders", "/sell-with-us"] as const;
+export const AUTH_RETURN_PATHS = ["/checkout", "/my-orders", "/sell-with-us", "/staff"] as const;
 
 export type AuthReturnPath = (typeof AUTH_RETURN_PATHS)[number];
 

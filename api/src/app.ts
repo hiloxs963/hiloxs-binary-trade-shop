@@ -25,6 +25,7 @@ import { registerOrderRoutes } from "./routes/orders.js";
 import { registerProductRoutes } from "./routes/products.js";
 import { registerSellerRoutes } from "./sellers/routes.js";
 import { registerSellerProductRoutes } from "./seller-products/routes.js";
+import { registerStaffRoutes } from "./staff/routes.js";
 
 export type BuildAppOptions = {
   database?: DatabaseClient;
@@ -33,6 +34,7 @@ export type BuildAppOptions = {
   allowedOrigins?: readonly string[];
   logger?: FastifyServerOptions["logger"];
   mpesa?: { provider: MpesaProvider; config: MpesaRuntimeConfig };
+  staffReviewEnabled?: boolean;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -63,6 +65,11 @@ export async function buildApp(options: BuildAppOptions = {}) {
     registerOrderRoutes(app, { auth: options.auth, database: options.database });
     registerSellerRoutes(app, { auth: options.auth, database: options.database });
     registerSellerProductRoutes(app, { auth: options.auth, database: options.database });
+    registerStaffRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      reviewEnabled: options.staffReviewEnabled ?? false,
+    });
     if (options.mpesa) {
       registerMpesaRoutes(app, {
         auth: options.auth,

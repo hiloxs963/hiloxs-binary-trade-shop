@@ -6,6 +6,7 @@ import * as metadataSchema from "./schema/system-metadata.js";
 import * as paymentSchema from "./schema/payments.js";
 import * as sellerProductSchema from "./schema/seller-products.js";
 import * as sellerSchema from "./schema/sellers.js";
+import * as staffSchema from "./schema/staff.js";
 
 const schema = {
   ...authSchema,
@@ -14,6 +15,7 @@ const schema = {
   ...paymentSchema,
   ...sellerProductSchema,
   ...sellerSchema,
+  ...staffSchema,
 };
 
 export type Database = NodePgDatabase<typeof schema>;

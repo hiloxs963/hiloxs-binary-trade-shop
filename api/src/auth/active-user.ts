@@ -13,6 +13,7 @@ export type ActiveUser = {
   emailVerified: boolean;
   phone: string;
   status: "ACTIVE";
+  mfaEnabled: boolean;
 };
 
 export async function requireActiveUser(
@@ -31,6 +32,7 @@ export async function requireActiveUser(
       emailVerified: user.emailVerified,
       phone: user.phone,
       status: user.status,
+      mfaEnabled: user.twoFactorEnabled,
     })
     .from(user)
     .where(and(eq(user.id, authSession.user.id), eq(user.status, "ACTIVE")))

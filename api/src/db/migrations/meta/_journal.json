@@ -43,6 +43,13 @@
       "when": 1788346588237,
       "tag": "0005_premium_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788385522616,
+      "tag": "0006_far_longshot",
+      "breakpoints": true
     }
   ]
 }
