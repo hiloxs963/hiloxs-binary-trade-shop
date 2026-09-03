@@ -34,6 +34,8 @@ const EnvironmentSchema = z.object({
   STAFF_REVIEW_ENABLED: FailSafeBooleanEnvironmentSchema,
   MEDIA_UPLOAD_ENABLED: BooleanEnvironmentSchema,
   CATALOG_ACTIVATION_ENABLED: BooleanEnvironmentSchema,
+  SELLER_COMMERCE_ENABLED: BooleanEnvironmentSchema,
+  SELLER_ORDER_ACTIONS_ENABLED: BooleanEnvironmentSchema,
   MEDIA_S3_ENDPOINT: z.url().optional(),
   MEDIA_S3_REGION: z.string().trim().min(1).optional(),
   MEDIA_S3_BUCKET: z

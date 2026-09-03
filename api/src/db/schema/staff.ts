@@ -10,7 +10,13 @@ export const STAFF_ROLES = ["STAFF", "ADMIN"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 export const STAFF_MEMBERSHIP_STATUSES = ["ACTIVE", "SUSPENDED", "REVOKED"] as const;
 export type StaffMembershipStatus = (typeof STAFF_MEMBERSHIP_STATUSES)[number];
-export const STAFF_PERMISSIONS = ["SELLER_REVIEW", "PRODUCT_REVIEW", "CATALOG_ACTIVATE"] as const;
+export const STAFF_PERMISSIONS = [
+  "SELLER_REVIEW",
+  "PRODUCT_REVIEW",
+  "CATALOG_ACTIVATE",
+  "SELLER_COMMERCE_ACTIVATE",
+  "ORDER_SUPPORT",
+] as const;
 export type StaffPermission = (typeof STAFF_PERMISSIONS)[number];
 export const STAFF_GRANT_SOURCES = ["BOOTSTRAP", "STAFF"] as const;
 export type StaffGrantSource = (typeof STAFF_GRANT_SOURCES)[number];
@@ -29,6 +35,8 @@ export const STAFF_AUDIT_ACTIONS = [
   "SELLER_PRODUCT_MEDIA_REJECTED",
   "CATALOG_ACTIVATED",
   "CATALOG_DEACTIVATED",
+  "SELLER_COMMERCE_ENABLED",
+  "SELLER_COMMERCE_DISABLED",
 ] as const;
 export type StaffAuditAction = (typeof STAFF_AUDIT_ACTIONS)[number];
 
@@ -82,7 +90,7 @@ export const staffPermissionGrants = pgTable(
       .where(sql`${table.revokedAt} is null`),
     check(
       "staff_permission_grants_permission_check",
-      sql`${table.permission} in ('SELLER_REVIEW', 'PRODUCT_REVIEW', 'CATALOG_ACTIVATE')`,
+      sql`${table.permission} in ('SELLER_REVIEW', 'PRODUCT_REVIEW', 'CATALOG_ACTIVATE', 'SELLER_COMMERCE_ACTIVATE', 'ORDER_SUPPORT')`,
     ),
     check(
       "staff_permission_grants_source_check",
@@ -146,7 +154,7 @@ export const staffAuditEvents = pgTable(
     ),
     check(
       "staff_audit_events_permission_check",
-      sql`${table.permission} is null or ${table.permission} in ('SELLER_REVIEW', 'PRODUCT_REVIEW', 'CATALOG_ACTIVATE')`,
+      sql`${table.permission} is null or ${table.permission} in ('SELLER_REVIEW', 'PRODUCT_REVIEW', 'CATALOG_ACTIVATE', 'SELLER_COMMERCE_ACTIVATE', 'ORDER_SUPPORT')`,
     ),
     check(
       "staff_audit_events_actor_check",
@@ -169,6 +177,10 @@ export const staffAuditEvents = pgTable(
         ${table.sellerProductSubmissionId} is not null and ${table.productId} is not null and
         ${table.sellerApplicationId} is null and ${table.sellerProductMediaId} is null and
         ${table.previousStatus} is not null and ${table.resultingStatus} is not null) or
+        (${table.action} in ('SELLER_COMMERCE_ENABLED', 'SELLER_COMMERCE_DISABLED') and
+        ${table.productId} is not null and
+        ${table.sellerApplicationId} is null and ${table.sellerProductSubmissionId} is null and ${table.sellerProductMediaId} is null and
+        ${table.previousStatus} is not null and ${table.resultingStatus} is not null) or
         (${table.action} in ('STAFF_BOOTSTRAPPED', 'STAFF_PERMISSION_GRANTED') and
         num_nonnulls(${table.sellerApplicationId}, ${table.sellerProductSubmissionId}, ${table.sellerProductMediaId}, ${table.productId}) = 0 and
         ${table.previousStatus} is null and ${table.resultingStatus} is null)`,
@@ -178,7 +190,8 @@ export const staffAuditEvents = pgTable(
       sql`${table.actorType} = 'SYSTEM_BOOTSTRAP' or
         (${table.permission} = 'SELLER_REVIEW' and ${table.action} in ('SELLER_APPLICATION_REVIEW_STARTED', 'SELLER_APPLICATION_APPROVED', 'SELLER_APPLICATION_REJECTED')) or
         (${table.permission} = 'PRODUCT_REVIEW' and ${table.action} in ('SELLER_PRODUCT_REVIEW_STARTED', 'SELLER_PRODUCT_APPROVED', 'SELLER_PRODUCT_REJECTED', 'SELLER_PRODUCT_MEDIA_APPROVED', 'SELLER_PRODUCT_MEDIA_REJECTED')) or
-        (${table.permission} = 'CATALOG_ACTIVATE' and ${table.action} in ('CATALOG_ACTIVATED', 'CATALOG_DEACTIVATED'))`,
+        (${table.permission} = 'CATALOG_ACTIVATE' and ${table.action} in ('CATALOG_ACTIVATED', 'CATALOG_DEACTIVATED')) or
+        (${table.permission} = 'SELLER_COMMERCE_ACTIVATE' and ${table.action} in ('SELLER_COMMERCE_ENABLED', 'SELLER_COMMERCE_DISABLED'))`,
     ),
   ],
 );

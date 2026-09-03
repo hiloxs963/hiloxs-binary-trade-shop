@@ -22,12 +22,48 @@ export type CheckoutQuote = {
   subtotalMinor: string;
   totalMinor: string;
   items: QuoteItem[];
+  deliveryRequired?: boolean;
+};
+
+export type DeliveryAddress = {
+  recipientName: string;
+  phone: string;
+  county: string;
+  town: string;
+  addressLine: string;
+  landmark?: string;
+};
+
+export type OrderFulfillment = {
+  id: string;
+  status:
+    | "AWAITING_PAYMENT"
+    | "READY_FOR_SELLER"
+    | "ACCEPTED"
+    | "PREPARING"
+    | "DISPATCHED"
+    | "DELIVERED"
+    | "FULFILLMENT_ISSUE"
+    | "CANCELLED";
+  carrier: string | null;
+  trackingReference: string | null;
+  issueReason: string | null;
+  issueMessage: string | null;
+  deliveredAt: string | null;
+  items: CommerceOrder["items"];
 };
 
 export type CommerceOrder = {
   id: string;
   orderNumber: string;
-  status: "PENDING_PAYMENT" | "PAID" | "PROCESSING" | "COMPLETED" | "CANCELLED" | "REFUNDED";
+  status:
+    | "PENDING_PAYMENT"
+    | "PAYMENT_REVIEW_REQUIRED"
+    | "PAID"
+    | "PROCESSING"
+    | "COMPLETED"
+    | "CANCELLED"
+    | "REFUNDED";
   currency: "KES";
   subtotalMinor: string;
   totalMinor: string;
@@ -42,6 +78,10 @@ export type CommerceOrder = {
     quantity: number;
     lineTotalMinor: string;
   }>;
+  shippingMinor?: string;
+  reservationExpiresAt?: string | null;
+  deliveryAddress?: DeliveryAddress | null;
+  fulfillments?: OrderFulfillment[];
 };
 
 export type PaymentAttemptStatus =
@@ -89,14 +129,23 @@ export async function getCheckoutQuote(items: CartRequestItem[]): Promise<Checko
 export async function createOrder(
   items: CartRequestItem[],
   idempotencyKey: string,
+  deliveryAddress?: DeliveryAddress,
 ): Promise<CommerceOrder> {
   const response = await request("/api/v1/orders", {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, ...(deliveryAddress ? { deliveryAddress } : {}) }),
   });
   if (!response.ok) throw await toCommerceError(response, "Unable to create the order");
   return ((await response.json()) as { order: CommerceOrder }).order;
+}
+
+export async function confirmOrderDelivery(orderId: string, fulfillmentId: string): Promise<void> {
+  const response = await request(
+    `/api/v1/orders/${encodeURIComponent(orderId)}/fulfillments/${encodeURIComponent(fulfillmentId)}/confirm-delivery`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  if (!response.ok) throw await toCommerceError(response, "Unable to confirm delivery");
 }
 
 export async function getOrders(): Promise<CommerceOrder[]> {

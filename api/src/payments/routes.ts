@@ -39,6 +39,7 @@ import {
   normalizeKenyanMpesaPhone,
   type ParsedMpesaCallback,
 } from "./validation.js";
+import { settleOrderAfterConfirmedPayment } from "../orders/service.js";
 
 type PaymentAttempt = typeof paymentAttempts.$inferSelect;
 
@@ -193,7 +194,12 @@ export function registerMpesaRoutes(
 
     try {
       const result = await options.provider.query(attempt.providerCheckoutRequestId);
-      const reconciled = await reconcileQueryResult(options.database, attempt.id, result);
+      const reconciled = await reconcileQueryResult(
+        options.database,
+        attempt.id,
+        result,
+        request.id,
+      );
       if (reconciled.attempt.status === "REVIEW_REQUIRED") {
         request.log.error(
           { paymentAttemptId: reconciled.attempt.id, orderId: reconciled.order.id },
@@ -463,6 +469,7 @@ async function reconcileQueryResult(
     resultCode: number;
     resultDescription: string;
   },
+  requestId: string,
 ) {
   return database.db.transaction(async (transaction) => {
     const observed = await transaction
@@ -515,7 +522,6 @@ async function reconcileQueryResult(
       )
       .limit(1);
     const invalid =
-      order.status !== "PENDING_PAYMENT" ||
       order.currency !== "KES" ||
       attempt.currency !== "KES" ||
       attempt.amountMinor !== order.totalMinor ||
@@ -527,10 +533,12 @@ async function reconcileQueryResult(
     }
 
     const now = new Date();
+    const settlement = await settleOrderAfterConfirmedPayment(transaction, order, requestId, now);
+    const nextAttemptStatus = settlement.outcome === "PAID" ? "SUCCEEDED" : "REVIEW_REQUIRED";
     const [succeeded] = await transaction
       .update(paymentAttempts)
       .set({
-        status: "SUCCEEDED",
+        status: nextAttemptStatus,
         providerResultCode: "0",
         providerResultDescription: safeDescription(result.resultDescription),
         lastQueryAt: now,
@@ -539,13 +547,8 @@ async function reconcileQueryResult(
       })
       .where(eq(paymentAttempts.id, attempt.id))
       .returning();
-    const [paidOrder] = await transaction
-      .update(orders)
-      .set({ status: "PAID", updatedAt: now })
-      .where(and(eq(orders.id, order.id), eq(orders.status, "PENDING_PAYMENT")))
-      .returning();
-    if (!succeeded || !paidOrder) throw new PaymentRequiresReviewError();
-    return { order: paidOrder, attempt: succeeded };
+    if (!succeeded) throw new PaymentRequiresReviewError();
+    return { order: settlement.order, attempt: succeeded };
   });
 }
 

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { count, eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
@@ -17,7 +18,25 @@ import {
 } from "../../src/config/env.js";
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
 import { user } from "../../src/db/schema/auth.js";
-import { orderItems, orders, products } from "../../src/db/schema/commerce.js";
+import {
+  orderDeliveryAddresses,
+  orderItems,
+  orders,
+  products,
+  sellerOrderFulfillments,
+} from "../../src/db/schema/commerce.js";
+import { inventoryReservations, productInventory } from "../../src/db/schema/media.js";
+import { sellerProductSubmissions } from "../../src/db/schema/seller-products.js";
+import { sellerApplications } from "../../src/db/schema/sellers.js";
+import {
+  expirePendingReservations,
+  settleOrderAfterConfirmedPayment,
+} from "../../src/orders/service.js";
+import {
+  confirmDelivery,
+  getSellerFulfillment,
+  transitionSellerFulfillment,
+} from "../../src/orders/fulfillment-service.js";
 
 const FRONTEND_ORIGIN = "http://localhost:8080";
 const PASSWORD = "StrongPassword!42";
@@ -42,6 +61,7 @@ beforeAll(async () => {
     auth,
     authRuntime: runtime,
     allowedOrigins: runtime.trustedOrigins,
+    sellerCommerceEnabled: true,
   });
 });
 
@@ -426,6 +446,250 @@ describe("server-authoritative commerce", () => {
       await database.pool.query("drop function if exists phase3_reject_order_item()");
     }
   });
+
+  it("reserves, cancels, settles, and expires seller inventory without changing platform flow", async () => {
+    const owner = await createVerifiedCustomer("seller-order-owner@example.com");
+    const seller = await createSellerCatalogProduct(owner.userId, 4);
+    const body = sellerCart(seller.catalogKey, "Nairobi");
+
+    const quote = await post(
+      "/api/v1/checkout/quote",
+      { items: body.items },
+      { cookie: owner.cookie },
+    );
+    const missingAddress = await post(
+      "/api/v1/orders",
+      { items: body.items },
+      { cookie: owner.cookie, idempotencyKey: "seller-address-required" },
+    );
+    const created = await post("/api/v1/orders", body, {
+      cookie: owner.cookie,
+      idempotencyKey: "seller-reservation-one",
+    });
+    const createdOrder = created.json<{ order: CommerceOrder }>().order;
+    const changedAddress = await post("/api/v1/orders", sellerCart(seller.catalogKey, "Kiambu"), {
+      cookie: owner.cookie,
+      idempotencyKey: "seller-reservation-one",
+    });
+    const [address] = await database.db
+      .select()
+      .from(orderDeliveryAddresses)
+      .where(eq(orderDeliveryAddresses.orderId, createdOrder.id));
+    const [reserved] = await database.db
+      .select()
+      .from(productInventory)
+      .where(eq(productInventory.productId, seller.productId));
+    const [reservation] = await database.db
+      .select()
+      .from(inventoryReservations)
+      .where(eq(inventoryReservations.orderId, createdOrder.id));
+    const [hidden] = await database.db
+      .select()
+      .from(sellerOrderFulfillments)
+      .where(eq(sellerOrderFulfillments.orderId, createdOrder.id));
+
+    expect(quote.json()).toMatchObject({ quote: { deliveryRequired: true } });
+    expect(missingAddress.statusCode).toBe(400);
+    expect(created.statusCode).toBe(201);
+    expect(changedAddress.statusCode).toBe(409);
+    expect(address?.phone).toBe("+254712345678");
+    expect(reserved).toMatchObject({ quantityOnHand: 4, quantityReserved: 1 });
+    expect(reservation?.status).toBe("ACTIVE");
+    expect(hidden?.status).toBe("AWAITING_PAYMENT");
+
+    const cancelled = await post(
+      `/api/v1/orders/${createdOrder.id}/cancel`,
+      {},
+      { cookie: owner.cookie },
+    );
+    const [released] = await database.db
+      .select()
+      .from(inventoryReservations)
+      .where(eq(inventoryReservations.orderId, createdOrder.id));
+    expect(cancelled.json()).toMatchObject({ order: { status: "CANCELLED" } });
+    expect(released?.status).toBe("RELEASED");
+
+    const paidResponse = await post("/api/v1/orders", body, {
+      cookie: owner.cookie,
+      idempotencyKey: "seller-reservation-paid",
+    });
+    const paidId = paidResponse.json<{ order: CommerceOrder }>().order.id;
+    await database.db.transaction(async (transaction) => {
+      const [order] = await transaction
+        .select()
+        .from(orders)
+        .where(eq(orders.id, paidId))
+        .for("update");
+      expect(order).toBeDefined();
+      await settleOrderAfterConfirmedPayment(transaction, order!, "test-payment");
+    });
+    const [committed] = await database.db
+      .select()
+      .from(inventoryReservations)
+      .where(eq(inventoryReservations.orderId, paidId));
+    const [afterPayment] = await database.db
+      .select()
+      .from(productInventory)
+      .where(eq(productInventory.productId, seller.productId));
+    const [ready] = await database.db
+      .select()
+      .from(sellerOrderFulfillments)
+      .where(eq(sellerOrderFulfillments.orderId, paidId));
+    expect(committed?.status).toBe("COMMITTED");
+    expect(afterPayment).toMatchObject({ quantityOnHand: 3, quantityReserved: 0 });
+    expect(ready?.status).toBe("READY_FOR_SELLER");
+
+    const sellerList = await get("/api/v1/seller/orders", owner.cookie);
+    const sellerDetail = await get(`/api/v1/seller/orders/${ready!.id}`, owner.cookie);
+    const blockedAction = await post(
+      `/api/v1/seller/orders/${ready!.id}/accept`,
+      {},
+      { cookie: owner.cookie },
+    );
+    expect(sellerList.statusCode).toBe(200);
+    expect(sellerList.body).not.toContain("deliveryAddress");
+    expect(sellerDetail.json()).toMatchObject({
+      fulfillment: { status: "READY_FOR_SELLER", deliveryAddress: { county: "Nairobi" } },
+    });
+    expect(blockedAction.statusCode).toBe(503);
+    expect(blockedAction.json()).toMatchObject({
+      error: { code: "SELLER_ORDER_ACTIONS_DISABLED" },
+    });
+
+    for (const action of ["accept", "prepare"] as const) {
+      await transitionSellerFulfillment(database, {
+        sellerApplicationId: seller.applicationId,
+        sellerUserId: owner.userId,
+        fulfillmentId: ready!.id,
+        action,
+        requestId: `test-${action}`,
+      });
+    }
+    await transitionSellerFulfillment(database, {
+      sellerApplicationId: seller.applicationId,
+      sellerUserId: owner.userId,
+      fulfillmentId: ready!.id,
+      action: "dispatch",
+      requestId: "test-dispatch",
+      carrier: "Test Courier",
+      trackingReference: "TEST-TRACKING",
+    });
+    await confirmDelivery(database, owner.userId, paidId, ready!.id, "test-delivered");
+    const delivered = await getSellerFulfillment(database, seller.applicationId, ready!.id);
+    expect(delivered.status).toBe("DELIVERED");
+    expect(delivered).not.toHaveProperty("deliveryAddress");
+
+    const oldNow = new Date(Date.now() - 31 * 60_000);
+    const expiring = await post("/api/v1/orders", body, {
+      cookie: owner.cookie,
+      idempotencyKey: `seller-expiry-${oldNow.getTime()}`,
+    });
+    const expiringId = expiring.json<{ order: CommerceOrder }>().order.id;
+    await database.db
+      .update(orders)
+      .set({ reservationExpiresAt: new Date(Date.now() - 1_000) })
+      .where(eq(orders.id, expiringId));
+    await database.db
+      .update(inventoryReservations)
+      .set({ expiresAt: new Date(Date.now() - 1_000) })
+      .where(eq(inventoryReservations.orderId, expiringId));
+    expect(await expirePendingReservations(database)).toBe(1);
+    const [expired] = await database.db.select().from(orders).where(eq(orders.id, expiringId));
+    expect(expired).toMatchObject({
+      status: "CANCELLED",
+      cancellationReason: "RESERVATION_EXPIRED",
+    });
+    await database.db.transaction(async (transaction) => {
+      const [order] = await transaction
+        .select()
+        .from(orders)
+        .where(eq(orders.id, expiringId))
+        .for("update");
+      const result = await settleOrderAfterConfirmedPayment(
+        transaction,
+        order!,
+        "test-late-payment",
+      );
+      expect(result.outcome).toBe("REVIEW_REQUIRED");
+    });
+    const [lateOrder] = await database.db.select().from(orders).where(eq(orders.id, expiringId));
+    const [lateInventory] = await database.db
+      .select()
+      .from(productInventory)
+      .where(eq(productInventory.productId, seller.productId));
+    expect(lateOrder?.status).toBe("PAYMENT_REVIEW_REQUIRED");
+    expect(lateInventory).toMatchObject({ quantityOnHand: 3, quantityReserved: 0 });
+  });
+
+  it("allows only one concurrent order to reserve the final seller unit", async () => {
+    const first = await createVerifiedCustomer("final-unit-one@example.com");
+    const second = await createVerifiedCustomer("final-unit-two@example.com");
+    const seller = await createSellerCatalogProduct(first.userId, 1);
+    const responses = await Promise.all([
+      post("/api/v1/orders", sellerCart(seller.catalogKey, "Nairobi"), {
+        cookie: first.cookie,
+        idempotencyKey: "final-unit-first",
+      }),
+      post("/api/v1/orders", sellerCart(seller.catalogKey, "Nairobi"), {
+        cookie: second.cookie,
+        idempotencyKey: "final-unit-second",
+      }),
+    ]);
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([201, 400]);
+    const [inventory] = await database.db
+      .select()
+      .from(productInventory)
+      .where(eq(productInventory.productId, seller.productId));
+    expect(inventory).toMatchObject({ quantityOnHand: 1, quantityReserved: 1 });
+  });
+
+  it("settles a mixed platform and multi-seller order as one atomic payment", async () => {
+    const customer = await createVerifiedCustomer("mixed-cart-customer@example.com");
+    const firstSeller = await createVerifiedCustomer("mixed-cart-seller-one@example.com");
+    const secondSeller = await createVerifiedCustomer("mixed-cart-seller-two@example.com");
+    const firstProduct = await createSellerCatalogProduct(firstSeller.userId, 2);
+    const secondProduct = await createSellerCatalogProduct(secondSeller.userId, 3);
+    const body = {
+      items: [
+        { productId: approvedLaptop.catalogKey, quantity: 1 },
+        { productId: firstProduct.catalogKey, quantity: 1 },
+        { productId: secondProduct.catalogKey, quantity: 2 },
+      ],
+      deliveryAddress: sellerCart(firstProduct.catalogKey, "Nairobi").deliveryAddress,
+    };
+    const response = await post("/api/v1/orders", body, {
+      cookie: customer.cookie,
+      idempotencyKey: "mixed-multi-seller-order",
+    });
+    const orderId = response.json<{ order: CommerceOrder }>().order.id;
+    const before = await database.db
+      .select()
+      .from(sellerOrderFulfillments)
+      .where(eq(sellerOrderFulfillments.orderId, orderId));
+    expect(response.statusCode).toBe(201);
+    expect(before).toHaveLength(2);
+    expect(before.every((fulfillment) => fulfillment.status === "AWAITING_PAYMENT")).toBe(true);
+
+    await database.db.transaction(async (transaction) => {
+      const [order] = await transaction
+        .select()
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .for("update");
+      await settleOrderAfterConfirmedPayment(transaction, order!, "test-multi-seller-payment");
+    });
+    const after = await database.db
+      .select()
+      .from(sellerOrderFulfillments)
+      .where(eq(sellerOrderFulfillments.orderId, orderId));
+    const reservations = await database.db
+      .select()
+      .from(inventoryReservations)
+      .where(eq(inventoryReservations.orderId, orderId));
+    expect(after.every((fulfillment) => fulfillment.status === "READY_FOR_SELLER")).toBe(true);
+    expect(reservations).toHaveLength(2);
+    expect(reservations.every((reservation) => reservation.status === "COMMITTED")).toBe(true);
+  });
 });
 
 type CommerceOrder = {
@@ -480,6 +744,79 @@ async function createVerifiedSession(email: string): Promise<string> {
   const setCookie = login.headers["set-cookie"];
   const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
   return cookies.find((value) => value.includes("session_token"))?.split(";", 1)[0] ?? "";
+}
+
+async function createVerifiedCustomer(email: string): Promise<{ cookie: string; userId: string }> {
+  const cookie = await createVerifiedSession(email);
+  const [accountUser] = await database.db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, email));
+  return { cookie, userId: accountUser!.id };
+}
+
+async function createSellerCatalogProduct(userId: string, quantityOnHand: number) {
+  const now = new Date();
+  const applicationId = randomUUID();
+  const submissionId = randomUUID();
+  const productId = randomUUID();
+  const catalogKey = `seller-${productId}`;
+  await database.db.insert(sellerApplications).values({
+    id: applicationId,
+    userId,
+    sellerType: "SOLE_PROPRIETOR",
+    legalName: "Test Seller",
+    kraPin: "A123456789Z",
+    status: "APPROVED",
+    termsVersion: "seller-terms-v1",
+    termsAcceptedAt: now,
+    submittedAt: now,
+    reviewedAt: now,
+  });
+  await database.db.insert(sellerProductSubmissions).values({
+    id: submissionId,
+    sellerApplicationId: applicationId,
+    status: "APPROVED",
+    name: "Seller reservation test product",
+    category: "Accessories",
+    description: "Controlled seller inventory reservation integration test product.",
+    priceMinor: 1_000n,
+    termsVersion: "seller-product-terms-v1",
+    termsAcceptedAt: now,
+    submittedAt: now,
+    reviewStartedAt: now,
+    reviewedAt: now,
+  });
+  await database.db.insert(products).values({
+    id: productId,
+    catalogKey,
+    slug: catalogKey,
+    name: "Seller reservation test product",
+    category: "Accessories",
+    description: "Controlled seller inventory reservation integration test product.",
+    priceMinor: 1_000n,
+    currency: "KES",
+    source: "SELLER",
+    isActive: true,
+    isPurchasable: true,
+    sellerApplicationId: applicationId,
+    sellerProductSubmissionId: submissionId,
+  });
+  await database.db.insert(productInventory).values({ productId, quantityOnHand });
+  return { productId, catalogKey, applicationId };
+}
+
+function sellerCart(productId: string, county: "Nairobi" | "Kiambu") {
+  return {
+    items: [{ productId, quantity: 1 }],
+    deliveryAddress: {
+      recipientName: "Commerce Test Customer",
+      phone: "0712345678",
+      county,
+      town: "Nairobi",
+      addressLine: "Controlled test address",
+    },
+  };
 }
 
 function post(

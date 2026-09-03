@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { ProductListQuerySchema, ProductSlugSchema } from "../commerce/validation.js";
 import type { DatabaseClient } from "../db/client.js";
 import { products } from "../db/schema/commerce.js";
-import { productMedia, productMediaVariants } from "../db/schema/media.js";
+import { productInventory, productMedia, productMediaVariants } from "../db/schema/media.js";
 import { NotFoundError } from "../lib/errors.js";
 import { sendMediaVariant } from "../media/delivery.js";
 import type { MediaStorage } from "../media/storage.js";
@@ -13,12 +13,14 @@ export function registerProductRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   storage?: MediaStorage,
+  sellerCommerceEnabled = false,
 ): void {
   app.get("/api/v1/products", async (request) => {
     const { category } = ProductListQuerySchema.parse(request.query);
     const rows = await database.db
       .select(publicProductSelection)
       .from(products)
+      .leftJoin(productInventory, eq(productInventory.productId, products.id))
       .where(
         category
           ? and(eq(products.isActive, true), eq(products.category, category))
@@ -31,7 +33,7 @@ export function registerProductRoutes(
     );
     return {
       products: rows.map((product) =>
-        serializeProduct(product, media.get(product.databaseId) ?? []),
+        serializeProduct(product, media.get(product.databaseId) ?? [], sellerCommerceEnabled),
       ),
     };
   });
@@ -41,11 +43,18 @@ export function registerProductRoutes(
     const [product] = await database.db
       .select(publicProductSelection)
       .from(products)
+      .leftJoin(productInventory, eq(productInventory.productId, products.id))
       .where(and(eq(products.slug, slug), eq(products.isActive, true)))
       .limit(1);
     if (!product) throw new NotFoundError();
     const media = await publicMediaForProducts(database, [product.databaseId]);
-    return { product: serializeProduct(product, media.get(product.databaseId) ?? []) };
+    return {
+      product: serializeProduct(
+        product,
+        media.get(product.databaseId) ?? [],
+        sellerCommerceEnabled,
+      ),
+    };
   });
 
   app.get("/api/v1/products/:slug/media/:mediaId/:variant", async (request, reply) => {
@@ -87,6 +96,9 @@ const publicProductSelection = {
   priceMinor: products.priceMinor,
   currency: products.currency,
   isPurchasable: products.isPurchasable,
+  source: products.source,
+  quantityOnHand: productInventory.quantityOnHand,
+  quantityReserved: productInventory.quantityReserved,
 };
 
 type PublicProductRow = {
@@ -99,6 +111,9 @@ type PublicProductRow = {
   priceMinor: bigint;
   currency: string;
   isPurchasable: boolean;
+  source: "PLATFORM" | "SELLER";
+  quantityOnHand: number | null;
+  quantityReserved: number | null;
 };
 
 type PublicMediaRow = {
@@ -110,7 +125,11 @@ type PublicMediaRow = {
   height: number;
 };
 
-function serializeProduct(product: PublicProductRow, mediaRows: PublicMediaRow[]) {
+function serializeProduct(
+  product: PublicProductRow,
+  mediaRows: PublicMediaRow[],
+  sellerCommerceEnabled: boolean,
+) {
   const grouped = new Map<
     string,
     {
@@ -139,7 +158,14 @@ function serializeProduct(product: PublicProductRow, mediaRows: PublicMediaRow[]
     category: product.category,
     description: product.description,
     currency: product.currency,
-    isPurchasable: product.isPurchasable,
+    isPurchasable:
+      product.source === "PLATFORM"
+        ? product.isPurchasable
+        : product.isPurchasable &&
+          sellerCommerceEnabled &&
+          product.quantityOnHand !== null &&
+          product.quantityReserved !== null &&
+          product.quantityOnHand - product.quantityReserved > 0,
     priceMinor: product.priceMinor.toString(),
     media: [...grouped.values()].sort((left, right) => left.sortOrder - right.sortOrder),
   };

@@ -11,6 +11,8 @@ export type ErrorCode =
   | "STAFF_REVIEW_DISABLED"
   | "MEDIA_UPLOAD_DISABLED"
   | "CATALOG_ACTIVATION_DISABLED"
+  | "SELLER_COMMERCE_DISABLED"
+  | "SELLER_ORDER_ACTIONS_DISABLED"
   | "MEDIA_STORAGE_UNAVAILABLE"
   | "ORIGIN_NOT_ALLOWED"
   | "CONFLICT"
@@ -164,6 +166,26 @@ export class CatalogActivationDisabledError extends AppError {
   constructor() {
     super("Catalog activation is currently disabled", {
       code: "CATALOG_ACTIVATION_DISABLED",
+      statusCode: 503,
+      expose: true,
+    });
+  }
+}
+
+export class SellerCommerceDisabledError extends AppError {
+  constructor() {
+    super("Seller commerce is currently disabled", {
+      code: "SELLER_COMMERCE_DISABLED",
+      statusCode: 503,
+      expose: true,
+    });
+  }
+}
+
+export class SellerOrderActionsDisabledError extends AppError {
+  constructor() {
+    super("Seller order actions are currently disabled", {
+      code: "SELLER_ORDER_ACTIONS_DISABLED",
       statusCode: 503,
       expose: true,
     });

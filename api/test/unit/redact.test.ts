@@ -44,6 +44,15 @@ describe("log redaction", () => {
         twoFactorCode: "654321",
         twoFactorChallenge: "challenge-value",
         backupCodes: ["backup-one", "backup-two"],
+        deliveryAddress: {
+          recipientName: "Test Recipient",
+          phone: "+254700000000",
+          county: "Nairobi",
+          town: "Nairobi",
+          addressLine: "Test address",
+          landmark: "Test landmark",
+        },
+        trackingReference: "TRACK-TEST",
       }),
     ).toEqual({
       user: "safe",
@@ -64,6 +73,8 @@ describe("log redaction", () => {
       twoFactorCode: "[REDACTED]",
       twoFactorChallenge: "[REDACTED]",
       backupCodes: "[REDACTED]",
+      deliveryAddress: "[REDACTED]",
+      trackingReference: "[REDACTED]",
     });
   });
 

@@ -18,8 +18,17 @@ import {
 } from "../../src/config/env.js";
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
 import { session, user } from "../../src/db/schema/auth.js";
-import { products } from "../../src/db/schema/commerce.js";
-import { sellerProductActivations, sellerProductMedia } from "../../src/db/schema/media.js";
+import {
+  products,
+  SELLER_FULFILLMENT_TERMS_VERSION,
+  sellerFulfillmentConfigs,
+} from "../../src/db/schema/commerce.js";
+import {
+  productInventory,
+  productMedia,
+  sellerProductActivations,
+  sellerProductMedia,
+} from "../../src/db/schema/media.js";
 import { sellerProductSubmissions } from "../../src/db/schema/seller-products.js";
 import { sellerApplications } from "../../src/db/schema/sellers.js";
 import {
@@ -60,6 +69,7 @@ beforeAll(async () => {
     authRuntime: runtime,
     allowedOrigins: runtime.trustedOrigins,
     staffReviewEnabled: true,
+    sellerCommerceEnabled: true,
   });
 
   disabledDatabase = createDatabaseClient(databaseUrl);
@@ -817,6 +827,71 @@ describe("Phase 8 staff capabilities", () => {
   });
 });
 
+describe("Phase 9 staff commerce capabilities", () => {
+  it("requires an explicit grant, enables only when ready, and permits pause during a global stop", async () => {
+    const authorized = await createStaff("commerce-authorized@example.com", [
+      "SELLER_COMMERCE_ACTIVATE",
+    ]);
+    const wrongPermission = await createStaff("commerce-wrong@example.com", ["PRODUCT_REVIEW"]);
+    const adminWithoutGrant = await createStaff(
+      "commerce-admin@example.com",
+      ["SELLER_REVIEW"],
+      "ADMIN",
+    );
+    const productId = await insertCommerceReadyProduct(authorized.userId);
+
+    const anonymous = await app.inject({
+      method: "GET",
+      url: `/api/v1/staff/catalog-products/${productId}/commerce-readiness`,
+    });
+    const denied = await get(
+      `/api/v1/staff/catalog-products/${productId}/commerce-readiness`,
+      wrongPermission.cookie,
+    );
+    const adminDenied = await get(
+      `/api/v1/staff/catalog-products/${productId}/commerce-readiness`,
+      adminWithoutGrant.cookie,
+    );
+    const readiness = await get(
+      `/api/v1/staff/catalog-products/${productId}/commerce-readiness`,
+      authorized.cookie,
+    );
+    const enabled = await post(
+      `/api/v1/staff/catalog-products/${productId}/enable-commerce`,
+      {},
+      authorized.cookie,
+    );
+    const paused = await injectPost(
+      disabledApp,
+      `/api/v1/staff/catalog-products/${productId}/pause-commerce`,
+      {},
+      authorized.cookie,
+    );
+    const [stored] = await database.db
+      .select({ isPurchasable: products.isPurchasable })
+      .from(products)
+      .where(eq(products.id, productId));
+    const audits = await database.db
+      .select({ action: staffAuditEvents.action })
+      .from(staffAuditEvents)
+      .where(eq(staffAuditEvents.productId, productId));
+
+    expect(anonymous.statusCode).toBe(401);
+    expect(denied.statusCode).toBe(403);
+    expect(adminDenied.statusCode).toBe(403);
+    expect(readiness.json()).toMatchObject({
+      readiness: { ready: true, commerceEnabled: true },
+    });
+    expect(enabled.json()).toMatchObject({ product: { isPurchasable: true } });
+    expect(paused.statusCode).toBe(200);
+    expect(stored?.isPurchasable).toBe(false);
+    expect(audits.map((audit) => audit.action)).toEqual([
+      "SELLER_COMMERCE_ENABLED",
+      "SELLER_COMMERCE_DISABLED",
+    ]);
+  });
+});
+
 async function createStaff(
   email: string,
   permissions: StaffPermission[],
@@ -967,6 +1042,46 @@ async function insertReadyMedia(submissionId: string, sortOrder: number) {
     })
     .returning();
   return media!;
+}
+
+async function insertCommerceReadyProduct(staffUserId: string): Promise<string> {
+  const application = await insertSellerApplication("APPROVED");
+  const submission = await insertSellerProduct(application.id, "APPROVED");
+  const media = await insertReadyMedia(submission.id, 0);
+  const productId = randomUUID();
+  await database.db.insert(products).values({
+    id: productId,
+    catalogKey: `commerce-${productId}`,
+    slug: `commerce-${productId}`,
+    name: "Commerce readiness product",
+    category: "Accessories",
+    description: "Controlled Phase Nine staff commerce readiness test product.",
+    priceMinor: 1_000n,
+    currency: "KES",
+    source: "SELLER",
+    isActive: true,
+    isPurchasable: false,
+    sellerApplicationId: application.id,
+    sellerProductSubmissionId: submission.id,
+  });
+  await database.db.insert(sellerProductActivations).values({
+    sellerProductSubmissionId: submission.id,
+    productId,
+    activatedByStaffUserId: staffUserId,
+    requestId: `commerce-activation-${randomUUID()}`,
+  });
+  await database.db.insert(productInventory).values({ productId, quantityOnHand: 5 });
+  await database.db.insert(productMedia).values({
+    productId,
+    sourceSellerMediaId: media.id,
+    sortOrder: 0,
+  });
+  await database.db.insert(sellerFulfillmentConfigs).values({
+    sellerApplicationId: application.id,
+    termsVersion: SELLER_FULFILLMENT_TERMS_VERSION,
+    termsAcceptedAt: new Date(),
+  });
+  return productId;
 }
 
 async function insertApplicant(): Promise<string> {

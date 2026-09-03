@@ -1,4 +1,9 @@
-export type StaffPermission = "SELLER_REVIEW" | "PRODUCT_REVIEW" | "CATALOG_ACTIVATE";
+export type StaffPermission =
+  | "SELLER_REVIEW"
+  | "PRODUCT_REVIEW"
+  | "CATALOG_ACTIVATE"
+  | "SELLER_COMMERCE_ACTIVATE"
+  | "ORDER_SUPPORT";
 export type StaffProfile = {
   role: "STAFF" | "ADMIN";
   permissions: StaffPermission[];
@@ -167,6 +172,47 @@ export async function deactivateStaffSellerProduct(submissionId: string): Promis
     body: JSON.stringify({}),
   });
   if (!response.ok) throw await toError(response);
+}
+
+export async function getCommerceReadiness(productId: string) {
+  const response = await request(
+    `/api/v1/staff/catalog-products/${encodeURIComponent(productId)}/commerce-readiness`,
+    { method: "GET" },
+  );
+  if (!response.ok) throw await toError(response);
+  return (await response.json()) as {
+    readiness: {
+      ready: boolean;
+      commerceEnabled: boolean;
+      checks: Record<string, boolean>;
+    };
+  };
+}
+
+export async function setStaffSellerCommerce(productId: string, enabled: boolean): Promise<void> {
+  const response = await request(
+    `/api/v1/staff/catalog-products/${encodeURIComponent(productId)}/${enabled ? "enable-commerce" : "pause-commerce"}`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  if (!response.ok) throw await toError(response);
+}
+
+export type OrderSupportItem = {
+  orderId: string;
+  orderNumber: string;
+  orderStatus: string;
+  fulfillmentId: string | null;
+  fulfillmentStatus: string | null;
+  issueReason: string | null;
+  updatedAt: string;
+};
+
+export async function getOrderSupportItems(type: "PAYMENT_REVIEW_REQUIRED" | "FULFILLMENT_ISSUE") {
+  const response = await request(`/api/v1/staff/order-support?type=${type}&limit=25`, {
+    method: "GET",
+  });
+  if (!response.ok) throw await toError(response);
+  return ((await response.json()) as { items: OrderSupportItem[] }).items;
 }
 
 export function staffMediaPreviewUrl(
