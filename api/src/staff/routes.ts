@@ -21,12 +21,19 @@ type StaffRouteOptions = {
   auth: AuthService;
   database: DatabaseClient;
   reviewEnabled: boolean;
+  catalogActivationEnabled: boolean;
 };
 
 export function registerStaffRoutes(app: FastifyInstance, options: StaffRouteOptions): void {
   app.get("/api/v1/staff/me", async (request) => {
     const profile = await requireStaffProfile(options.auth, options.database, request.headers);
-    return { staff: { ...profile, reviewEnabled: options.reviewEnabled } };
+    return {
+      staff: {
+        ...profile,
+        reviewEnabled: options.reviewEnabled,
+        catalogActivationEnabled: options.catalogActivationEnabled,
+      },
+    };
   });
 
   app.get("/api/v1/staff/seller-applications", async (request) => {

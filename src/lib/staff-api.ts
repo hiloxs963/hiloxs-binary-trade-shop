@@ -1,9 +1,29 @@
-export type StaffPermission = "SELLER_REVIEW" | "PRODUCT_REVIEW";
+export type StaffPermission = "SELLER_REVIEW" | "PRODUCT_REVIEW" | "CATALOG_ACTIVATE";
 export type StaffProfile = {
   role: "STAFF" | "ADMIN";
   permissions: StaffPermission[];
   reviewEnabled: boolean;
+  catalogActivationEnabled: boolean;
   mfaEnabled: true;
+};
+
+export type StaffSellerMedia = {
+  id: string;
+  status: string;
+  detectedMime: string | null;
+  width: number | null;
+  height: number | null;
+  sortOrder: number;
+  selectedForActivation: boolean;
+  processedAt: string | null;
+  reviewedAt: string | null;
+  reviewReason: string | null;
+};
+
+export type ActivationReadiness = {
+  ready: boolean;
+  activation: { productId: string; slug: string; active: boolean } | null;
+  checks: Record<string, boolean>;
 };
 
 export type StaffSellerApplication = {
@@ -99,6 +119,62 @@ export async function reviewStaffItem(
     body: JSON.stringify(action === "reject" ? { reason } : {}),
   });
   if (!response.ok) throw await toError(response);
+}
+
+export async function getStaffSellerMedia(submissionId: string) {
+  const response = await request(`/api/v1/staff/seller-products/${submissionId}/media`, {
+    method: "GET",
+  });
+  if (!response.ok) throw await toError(response);
+  return (await response.json()) as { media: StaffSellerMedia[]; reviewEnabled: boolean };
+}
+
+export async function reviewStaffSellerMedia(
+  mediaId: string,
+  action: "approve" | "reject",
+  reason?: string,
+): Promise<void> {
+  const response = await request(`/api/v1/staff/seller-product-media/${mediaId}/${action}`, {
+    method: "POST",
+    body: JSON.stringify(action === "reject" ? { reason } : {}),
+  });
+  if (!response.ok) throw await toError(response);
+}
+
+export async function getActivationReadiness(submissionId: string) {
+  const response = await request(
+    `/api/v1/staff/seller-products/${submissionId}/activation-readiness`,
+    { method: "GET" },
+  );
+  if (!response.ok) throw await toError(response);
+  return (await response.json()) as {
+    readiness: ActivationReadiness;
+    activationEnabled: boolean;
+  };
+}
+
+export async function activateStaffSellerProduct(submissionId: string): Promise<void> {
+  const response = await request(`/api/v1/staff/seller-products/${submissionId}/activate`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw await toError(response);
+}
+
+export async function deactivateStaffSellerProduct(submissionId: string): Promise<void> {
+  const response = await request(`/api/v1/staff/seller-products/${submissionId}/deactivate`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw await toError(response);
+}
+
+export function staffMediaPreviewUrl(
+  submissionId: string,
+  mediaId: string,
+  variant: "THUMBNAIL" | "MEDIUM" | "LARGE" = "MEDIUM",
+): string {
+  return `${API_ORIGIN}/api/v1/staff/seller-products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(mediaId)}/preview/${variant}`;
 }
 
 function queueUrl(path: string, status?: string): string {

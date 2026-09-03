@@ -50,6 +50,13 @@
       "when": 1788385522616,
       "tag": "0006_far_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788433450078,
+      "tag": "0007_phase8_media_inventory",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, Loader2, RefreshCw, ShieldAlert, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { StaffMediaActivation } from "@/components/hiloxs/StaffMediaActivation";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -119,7 +120,10 @@ function StaffPage() {
         )}
         {profile.permissions.includes("PRODUCT_REVIEW") && (
           <TabsContent value="products">
-            <ProductQueue reviewEnabled={profile.reviewEnabled} />
+            <ProductQueue
+              reviewEnabled={profile.reviewEnabled}
+              canActivate={profile.permissions.includes("CATALOG_ACTIVATE")}
+            />
           </TabsContent>
         )}
       </Tabs>
@@ -189,7 +193,13 @@ function ApplicationQueue({ reviewEnabled }: { reviewEnabled: boolean }) {
   );
 }
 
-function ProductQueue({ reviewEnabled }: { reviewEnabled: boolean }) {
+function ProductQueue({
+  reviewEnabled,
+  canActivate,
+}: {
+  reviewEnabled: boolean;
+  canActivate: boolean;
+}) {
   const [items, setItems] = useState<StaffSellerProduct[]>([]);
   const [selected, setSelected] = useState<StaffSellerProduct | null>(null);
   const [status, setStatus] = useState("SUBMITTED");
@@ -227,24 +237,33 @@ function ProductQueue({ reviewEnabled }: { reviewEnabled: boolean }) {
       }}
     >
       {selected && (
-        <ReviewDetail
-          kind="seller-products"
-          item={selected}
-          reviewEnabled={reviewEnabled}
-          onChanged={load}
-        >
-          <DetailRow label="Product" value={selected.name} />
-          <DetailRow label="Category" value={selected.category} />
-          <DetailRow label="Description" value={selected.description ?? ""} />
-          <DetailRow
-            label="Price"
-            value={`${selected.currency} ${(Number(selected.priceMinor) / 100).toFixed(2)}`}
-          />
-          <DetailRow
-            label="Seller"
-            value={selected.seller?.tradingName || selected.seller?.legalName || ""}
-          />
-        </ReviewDetail>
+        <>
+          <ReviewDetail
+            kind="seller-products"
+            item={selected}
+            reviewEnabled={reviewEnabled}
+            onChanged={load}
+          >
+            <DetailRow label="Product" value={selected.name} />
+            <DetailRow label="Category" value={selected.category} />
+            <DetailRow label="Description" value={selected.description ?? ""} />
+            <DetailRow
+              label="Price"
+              value={`${selected.currency} ${(Number(selected.priceMinor) / 100).toFixed(2)}`}
+            />
+            <DetailRow
+              label="Seller"
+              value={selected.seller?.tradingName || selected.seller?.legalName || ""}
+            />
+          </ReviewDetail>
+          {selected.status === "APPROVED" && (
+            <StaffMediaActivation
+              submissionId={selected.id}
+              reviewEnabled={reviewEnabled}
+              canActivate={canActivate}
+            />
+          )}
+        </>
       )}
     </ReviewLayout>
   );

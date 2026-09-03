@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { restoreInitialCatalog } from "./helpers.js";
 import { buildApp } from "../../src/app.js";
 import { createAuthService, type AuthService } from "../../src/auth/auth.js";
 import { InMemoryAuthEmailSender } from "../../src/auth/email.js";
@@ -18,6 +19,7 @@ import {
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
 import { session, user } from "../../src/db/schema/auth.js";
 import { products } from "../../src/db/schema/commerce.js";
+import { sellerProductActivations, sellerProductMedia } from "../../src/db/schema/media.js";
 import { sellerProductSubmissions } from "../../src/db/schema/seller-products.js";
 import { sellerApplications } from "../../src/db/schema/sellers.js";
 import {
@@ -29,6 +31,7 @@ import {
 } from "../../src/db/schema/staff.js";
 import {
   bootstrapStaffMembership,
+  grantStaffPermissionBySystem,
   revokeStaffPermission,
 } from "../../src/staff/bootstrap-service.js";
 
@@ -74,6 +77,7 @@ beforeEach(async () => {
   await database.pool.query(
     'truncate table "staff_audit_events", "staff_permission_grants", "staff_memberships", "seller_product_submissions", "seller_applications", "payment_events", "payment_attempts", "order_items", "orders", "verification", "two_factor", "session", "account", "user" cascade',
   );
+  await restoreInitialCatalog(database);
   emailSender.messages.length = 0;
 });
 
@@ -104,6 +108,7 @@ describe("staff authorization and privacy", () => {
         permissions: ["SELLER_REVIEW", "PRODUCT_REVIEW"],
         mfaEnabled: true,
         reviewEnabled: true,
+        catalogActivationEnabled: false,
       },
     });
     expect(response.body).not.toMatch(/email|phone|grant|session|token/i);
@@ -136,6 +141,37 @@ describe("staff authorization and privacy", () => {
 
     expect(responses.map((response) => response.statusCode)).toEqual([401, 401, 401, 401]);
     expect((await applicationStatus(target.id)).status).toBe("SUBMITTED");
+  });
+
+  it("requires a new MFA session after an internal permission grant", async () => {
+    const email = "post-grant-session@example.com";
+    const staff = await createStaff(email, ["PRODUCT_REVIEW"]);
+
+    await grantStaffPermissionBySystem(database, {
+      staffUserId: staff.userId,
+      permission: "CATALOG_ACTIVATE",
+      requestId: `test-grant-${randomUUID()}`,
+    });
+
+    expect((await get("/api/v1/staff/me", staff.cookie)).statusCode).toBe(401);
+    const [remainingSessions] = await database.db
+      .select({ value: count() })
+      .from(session)
+      .where(eq(session.userId, staff.userId));
+    expect(remainingSessions?.value).toBe(0);
+
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 2));
+    const challenged = await post("/api/auth/sign-in/email", { email, password: PASSWORD });
+    const challengeCookie = cookieValues(challenged).join("; ");
+    const code = (await auth.api.generateTOTP({ body: { secret: staff.secret } })).code;
+    const completed = await post("/api/auth/two-factor/verify-totp", { code }, challengeCookie);
+    const profile = await get("/api/v1/staff/me", sessionCookie(completed));
+
+    expect(profile.statusCode).toBe(200);
+    expect(profile.json<{ staff: { permissions: string[] } }>().staff.permissions).toEqual([
+      "PRODUCT_REVIEW",
+      "CATALOG_ACTIVATE",
+    ]);
   });
 
   it("requires a fresh MFA sign-in after bootstrap before staff reads and writes", async () => {
@@ -387,6 +423,10 @@ describe("staff review trust boundary", () => {
       .set({ createdAt: new Date(Date.now() - 60 * 60 * 1_000) })
       .where(eq(staffMemberships.userId, staff.userId));
     await database.db
+      .update(staffPermissionGrants)
+      .set({ grantedAt: new Date(Date.now() - 60 * 60 * 1_000) })
+      .where(eq(staffPermissionGrants.staffUserId, staff.userId));
+    await database.db
       .update(session)
       .set({ createdAt: new Date(Date.now() - 31 * 60 * 1_000) })
       .where(eq(session.userId, staff.userId));
@@ -634,6 +674,149 @@ describe("seller-product isolation and applicant privacy", () => {
   });
 });
 
+describe("Phase 8 staff capabilities", () => {
+  it("reviews sanitized media with PRODUCT_REVIEW and writes minimized audit events", async () => {
+    const staff = await createStaff("media-review@example.com", ["PRODUCT_REVIEW"]);
+    const application = await insertSellerApplication("APPROVED");
+    const submission = await insertSellerProduct(application.id, "APPROVED");
+    const approvedTarget = await insertReadyMedia(submission.id, 0);
+    const rejectedTarget = await insertReadyMedia(submission.id, 1);
+
+    const approved = await post(
+      `/api/v1/staff/seller-product-media/${approvedTarget.id}/approve`,
+      {},
+      staff.cookie,
+    );
+    const rejected = await post(
+      `/api/v1/staff/seller-product-media/${rejectedTarget.id}/reject`,
+      { reason: "The image does not clearly represent the submitted product." },
+      staff.cookie,
+    );
+    const audits = await database.db
+      .select()
+      .from(staffAuditEvents)
+      .where(eq(staffAuditEvents.actorUserId, staff.userId));
+
+    expect(approved.statusCode).toBe(200);
+    expect(approved.json()).toMatchObject({ media: { status: "APPROVED", reviewReason: null } });
+    expect(rejected.statusCode).toBe(200);
+    expect(rejected.json()).toMatchObject({
+      media: {
+        status: "REJECTED",
+        reviewReason: "The image does not clearly represent the submitted product.",
+      },
+    });
+    expect(audits.map((event) => event.action)).toEqual([
+      "SELLER_PRODUCT_MEDIA_APPROVED",
+      "SELLER_PRODUCT_MEDIA_REJECTED",
+    ]);
+    expect(JSON.stringify(audits)).not.toMatch(/kra|registration|email|phone|secret|objectKey/i);
+  });
+
+  it("keeps media review and catalog activation behind independent flags and grants", async () => {
+    const productReviewer = await createStaff("media-flag@example.com", ["PRODUCT_REVIEW"]);
+    const application = await insertSellerApplication("APPROVED");
+    const submission = await insertSellerProduct(application.id, "APPROVED");
+    const media = await insertReadyMedia(submission.id, 0);
+    const disabledReview = await injectPost(
+      disabledApp,
+      `/api/v1/staff/seller-product-media/${media.id}/approve`,
+      {},
+      productReviewer.cookie,
+    );
+    const wrongPermission = await post(
+      `/api/v1/staff/seller-products/${submission.id}/activate`,
+      {},
+      productReviewer.cookie,
+    );
+    const catalogStaff = await createStaff("catalog-flag@example.com", ["CATALOG_ACTIVATE"]);
+    const disabledActivation = await injectPost(
+      disabledApp,
+      `/api/v1/staff/seller-products/${submission.id}/activate`,
+      {},
+      catalogStaff.cookie,
+    );
+    const readiness = await disabledApp.inject({
+      method: "GET",
+      url: `/api/v1/staff/seller-products/${submission.id}/activation-readiness`,
+      headers: { cookie: catalogStaff.cookie },
+    });
+    const productId = randomUUID();
+    await database.db.insert(products).values({
+      id: productId,
+      catalogKey: `seller-${productId}`,
+      slug: `disabled-catalog-product-${productId.replaceAll("-", "")}`,
+      name: "Disabled Catalog Product",
+      category: "Accessories",
+      description: "Controlled product used to prove disabled catalog mutations.",
+      priceMinor: 1_000n,
+      currency: "KES",
+      source: "SELLER",
+      isActive: true,
+      isPurchasable: false,
+      sellerApplicationId: application.id,
+      sellerProductSubmissionId: submission.id,
+    });
+    await database.db.insert(sellerProductActivations).values({
+      sellerProductSubmissionId: submission.id,
+      productId,
+      activatedByStaffUserId: catalogStaff.userId,
+      requestId: `test-disabled-activation-${randomUUID()}`,
+    });
+    const disabledDeactivation = await injectPost(
+      disabledApp,
+      `/api/v1/staff/seller-products/${submission.id}/deactivate`,
+      {},
+      catalogStaff.cookie,
+    );
+    const [unchangedProduct] = await database.db
+      .select({ active: products.isActive })
+      .from(products)
+      .where(eq(products.id, productId));
+    const [deactivationAudits] = await database.db
+      .select({ value: count() })
+      .from(staffAuditEvents)
+      .where(eq(staffAuditEvents.action, "CATALOG_DEACTIVATED"));
+
+    const sellerIdentity = await createVerifiedIdentity("disabled-media-upload@example.com");
+    const sellerApplication = await insertSellerApplication("APPROVED", sellerIdentity.userId);
+    const sellerSubmission = await insertSellerProduct(sellerApplication.id, "APPROVED");
+    const disabledUpload = await injectPost(
+      disabledApp,
+      `/api/v1/seller/products/${sellerSubmission.id}/media/upload-intents`,
+      { declaredMime: "image/jpeg", declaredSize: 1, rightsAccepted: true },
+      sellerIdentity.cookie,
+    );
+    const [mediaCount] = await database.db
+      .select({ value: count() })
+      .from(sellerProductMedia)
+      .where(eq(sellerProductMedia.sellerProductSubmissionId, sellerSubmission.id));
+
+    expect(disabledReview.statusCode).toBe(503);
+    expect(disabledReview.json<{ error: { code: string } }>().error.code).toBe(
+      "STAFF_REVIEW_DISABLED",
+    );
+    expect(wrongPermission.statusCode).toBe(403);
+    expect(disabledActivation.statusCode).toBe(503);
+    expect(disabledActivation.json<{ error: { code: string } }>().error.code).toBe(
+      "CATALOG_ACTIVATION_DISABLED",
+    );
+    expect(readiness.statusCode).toBe(200);
+    expect(readiness.json()).toMatchObject({
+      readiness: { ready: false },
+      activationEnabled: false,
+    });
+    expect(disabledDeactivation.statusCode).toBe(503);
+    expect(unchangedProduct?.active).toBe(true);
+    expect(deactivationAudits?.value).toBe(0);
+    expect(disabledUpload.statusCode).toBe(503);
+    expect(disabledUpload.json<{ error: { code: string } }>().error.code).toBe(
+      "MEDIA_UPLOAD_DISABLED",
+    );
+    expect(mediaCount?.value).toBe(0);
+  });
+});
+
 async function createStaff(
   email: string,
   permissions: StaffPermission[],
@@ -730,7 +913,10 @@ async function insertSellerApplication(
   return application!;
 }
 
-async function insertSellerProduct(applicationId: string, status: "SUBMITTED" | "REJECTED") {
+async function insertSellerProduct(
+  applicationId: string,
+  status: "SUBMITTED" | "APPROVED" | "REJECTED",
+) {
   const now = new Date();
   const [submission] = await database.db
     .insert(sellerProductSubmissions)
@@ -745,12 +931,42 @@ async function insertSellerProduct(applicationId: string, status: "SUBMITTED" | 
       termsVersion: "seller-product-terms-v1",
       termsAcceptedAt: now,
       submittedAt: now,
-      reviewStartedAt: status === "REJECTED" ? now : null,
-      reviewedAt: status === "REJECTED" ? now : null,
+      reviewStartedAt: status === "SUBMITTED" ? null : now,
+      reviewedAt: status === "SUBMITTED" ? null : now,
       reviewReason: status === "REJECTED" ? "Applicant-safe test reason" : null,
     })
     .returning();
   return submission!;
+}
+
+async function insertReadyMedia(submissionId: string, sortOrder: number) {
+  const now = new Date();
+  const [media] = await database.db
+    .insert(sellerProductMedia)
+    .values({
+      sellerProductSubmissionId: submissionId,
+      status: "READY_FOR_REVIEW",
+      quarantineObjectKey: `quarantine/test/${randomUUID()}`,
+      canonicalObjectKey: `canonical/test/${randomUUID()}/master.webp`,
+      declaredMime: "image/jpeg",
+      detectedMime: "image/jpeg",
+      canonicalMime: "image/webp",
+      declaredByteSize: 1,
+      inputByteSize: 1,
+      canonicalByteSize: 1,
+      width: 600,
+      height: 600,
+      sha256: "a".repeat(64),
+      sortOrder,
+      rightsTermsVersion: "seller-media-rights-v1",
+      rightsAcceptedAt: now,
+      uploadExpiresAt: new Date(now.getTime() + 60_000),
+      uploadedAt: now,
+      processingStartedAt: now,
+      processedAt: now,
+    })
+    .returning();
+  return media!;
 }
 
 async function insertApplicant(): Promise<string> {

@@ -105,6 +105,37 @@ describe("log redaction", () => {
     });
   });
 
+  it("redacts S3 credentials and presigned POST authorization fields", () => {
+    const sensitive = {
+      MEDIA_S3_ACCESS_KEY_ID: "temporary-access-id",
+      MEDIA_S3_SECRET_ACCESS_KEY: "temporary-secret",
+      MEDIA_S3_SESSION_TOKEN: "temporary-session-token",
+      accessKeyId: "nested-access-id",
+      "x-amz-credential": "temporary-credential",
+      "x-amz-signature": "temporary-signature",
+      "x-amz-security-token": "temporary-security-token",
+      policy: "base64-policy",
+      bucketRegion: "us-east-1",
+    };
+
+    expect(redactSensitive(sensitive)).toEqual({
+      MEDIA_S3_ACCESS_KEY_ID: "[REDACTED]",
+      MEDIA_S3_SECRET_ACCESS_KEY: "[REDACTED]",
+      MEDIA_S3_SESSION_TOKEN: "[REDACTED]",
+      accessKeyId: "[REDACTED]",
+      "x-amz-credential": "[REDACTED]",
+      "x-amz-signature": "[REDACTED]",
+      "x-amz-security-token": "[REDACTED]",
+      policy: "[REDACTED]",
+      bucketRegion: "us-east-1",
+    });
+    expect(
+      redactText(
+        "MEDIA_S3_ACCESS_KEY_ID=temporary-access x-amz-signature=temporary-signature policy=base64-policy",
+      ),
+    ).not.toMatch(/temporary-access|temporary-signature|base64-policy/);
+  });
+
   it("preserves benign structured values", () => {
     const value = {
       username: "safe-user",

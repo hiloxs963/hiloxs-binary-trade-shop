@@ -1,14 +1,16 @@
 import { AppError } from "./errors.js";
 
 const SENSITIVE_KEY =
-  /authorization|cookie|password|passphrase|passkey|token|secret|databaseurl|apikey|krapin|registrationnumber|totp|backupcode|twofactor/i;
+  /authorization|cookie|password|passphrase|passkey|token|secret|databaseurl|apikey|accesskey|credential|signature|krapin|registrationnumber|totp|backupcode|twofactor/i;
+
+const SENSITIVE_EXACT_KEYS = new Set(["policy"]);
 
 const API_KEY_FIELDS = ["apiKey", "api_key", "API_KEY", "xApiKey"] as const;
 const HEADER_PATHS = ["req.headers", "request.headers", "headers"] as const;
 
 function isSensitiveKey(key: string): boolean {
   const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return SENSITIVE_KEY.test(normalizedKey);
+  return SENSITIVE_EXACT_KEYS.has(normalizedKey) || SENSITIVE_KEY.test(normalizedKey);
 }
 
 export const LOG_REDACT_PATHS = [
@@ -24,6 +26,20 @@ export const LOG_REDACT_PATHS = [
   "DATABASE_URL",
   "databaseUrl",
   "RESEND_API_KEY",
+  "MEDIA_S3_ACCESS_KEY_ID",
+  "MEDIA_S3_SECRET_ACCESS_KEY",
+  "MEDIA_S3_SESSION_TOKEN",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_SESSION_TOKEN",
+  "accessKeyId",
+  "secretAccessKey",
+  "sessionToken",
+  "policy",
+  "Policy",
+  "x-amz-credential",
+  "x-amz-signature",
+  "x-amz-security-token",
   "MPESA_CONSUMER_SECRET",
   "MPESA_PASSKEY",
   "kraPin",
@@ -44,7 +60,7 @@ export function redactText(value: string): string {
     .replace(/(postgres(?:ql)?:\/\/)[^\s@]+@/gi, "$1[REDACTED]@")
     .replace(/(bearer\s+)[^\s]+/gi, "$1[REDACTED]")
     .replace(
-      /((?:password|passkey|token|secret|database[_-]?url|(?:resend[_-]?)?(?:x[_-]?)?api[_-]?key|kra[_-]?pin|registration[_-]?number|totp(?:[_-]?(?:uri|code))?|backup[_-]?codes?|two[_-]?factor(?:[_-]?(?:uri|code|challenge))?)\s*[=:]\s*)[^\s,;]+/gi,
+      /((?:password|passkey|token|secret|database[_-]?url|(?:resend[_-]?)?(?:x[_-]?)?api[_-]?key|(?:media[_-]?s3[_-]?|aws[_-]?)?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token)|x[_-]?amz[_-]?(?:credential|signature|security[_-]?token)|policy|kra[_-]?pin|registration[_-]?number|totp(?:[_-]?(?:uri|code))?|backup[_-]?codes?|two[_-]?factor(?:[_-]?(?:uri|code|challenge))?)\s*[=:]\s*)[^\s,;]+/gi,
       "$1[REDACTED]",
     );
 }

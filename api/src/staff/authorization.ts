@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, lt } from "drizzle-orm";
 import { fromNodeHeaders } from "better-auth/node";
 import type { IncomingHttpHeaders } from "node:http";
 import type { AuthService } from "../auth/auth.js";
@@ -39,6 +39,7 @@ export async function requireStaffPermission(
     .select({
       role: staffMemberships.role,
       membershipCreatedAt: staffMemberships.createdAt,
+      grantCreatedAt: staffPermissionGrants.grantedAt,
       sessionCreatedAt: session.createdAt,
     })
     .from(staffMemberships)
@@ -72,6 +73,7 @@ export async function requireStaffPermission(
 
   if (!access) throw new StaffPermissionRequiredError();
   assertPostMembershipSession(access.sessionCreatedAt, access.membershipCreatedAt);
+  assertPostPermissionGrantSession(access.sessionCreatedAt, access.grantCreatedAt);
   if (options.recent) {
     assertRecentSession(access.sessionCreatedAt, options.now ?? new Date());
   }
@@ -109,6 +111,7 @@ export async function requireStaffProfile(
       and(
         eq(staffPermissionGrants.staffUserId, staffMemberships.userId),
         isNull(staffPermissionGrants.revokedAt),
+        lt(staffPermissionGrants.grantedAt, session.createdAt),
       ),
     )
     .where(
@@ -146,5 +149,14 @@ export function assertRecentSession(sessionCreatedAt: Date, now: Date): void {
   const age = now.getTime() - sessionCreatedAt.getTime();
   if (age < 0 || age > STAFF_RECENT_SESSION_MAX_AGE_MS) {
     throw new StaffRecentAuthRequiredError();
+  }
+}
+
+export function assertPostPermissionGrantSession(
+  sessionCreatedAt: Date,
+  permissionGrantedAt: Date,
+): void {
+  if (sessionCreatedAt.getTime() <= permissionGrantedAt.getTime()) {
+    throw new StaffReauthRequiredError();
   }
 }

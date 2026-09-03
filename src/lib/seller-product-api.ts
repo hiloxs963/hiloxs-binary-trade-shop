@@ -38,6 +38,50 @@ export type SellerProductState = {
   termsVersion: string;
 };
 
+export type SellerProductMediaStatus =
+  | "PENDING_UPLOAD"
+  | "UPLOADED"
+  | "PROCESSING"
+  | "READY_FOR_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+  | "PROCESSING_FAILED"
+  | "ABANDONED";
+
+export type SellerProductMedia = {
+  id: string;
+  status: SellerProductMediaStatus;
+  declaredMime: string;
+  declaredSize: number;
+  detectedMime: string | null;
+  width: number | null;
+  height: number | null;
+  sortOrder: number;
+  selectedForActivation: boolean;
+  rightsTermsVersion: string;
+  rightsAcceptedAt: string;
+  uploadExpiresAt: string;
+  processedAt: string | null;
+  reviewedAt: string | null;
+  reviewReason: string | null;
+};
+
+export type SellerMediaState = {
+  media: SellerProductMedia[];
+  rightsTermsVersion: string;
+  activated: boolean;
+};
+
+export type SellerInventoryState = {
+  inventory: {
+    quantityAvailable: number;
+    version: number;
+    configuredAt: string;
+    updatedAt: string;
+  } | null;
+  activated: boolean;
+};
+
 type ApiErrorBody = { error?: { code?: string; message?: string } };
 
 const configuredApiOrigin = import.meta.env["VITE_API_URL"]?.trim().replace(/\/$/, "");
@@ -108,6 +152,96 @@ export async function withdrawSellerProduct(submissionId: string): Promise<Selle
     { method: "POST", body: JSON.stringify({}) },
     "Unable to withdraw the product submission",
   );
+}
+
+export async function getSellerProductMedia(submissionId: string): Promise<SellerMediaState> {
+  return send(
+    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media`,
+    { method: "GET" },
+    "Unable to load product media",
+  );
+}
+
+export async function uploadSellerProductMedia(submissionId: string, file: File): Promise<void> {
+  const intent = await send<{
+    media: SellerProductMedia;
+    upload: { method: "POST"; url: string; fields: Record<string, string> };
+  }>(
+    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/upload-intents`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        declaredMime: file.type,
+        declaredSize: file.size,
+        rightsAccepted: true,
+      }),
+    },
+    "Unable to prepare the media upload",
+  );
+  const form = new FormData();
+  for (const [key, value] of Object.entries(intent.upload.fields)) form.append(key, value);
+  form.append("file", file);
+  const uploaded = await fetch(intent.upload.url, { method: "POST", body: form });
+  if (!uploaded.ok) {
+    throw new SellerProductApiError("The private media upload failed", uploaded.status);
+  }
+  await send(
+    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(intent.media.id)}/finalize`,
+    { method: "POST", body: JSON.stringify({}) },
+    "Unable to finalize the media upload",
+  );
+}
+
+export async function arrangeSellerProductMedia(
+  submissionId: string,
+  orderedMediaIds: string[],
+  selectedMediaIds: string[],
+): Promise<SellerMediaState> {
+  return send(
+    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/arrange`,
+    { method: "POST", body: JSON.stringify({ orderedMediaIds, selectedMediaIds }) },
+    "Unable to update the media selection",
+  );
+}
+
+export async function abandonSellerProductMedia(
+  submissionId: string,
+  mediaId: string,
+): Promise<void> {
+  await send(
+    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(mediaId)}/abandon`,
+    { method: "POST", body: JSON.stringify({}) },
+    "Unable to abandon the upload",
+  );
+}
+
+export async function getSellerProductInventory(
+  submissionId: string,
+): Promise<SellerInventoryState> {
+  return send(
+    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/inventory`,
+    { method: "GET" },
+    "Unable to load product inventory",
+  );
+}
+
+export async function setSellerProductInventory(
+  submissionId: string,
+  quantityAvailable: number,
+): Promise<SellerInventoryState> {
+  return send(
+    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/inventory`,
+    { method: "PUT", body: JSON.stringify({ quantityAvailable }) },
+    "Unable to save product inventory",
+  );
+}
+
+export function sellerMediaPreviewUrl(
+  submissionId: string,
+  mediaId: string,
+  variant: "THUMBNAIL" | "MEDIUM" | "LARGE" = "MEDIUM",
+): string {
+  return `${API_ORIGIN}/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(mediaId)}/preview/${variant}`;
 }
 
 async function send<T>(path: string, init: RequestInit, fallback: string): Promise<T> {

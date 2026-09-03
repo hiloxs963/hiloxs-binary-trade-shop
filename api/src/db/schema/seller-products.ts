@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import type { SellerProductCategory, SellerProductStatus } from "../../seller-products/model.js";
 import { sellerApplications } from "./sellers.js";
 
@@ -32,6 +41,10 @@ export const sellerProductSubmissions = pgTable(
       table.createdAt,
     ),
     index("seller_product_submissions_status_submitted_idx").on(table.status, table.submittedAt),
+    uniqueIndex("seller_product_submissions_application_id_id_uidx").on(
+      table.sellerApplicationId,
+      table.id,
+    ),
     check(
       "seller_product_submissions_status_check",
       sql`${table.status} in ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'WITHDRAWN')`,

@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import * as authSchema from "./schema/auth.js";
 import * as commerceSchema from "./schema/commerce.js";
 import * as metadataSchema from "./schema/system-metadata.js";
+import * as mediaSchema from "./schema/media.js";
 import * as paymentSchema from "./schema/payments.js";
 import * as sellerProductSchema from "./schema/seller-products.js";
 import * as sellerSchema from "./schema/sellers.js";
@@ -12,6 +13,7 @@ const schema = {
   ...authSchema,
   ...commerceSchema,
   ...metadataSchema,
+  ...mediaSchema,
   ...paymentSchema,
   ...sellerProductSchema,
   ...sellerSchema,
