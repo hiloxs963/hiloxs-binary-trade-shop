@@ -1,7 +1,7 @@
 import { AppError } from "./errors.js";
 
 const SENSITIVE_KEY =
-  /authorization|cookie|password|passphrase|passkey|token|secret|databaseurl|apikey|accesskey|credential|signature|krapin|registrationnumber|totp|backupcode|twofactor/i;
+  /authorization|cookie|password|passphrase|passkey|token|secret|databaseurl|apikey|accesskey|credential|signature|krapin|registrationnumber|totp|backupcode|twofactor|recipientname|deliveryphone|deliveryaddress|addressline|landmark|trackingreference/i;
 
 const SENSITIVE_EXACT_KEYS = new Set(["policy"]);
 
@@ -51,6 +51,12 @@ export const LOG_REDACT_PATHS = [
   "twoFactorCode",
   "twoFactorChallenge",
   "backupCodes",
+  "recipientName",
+  "deliveryPhone",
+  "deliveryAddress",
+  "addressLine",
+  "landmark",
+  "trackingReference",
   ...API_KEY_FIELDS,
   ...HEADER_PATHS.map((path) => `${path}["x-api-key"]`),
 ] as const;
@@ -60,7 +66,7 @@ export function redactText(value: string): string {
     .replace(/(postgres(?:ql)?:\/\/)[^\s@]+@/gi, "$1[REDACTED]@")
     .replace(/(bearer\s+)[^\s]+/gi, "$1[REDACTED]")
     .replace(
-      /((?:password|passkey|token|secret|database[_-]?url|(?:resend[_-]?)?(?:x[_-]?)?api[_-]?key|(?:media[_-]?s3[_-]?|aws[_-]?)?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token)|x[_-]?amz[_-]?(?:credential|signature|security[_-]?token)|policy|kra[_-]?pin|registration[_-]?number|totp(?:[_-]?(?:uri|code))?|backup[_-]?codes?|two[_-]?factor(?:[_-]?(?:uri|code|challenge))?)\s*[=:]\s*)[^\s,;]+/gi,
+      /((?:password|passkey|token|secret|database[_-]?url|(?:resend[_-]?)?(?:x[_-]?)?api[_-]?key|(?:media[_-]?s3[_-]?|aws[_-]?)?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token)|x[_-]?amz[_-]?(?:credential|signature|security[_-]?token)|policy|kra[_-]?pin|registration[_-]?number|totp(?:[_-]?(?:uri|code))?|backup[_-]?codes?|two[_-]?factor(?:[_-]?(?:uri|code|challenge))?|recipient[_-]?name|delivery[_-]?(?:phone|address)|address[_-]?line|landmark|tracking[_-]?reference)\s*[=:]\s*)[^\s,;]+/gi,
       "$1[REDACTED]",
     );
 }

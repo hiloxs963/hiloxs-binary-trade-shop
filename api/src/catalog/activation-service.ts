@@ -249,7 +249,8 @@ export async function activateSellerProduct(
     }
     await transaction.insert(productInventory).values({
       productId,
-      quantityAvailable: inventory.quantityAvailable,
+      quantityOnHand: inventory.quantityAvailable,
+      quantityReserved: 0,
     });
     await transaction.insert(sellerProductActivations).values({
       sellerProductSubmissionId: submission.id,

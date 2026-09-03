@@ -7,11 +7,17 @@ import type { DatabaseClient } from "../db/client.js";
 
 export function registerCheckoutRoute(
   app: FastifyInstance,
-  options: { auth: AuthService; database: DatabaseClient },
+  options: { auth: AuthService; database: DatabaseClient; sellerCommerceEnabled: boolean },
 ): void {
   app.post("/api/v1/checkout/quote", async (request) => {
     await requireActiveUser(options.auth, options.database, request.headers);
     const input = CartSchema.parse(request.body);
-    return { quote: serializePricedCart(await priceCart(options.database.db, input)) };
+    return {
+      quote: serializePricedCart(
+        await priceCart(options.database.db, input, {
+          sellerCommerceEnabled: options.sellerCommerceEnabled,
+        }),
+      ),
+    };
   });
 }

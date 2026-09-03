@@ -10,6 +10,14 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
 import {
   createOrder,
@@ -24,7 +32,9 @@ import {
   type CheckoutQuote,
   type OrderPaymentStatus,
   type PaymentConfig,
+  type DeliveryAddress,
 } from "@/lib/commerce-api";
+import { KENYA_COUNTIES } from "@/lib/delivery";
 import { PRODUCTS } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { pageSeo } from "@/lib/seo";
@@ -50,6 +60,14 @@ function CheckoutPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createdOrder, setCreatedOrder] = useState<CommerceOrder | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddress & { landmark: string }>({
+    recipientName: auth.currentUser?.name ?? "",
+    phone: auth.currentUser?.phone ?? "",
+    county: "",
+    town: "",
+    addressLine: "",
+    landmark: "",
+  });
   const idempotencyKey = useRef<string | null>(null);
   const items = useMemo(
     () => Object.entries(state.cart).map(([productId, quantity]) => ({ productId, quantity })),
@@ -177,6 +195,104 @@ function CheckoutPage() {
         )}
       </div>
 
+      {quote?.deliveryRequired && (
+        <div className="mt-6 border-t border-border pt-6">
+          <h2 className="text-lg font-semibold">Delivery address</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Seller product prices include delivery for the supported delivery area.
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <AddressField label="Recipient name" id="delivery-name">
+              <Input
+                id="delivery-name"
+                value={deliveryAddress.recipientName}
+                maxLength={120}
+                autoComplete="name"
+                onChange={(event) =>
+                  setDeliveryAddress((current) => ({
+                    ...current,
+                    recipientName: event.target.value,
+                  }))
+                }
+              />
+            </AddressField>
+            <AddressField label="Phone" id="delivery-phone">
+              <Input
+                id="delivery-phone"
+                value={deliveryAddress.phone}
+                maxLength={20}
+                inputMode="tel"
+                autoComplete="tel"
+                onChange={(event) =>
+                  setDeliveryAddress((current) => ({ ...current, phone: event.target.value }))
+                }
+              />
+            </AddressField>
+            <AddressField label="County" id="delivery-county">
+              <Select
+                value={deliveryAddress.county}
+                onValueChange={(county) =>
+                  setDeliveryAddress((current) => ({ ...current, county }))
+                }
+              >
+                <SelectTrigger id="delivery-county">
+                  <SelectValue placeholder="Select county" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KENYA_COUNTIES.map((county) => (
+                    <SelectItem key={county} value={county}>
+                      {county}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AddressField>
+            <AddressField label="Town" id="delivery-town">
+              <Input
+                id="delivery-town"
+                value={deliveryAddress.town}
+                maxLength={100}
+                autoComplete="address-level2"
+                onChange={(event) =>
+                  setDeliveryAddress((current) => ({ ...current, town: event.target.value }))
+                }
+              />
+            </AddressField>
+            <div className="sm:col-span-2">
+              <AddressField label="Address" id="delivery-address">
+                <Input
+                  id="delivery-address"
+                  value={deliveryAddress.addressLine}
+                  maxLength={240}
+                  autoComplete="street-address"
+                  onChange={(event) =>
+                    setDeliveryAddress((current) => ({
+                      ...current,
+                      addressLine: event.target.value,
+                    }))
+                  }
+                />
+              </AddressField>
+            </div>
+            <div className="sm:col-span-2">
+              <AddressField label="Landmark (optional)" id="delivery-landmark">
+                <Input
+                  id="delivery-landmark"
+                  value={deliveryAddress.landmark ?? ""}
+                  maxLength={160}
+                  onChange={(event) =>
+                    setDeliveryAddress((current) => ({
+                      ...current,
+                      landmark: event.target.value,
+                    }))
+                  }
+                />
+              </AddressField>
+            </div>
+          </div>
+        </div>
+      )}
+
       {createError && (
         <p className="mt-4 text-sm text-destructive" role="alert">
           {createError}
@@ -186,14 +302,23 @@ function CheckoutPage() {
         variant="hero"
         size="lg"
         className="mt-5 w-full"
-        disabled={!quote || quoteLoading || creating}
+        disabled={
+          !quote ||
+          quoteLoading ||
+          creating ||
+          (quote.deliveryRequired && !deliveryAddressComplete(deliveryAddress))
+        }
         onClick={async () => {
           if (!quote) return;
           setCreating(true);
           setCreateError("");
           idempotencyKey.current ??= crypto.randomUUID();
           try {
-            const order = await createOrder(items, idempotencyKey.current);
+            const order = await createOrder(
+              items,
+              idempotencyKey.current,
+              quote.deliveryRequired ? deliveryAddressForRequest(deliveryAddress) : undefined,
+            );
             clearCart();
             setCreatedOrder(order);
           } catch {
@@ -211,6 +336,40 @@ function CheckoutPage() {
       </p>
     </section>
   );
+}
+
+function AddressField({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <div className="mt-1.5">{children}</div>
+    </div>
+  );
+}
+
+function deliveryAddressComplete(address: DeliveryAddress): boolean {
+  return Boolean(
+    address.recipientName.trim() &&
+    address.phone.trim() &&
+    address.county &&
+    address.town.trim() &&
+    address.addressLine.trim(),
+  );
+}
+
+function deliveryAddressForRequest(
+  address: DeliveryAddress & { landmark: string },
+): DeliveryAddress {
+  const { landmark, ...required } = address;
+  return { ...required, ...(landmark.trim() ? { landmark } : {}) };
 }
 
 function CreatedOrderPayment({

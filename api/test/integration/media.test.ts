@@ -657,7 +657,7 @@ describe("controlled catalog activation", () => {
     expect(activationCount?.value).toBe(1);
     expect(inventoryCount?.value).toBe(1);
     const [inventorySnapshot] = await database.db.select().from(productInventory);
-    expect(inventorySnapshot?.quantityAvailable).toBe(5);
+    expect(inventorySnapshot?.quantityOnHand).toBe(5);
     expect(mediaCount?.value).toBe(1);
     expect(auditCount?.value).toBe(1);
     const [sellerProduct] = await database.db
@@ -777,7 +777,7 @@ describe("controlled catalog activation", () => {
       .from(productInventory)
       .where(eq(productInventory.productId, inventoryActivation.product.id));
     expect([200, 409]).toContain(inventoryEdit.statusCode);
-    expect(inventorySnapshot?.quantityAvailable).toBe(inventoryEdit.statusCode === 200 ? 7 : 5);
+    expect(inventorySnapshot?.quantityOnHand).toBe(inventoryEdit.statusCode === 200 ? 7 : 5);
 
     const mediaFixture = await activationFixture();
     const secondMedia = await insertApprovedMedia(mediaFixture.submissionId);

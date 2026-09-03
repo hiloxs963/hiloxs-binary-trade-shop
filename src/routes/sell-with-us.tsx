@@ -39,6 +39,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { pageSeo } from "@/lib/seo";
 import { SellerProducts } from "@/components/hiloxs/SellerProducts";
+import { SellerFulfillment } from "@/components/hiloxs/SellerFulfillment";
 import {
   createSellerApplication,
   getSellerApplication,
@@ -527,7 +528,12 @@ function SellerApplicationStatusView({
           </p>
         )}
       </div>
-      {application.status === "APPROVED" && <SellerProducts />}
+      {application.status === "APPROVED" && (
+        <>
+          <SellerProducts />
+          <SellerFulfillment />
+        </>
+      )}
     </section>
   );
 }

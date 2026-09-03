@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, Package, RefreshCw, Smartphone, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Package, RefreshCw, Smartphone, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AuthRequired } from "@/components/hiloxs/AuthRequired";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import {
   cancelOrder,
+  confirmOrderDelivery,
   formatMoneyMinor,
   getOrderPaymentStatus,
   getOrders,
@@ -46,6 +47,7 @@ function MyOrdersPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState("");
+  const [confirming, setConfirming] = useState("");
   const [paymentBlocking, setPaymentBlocking] = useState<Record<string, boolean>>({});
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>();
 
@@ -147,6 +149,63 @@ function MyOrdersPage() {
                   {order.status.replaceAll("_", " ")}
                 </Badge>
               </div>
+              {order.status === "PAYMENT_REVIEW_REQUIRED" && (
+                <p className="mt-4 text-sm text-destructive">
+                  Payment received. This order requires support review. Do not pay again.
+                </p>
+              )}
+              {order.fulfillments && order.fulfillments.length > 0 && (
+                <div className="mt-5 border-t border-border pt-4">
+                  <h3 className="text-sm font-semibold">Fulfillment</h3>
+                  <div className="mt-3 divide-y divide-border border-y border-border">
+                    {order.fulfillments.map((fulfillment, index) => (
+                      <div key={fulfillment.id} className="py-3 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium">Seller shipment {index + 1}</span>
+                          <Badge variant="outline">{fulfillmentLabel(fulfillment.status)}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {fulfillment.items.map((item) => item.productName).join(", ")}
+                        </p>
+                        {fulfillment.status === "DISPATCHED" && (
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-xs text-muted-foreground">
+                              {fulfillment.carrier}
+                              {fulfillment.trackingReference
+                                ? ` | ${fulfillment.trackingReference}`
+                                : ""}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={confirming === fulfillment.id}
+                              onClick={async () => {
+                                setConfirming(fulfillment.id);
+                                setError("");
+                                try {
+                                  await confirmOrderDelivery(order.id, fulfillment.id);
+                                  setOrders(await getOrders());
+                                } catch {
+                                  setError("Delivery could not be confirmed.");
+                                } finally {
+                                  setConfirming("");
+                                }
+                              }}
+                            >
+                              {confirming === fulfillment.id ? (
+                                <Loader2 className="animate-spin" aria-hidden />
+                              ) : (
+                                <CheckCircle2 aria-hidden />
+                              )}
+                              Confirm delivery
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="mt-5 grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Items</p>
@@ -215,6 +274,29 @@ function MyOrdersPage() {
       )}
     </section>
   );
+}
+
+function fulfillmentLabel(
+  status: NonNullable<CommerceOrder["fulfillments"]>[number]["status"],
+): string {
+  switch (status) {
+    case "AWAITING_PAYMENT":
+      return "Awaiting payment";
+    case "READY_FOR_SELLER":
+      return "Awaiting seller";
+    case "ACCEPTED":
+      return "Accepted";
+    case "PREPARING":
+      return "Preparing";
+    case "DISPATCHED":
+      return "Dispatched";
+    case "DELIVERED":
+      return "Delivered";
+    case "FULFILLMENT_ISSUE":
+      return "Issue";
+    case "CANCELLED":
+      return "Cancelled";
+  }
 }
 
 function OrderPaymentControls({

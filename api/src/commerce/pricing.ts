@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { Database } from "../db/client.js";
 import { products } from "../db/schema/commerce.js";
+import { productInventory } from "../db/schema/media.js";
 import { ValidationError } from "../lib/errors.js";
 import type { CartInput } from "./validation.js";
 
@@ -14,6 +15,8 @@ export type PricedLine = {
   unitPriceMinor: bigint;
   quantity: number;
   lineTotalMinor: bigint;
+  productSource: "PLATFORM" | "SELLER";
+  sellerApplicationId: string | null;
 };
 
 export type PricedCart = {
@@ -21,9 +24,14 @@ export type PricedCart = {
   subtotalMinor: bigint;
   totalMinor: bigint;
   items: PricedLine[];
+  hasSellerItems: boolean;
 };
 
-export async function priceCart(executor: SelectExecutor, input: CartInput): Promise<PricedCart> {
+export async function priceCart(
+  executor: SelectExecutor,
+  input: CartInput,
+  options: { sellerCommerceEnabled?: boolean } = {},
+): Promise<PricedCart> {
   const productIds = input.items.map((item) => item.productId);
   const rows = await executor
     .select({
@@ -33,8 +41,14 @@ export async function priceCart(executor: SelectExecutor, input: CartInput): Pro
       name: products.name,
       priceMinor: products.priceMinor,
       currency: products.currency,
+      source: products.source,
+      isPurchasable: products.isPurchasable,
+      sellerApplicationId: products.sellerApplicationId,
+      quantityOnHand: productInventory.quantityOnHand,
+      quantityReserved: productInventory.quantityReserved,
     })
     .from(products)
+    .leftJoin(productInventory, eq(productInventory.productId, products.id))
     .where(
       and(
         inArray(products.catalogKey, productIds),
@@ -50,7 +64,14 @@ export async function priceCart(executor: SelectExecutor, input: CartInput): Pro
 
   const items = input.items.map((item) => {
     const product = byCatalogKey.get(item.productId);
-    if (!product || product.currency !== "KES") {
+    const sellerAvailable =
+      product?.source !== "SELLER" ||
+      (options.sellerCommerceEnabled === true &&
+        product.sellerApplicationId !== null &&
+        product.quantityOnHand !== null &&
+        product.quantityReserved !== null &&
+        product.quantityOnHand - product.quantityReserved >= item.quantity);
+    if (!product || product.currency !== "KES" || !sellerAvailable) {
       throw new ValidationError("One or more products are unavailable");
     }
     const lineTotalMinor = product.priceMinor * BigInt(item.quantity);
@@ -62,15 +83,23 @@ export async function priceCart(executor: SelectExecutor, input: CartInput): Pro
       unitPriceMinor: product.priceMinor,
       quantity: item.quantity,
       lineTotalMinor,
+      productSource: product.source,
+      sellerApplicationId: product.sellerApplicationId,
     };
   });
   const subtotalMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0n);
 
-  return { currency: "KES", subtotalMinor, totalMinor: subtotalMinor, items };
+  return {
+    currency: "KES",
+    subtotalMinor,
+    totalMinor: subtotalMinor,
+    items,
+    hasSellerItems: items.some((item) => item.productSource === "SELLER"),
+  };
 }
 
 export function serializePricedCart(cart: PricedCart) {
-  return {
+  const serialized = {
     currency: cart.currency,
     subtotalMinor: cart.subtotalMinor.toString(),
     totalMinor: cart.totalMinor.toString(),
@@ -83,4 +112,5 @@ export function serializePricedCart(cart: PricedCart) {
       lineTotalMinor: item.lineTotalMinor.toString(),
     })),
   };
+  return cart.hasSellerItems ? { ...serialized, deliveryRequired: true } : serialized;
 }

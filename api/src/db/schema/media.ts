@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -13,7 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { MediaStatus, MediaVariant } from "../../media/model.js";
 import { user } from "./auth.js";
-import { products } from "./commerce.js";
+import { orderItems, orders, products } from "./commerce.js";
 import { sellerProductSubmissions } from "./seller-products.js";
 
 export const sellerProductMedia = pgTable(
@@ -220,14 +221,132 @@ export const productInventory = pgTable(
     productId: uuid("product_id")
       .primaryKey()
       .references(() => products.id, { onDelete: "restrict" }),
-    quantityAvailable: integer("quantity_available").notNull(),
+    quantityOnHand: integer("quantity_on_hand").notNull(),
+    quantityReserved: integer("quantity_reserved").notNull().default(0),
+    version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     check(
-      "product_inventory_quantity_check",
-      sql`${table.quantityAvailable} >= 0 and ${table.quantityAvailable} <= 1000000`,
+      "product_inventory_on_hand_check",
+      sql`${table.quantityOnHand} >= 0 and ${table.quantityOnHand} <= 1000000`,
+    ),
+    check(
+      "product_inventory_reserved_check",
+      sql`${table.quantityReserved} >= 0 and ${table.quantityReserved} <= ${table.quantityOnHand}`,
+    ),
+    check("product_inventory_version_check", sql`${table.version} > 0`),
+  ],
+);
+
+export const INVENTORY_RESERVATION_STATUSES = [
+  "ACTIVE",
+  "COMMITTED",
+  "RELEASED",
+  "EXPIRED",
+] as const;
+export type InventoryReservationStatus = (typeof INVENTORY_RESERVATION_STATUSES)[number];
+export const INVENTORY_RELEASE_REASONS = ["CUSTOMER_CANCELLED", "RESERVATION_EXPIRED"] as const;
+export type InventoryReleaseReason = (typeof INVENTORY_RELEASE_REASONS)[number];
+
+export const inventoryReservations = pgTable(
+  "inventory_reservations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict" }),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    orderItemId: uuid("order_item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    status: text("status").$type<InventoryReservationStatus>().notNull().default("ACTIVE"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    committedAt: timestamp("committed_at", { withTimezone: true }),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    releaseReason: text("release_reason").$type<InventoryReleaseReason>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("inventory_reservations_order_item_uidx").on(table.orderItemId),
+    index("inventory_reservations_order_status_idx").on(table.orderId, table.status),
+    index("inventory_reservations_active_expiry_idx")
+      .on(table.expiresAt, table.orderId)
+      .where(sql`${table.status} = 'ACTIVE'`),
+    check("inventory_reservations_quantity_check", sql`${table.quantity} > 0`),
+    check(
+      "inventory_reservations_status_check",
+      sql`${table.status} in ('ACTIVE', 'COMMITTED', 'RELEASED', 'EXPIRED')`,
+    ),
+    check(
+      "inventory_reservations_terminal_check",
+      sql`(${table.status} = 'ACTIVE' and ${table.committedAt} is null and ${table.releasedAt} is null and ${table.releaseReason} is null) or
+        (${table.status} = 'COMMITTED' and ${table.committedAt} is not null and ${table.releasedAt} is null and ${table.releaseReason} is null) or
+        (${table.status} in ('RELEASED', 'EXPIRED') and ${table.committedAt} is null and ${table.releasedAt} is not null and ${table.releaseReason} is not null)`,
+    ),
+    check(
+      "inventory_reservations_release_reason_check",
+      sql`${table.releaseReason} is null or ${table.releaseReason} in ('CUSTOMER_CANCELLED', 'RESERVATION_EXPIRED')`,
+    ),
+    foreignKey({
+      name: "inventory_reservations_order_item_fk",
+      columns: [table.orderItemId, table.orderId, table.productId],
+      foreignColumns: [orderItems.id, orderItems.orderId, orderItems.productId],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const INVENTORY_EVENT_ACTIONS = [
+  "SELLER_ON_HAND_CHANGED",
+  "RESERVED",
+  "COMMITTED",
+  "RELEASED",
+  "EXPIRED",
+] as const;
+export type InventoryEventAction = (typeof INVENTORY_EVENT_ACTIONS)[number];
+export const INVENTORY_EVENT_ACTOR_TYPES = ["SELLER", "SYSTEM"] as const;
+export type InventoryEventActorType = (typeof INVENTORY_EVENT_ACTOR_TYPES)[number];
+
+export const inventoryEvents = pgTable(
+  "inventory_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict" }),
+    reservationId: uuid("reservation_id").references(() => inventoryReservations.id, {
+      onDelete: "restrict",
+    }),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "restrict" }),
+    actorType: text("actor_type").$type<InventoryEventActorType>().notNull(),
+    actorUserId: text("actor_user_id").references(() => user.id, { onDelete: "restrict" }),
+    action: text("action").$type<InventoryEventAction>().notNull(),
+    quantityDelta: integer("quantity_delta").notNull(),
+    previousOnHand: integer("previous_on_hand").notNull(),
+    resultingOnHand: integer("resulting_on_hand").notNull(),
+    previousReserved: integer("previous_reserved").notNull(),
+    resultingReserved: integer("resulting_reserved").notNull(),
+    requestId: text("request_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("inventory_events_product_created_idx").on(table.productId, table.createdAt),
+    index("inventory_events_order_idx").on(table.orderId),
+    check(
+      "inventory_events_actor_check",
+      sql`(${table.actorType} = 'SYSTEM' and ${table.actorUserId} is null) or
+        (${table.actorType} = 'SELLER' and ${table.actorUserId} is not null)`,
+    ),
+    check(
+      "inventory_events_action_check",
+      sql`${table.action} in ('SELLER_ON_HAND_CHANGED', 'RESERVED', 'COMMITTED', 'RELEASED', 'EXPIRED')`,
+    ),
+    check(
+      "inventory_events_balances_check",
+      sql`${table.previousOnHand} >= 0 and ${table.resultingOnHand} >= 0 and
+        ${table.previousReserved} >= 0 and ${table.resultingReserved} >= 0`,
     ),
   ],
 );

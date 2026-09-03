@@ -29,6 +29,10 @@ import { registerProductRoutes } from "./routes/products.js";
 import { registerSellerRoutes } from "./sellers/routes.js";
 import { registerSellerProductRoutes } from "./seller-products/routes.js";
 import { registerStaffRoutes } from "./staff/routes.js";
+import { registerSellerInventoryRoutes } from "./orders/seller-inventory-routes.js";
+import { registerSellerOrderRoutes } from "./orders/seller-order-routes.js";
+import { registerStaffCommerceRoutes } from "./orders/staff-commerce-routes.js";
+import { registerOrderSupportRoutes } from "./orders/support-routes.js";
 
 export type BuildAppOptions = {
   database?: DatabaseClient;
@@ -38,6 +42,8 @@ export type BuildAppOptions = {
   logger?: FastifyServerOptions["logger"];
   mpesa?: { provider: MpesaProvider; config: MpesaRuntimeConfig };
   staffReviewEnabled?: boolean;
+  sellerCommerceEnabled?: boolean;
+  sellerOrderActionsEnabled?: boolean;
   media?: {
     storage?: MediaStorage;
     uploadEnabled: boolean;
@@ -69,10 +75,28 @@ export async function buildApp(options: BuildAppOptions = {}) {
     });
     registerEmailVerificationRoute(app, { auth: options.auth });
     registerCurrentUserRoute(app, { auth: options.auth, database: options.database });
-    registerCheckoutRoute(app, { auth: options.auth, database: options.database });
-    registerOrderRoutes(app, { auth: options.auth, database: options.database });
+    registerCheckoutRoute(app, {
+      auth: options.auth,
+      database: options.database,
+      sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+    });
+    registerOrderRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+    });
     registerSellerRoutes(app, { auth: options.auth, database: options.database });
     registerSellerProductRoutes(app, { auth: options.auth, database: options.database });
+    registerSellerInventoryRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+    });
+    registerSellerOrderRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      sellerOrderActionsEnabled: options.sellerOrderActionsEnabled ?? false,
+    });
     registerSellerMediaRoutes(app, {
       auth: options.auth,
       database: options.database,
@@ -92,6 +116,12 @@ export async function buildApp(options: BuildAppOptions = {}) {
       staffReviewEnabled: options.staffReviewEnabled ?? false,
       catalogActivationEnabled: options.media?.catalogActivationEnabled ?? false,
     });
+    registerStaffCommerceRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+    });
+    registerOrderSupportRoutes(app, { auth: options.auth, database: options.database });
     if (options.mpesa) {
       registerMpesaRoutes(app, {
         auth: options.auth,
@@ -103,7 +133,12 @@ export async function buildApp(options: BuildAppOptions = {}) {
   }
 
   if (options.database) {
-    registerProductRoutes(app, options.database, options.media?.storage);
+    registerProductRoutes(
+      app,
+      options.database,
+      options.media?.storage,
+      options.sellerCommerceEnabled ?? false,
+    );
     app.addHook("onClose", async () => {
       await options.database?.close();
     });

@@ -23,6 +23,8 @@ describe("environment configuration", () => {
       MEDIA_UPLOAD_ENABLED: false,
       CATALOG_ACTIVATION_ENABLED: false,
       MEDIA_S3_FORCE_PATH_STYLE: false,
+      SELLER_COMMERCE_ENABLED: false,
+      SELLER_ORDER_ACTIONS_ENABLED: false,
     });
   });
 
@@ -174,6 +176,18 @@ describe("environment configuration", () => {
     expect(parseEnv({ STAFF_REVIEW_ENABLED: "true" }).STAFF_REVIEW_ENABLED).toBe(true);
     expect(parseEnv({ STAFF_REVIEW_ENABLED: "TRUE" }).STAFF_REVIEW_ENABLED).toBe(false);
     expect(parseEnv({ STAFF_REVIEW_ENABLED: "1" }).STAFF_REVIEW_ENABLED).toBe(false);
+  });
+
+  it("parses seller commerce flags strictly and defaults both off", () => {
+    expect(parseEnv({})).toMatchObject({
+      SELLER_COMMERCE_ENABLED: false,
+      SELLER_ORDER_ACTIONS_ENABLED: false,
+    });
+    expect(
+      parseEnv({ SELLER_COMMERCE_ENABLED: "true", SELLER_ORDER_ACTIONS_ENABLED: "true" }),
+    ).toMatchObject({ SELLER_COMMERCE_ENABLED: true, SELLER_ORDER_ACTIONS_ENABLED: true });
+    expect(() => parseEnv({ SELLER_COMMERCE_ENABLED: "TRUE" })).toThrow(ConfigurationError);
+    expect(() => parseEnv({ SELLER_ORDER_ACTIONS_ENABLED: "1" })).toThrow(ConfigurationError);
   });
 
   it("keeps media writes disabled without storage and requires complete storage when enabled", () => {

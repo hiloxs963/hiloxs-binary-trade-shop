@@ -33,6 +33,8 @@ async function start(): Promise<void> {
     allowedOrigins: authRuntime.trustedOrigins,
     logger: createLoggerOptions(env.LOG_LEVEL),
     staffReviewEnabled: env.STAFF_REVIEW_ENABLED,
+    sellerCommerceEnabled: env.SELLER_COMMERCE_ENABLED,
+    sellerOrderActionsEnabled: env.SELLER_ORDER_ACTIONS_ENABLED,
     media: {
       ...(mediaStorage ? { storage: mediaStorage } : {}),
       uploadEnabled: mediaRuntime.uploadEnabled,

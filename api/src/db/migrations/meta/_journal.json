@@ -57,6 +57,13 @@
       "when": 1788433450078,
       "tag": "0007_phase8_media_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788460790477,
+      "tag": "0008_closed_callisto",
+      "breakpoints": true
     }
   ]
 }

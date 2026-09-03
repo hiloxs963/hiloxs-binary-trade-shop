@@ -3,6 +3,7 @@ import { Check, Loader2, RefreshCw, ShieldAlert, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { StaffMediaActivation } from "@/components/hiloxs/StaffMediaActivation";
+import { StaffCommerceControls } from "@/components/hiloxs/StaffCommerceControls";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -22,10 +23,12 @@ import {
   getStaffSellerProduct,
   getStaffSellerProducts,
   reviewStaffItem,
+  getOrderSupportItems,
   StaffApiError,
   type StaffProfile,
   type StaffSellerApplication,
   type StaffSellerProduct,
+  type OrderSupportItem,
 } from "@/lib/staff-api";
 
 export const Route = createFileRoute("/staff")({
@@ -82,6 +85,14 @@ function StaffPage() {
     );
   }
 
+  const defaultTab = profile.permissions.includes("SELLER_REVIEW")
+    ? "applications"
+    : profile.permissions.includes("PRODUCT_REVIEW")
+      ? "products"
+      : profile.permissions.includes("ORDER_SUPPORT")
+        ? "order-support"
+        : "products";
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
@@ -101,16 +112,16 @@ function StaffPage() {
           Review actions are currently disabled.
         </p>
       )}
-      <Tabs
-        defaultValue={profile.permissions.includes("SELLER_REVIEW") ? "applications" : "products"}
-        className="mt-6"
-      >
+      <Tabs defaultValue={defaultTab} className="mt-6">
         <TabsList>
           {profile.permissions.includes("SELLER_REVIEW") && (
             <TabsTrigger value="applications">Seller Applications</TabsTrigger>
           )}
           {profile.permissions.includes("PRODUCT_REVIEW") && (
             <TabsTrigger value="products">Seller Products</TabsTrigger>
+          )}
+          {profile.permissions.includes("ORDER_SUPPORT") && (
+            <TabsTrigger value="order-support">Order Support</TabsTrigger>
           )}
         </TabsList>
         {profile.permissions.includes("SELLER_REVIEW") && (
@@ -123,7 +134,13 @@ function StaffPage() {
             <ProductQueue
               reviewEnabled={profile.reviewEnabled}
               canActivate={profile.permissions.includes("CATALOG_ACTIVATE")}
+              canCommerce={profile.permissions.includes("SELLER_COMMERCE_ACTIVATE")}
             />
+          </TabsContent>
+        )}
+        {profile.permissions.includes("ORDER_SUPPORT") && (
+          <TabsContent value="order-support">
+            <OrderSupportQueue />
           </TabsContent>
         )}
       </Tabs>
@@ -196,9 +213,11 @@ function ApplicationQueue({ reviewEnabled }: { reviewEnabled: boolean }) {
 function ProductQueue({
   reviewEnabled,
   canActivate,
+  canCommerce,
 }: {
   reviewEnabled: boolean;
   canActivate: boolean;
+  canCommerce: boolean;
 }) {
   const [items, setItems] = useState<StaffSellerProduct[]>([]);
   const [selected, setSelected] = useState<StaffSellerProduct | null>(null);
@@ -257,15 +276,88 @@ function ProductQueue({
             />
           </ReviewDetail>
           {selected.status === "APPROVED" && (
-            <StaffMediaActivation
-              submissionId={selected.id}
-              reviewEnabled={reviewEnabled}
-              canActivate={canActivate}
-            />
+            <>
+              <StaffMediaActivation
+                submissionId={selected.id}
+                reviewEnabled={reviewEnabled}
+                canActivate={canActivate}
+              />
+              {canCommerce && <StaffCommerceControls submissionId={selected.id} />}
+            </>
           )}
         </>
       )}
     </ReviewLayout>
+  );
+}
+
+function OrderSupportQueue() {
+  const [type, setType] = useState<"PAYMENT_REVIEW_REQUIRED" | "FULFILLMENT_ISSUE">(
+    "PAYMENT_REVIEW_REQUIRED",
+  );
+  const [items, setItems] = useState<OrderSupportItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      setItems(await getOrderSupportItems(type));
+    } catch {
+      setError("The order support queue could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }, [type]);
+  useEffect(() => void load(), [load]);
+  return (
+    <div className="mt-5">
+      <div className="flex items-center gap-2">
+        <Select value={type} onValueChange={(value: typeof type) => setType(value)}>
+          <SelectTrigger className="w-60">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="PAYMENT_REVIEW_REQUIRED">Payment review</SelectItem>
+            <SelectItem value="FULFILLMENT_ISSUE">Fulfillment issues</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          size="icon"
+          variant="outline"
+          aria-label="Refresh order support"
+          onClick={() => void load()}
+        >
+          <RefreshCw aria-hidden />
+        </Button>
+      </div>
+      {loading && <p className="mt-5 text-sm text-muted-foreground">Loading support queue...</p>}
+      {error && <p className="mt-5 text-sm text-destructive">{error}</p>}
+      {!loading && !error && items.length === 0 && (
+        <p className="mt-5 text-sm text-muted-foreground">No orders require this review.</p>
+      )}
+      <div className="mt-4 divide-y divide-border border-y border-border">
+        {items.map((item) => (
+          <div
+            key={`${item.orderId}:${item.fulfillmentId ?? "order"}`}
+            className="flex flex-wrap items-center justify-between gap-3 py-4"
+          >
+            <div>
+              <p className="text-sm font-medium">{item.orderNumber}</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(item.updatedAt).toLocaleString("en-KE")}
+              </p>
+            </div>
+            <Badge variant="outline">
+              {(item.fulfillmentStatus ?? item.orderStatus).replaceAll("_", " ")}
+            </Badge>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">
+        This queue is read-only. Financial and inventory changes are not available here.
+      </p>
+    </div>
   );
 }
 
