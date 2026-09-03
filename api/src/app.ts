@@ -15,6 +15,9 @@ import { safeErrorForLog } from "./lib/redact.js";
 import { requestContextPlugin } from "./plugins/request-context.js";
 import { securityPlugin } from "./plugins/security.js";
 import type { MpesaProvider } from "./payments/provider.js";
+import { registerSellerMediaRoutes } from "./media/seller-routes.js";
+import { registerStaffMediaRoutes } from "./media/staff-routes.js";
+import type { MediaStorage } from "./media/storage.js";
 import { registerMpesaRoutes } from "./payments/routes.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerCurrentUserRoute } from "./routes/current-user.js";
@@ -35,6 +38,11 @@ export type BuildAppOptions = {
   logger?: FastifyServerOptions["logger"];
   mpesa?: { provider: MpesaProvider; config: MpesaRuntimeConfig };
   staffReviewEnabled?: boolean;
+  media?: {
+    storage?: MediaStorage;
+    uploadEnabled: boolean;
+    catalogActivationEnabled: boolean;
+  };
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -65,10 +73,24 @@ export async function buildApp(options: BuildAppOptions = {}) {
     registerOrderRoutes(app, { auth: options.auth, database: options.database });
     registerSellerRoutes(app, { auth: options.auth, database: options.database });
     registerSellerProductRoutes(app, { auth: options.auth, database: options.database });
+    registerSellerMediaRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      ...(options.media?.storage ? { storage: options.media.storage } : {}),
+      uploadEnabled: options.media?.uploadEnabled ?? false,
+    });
     registerStaffRoutes(app, {
       auth: options.auth,
       database: options.database,
       reviewEnabled: options.staffReviewEnabled ?? false,
+      catalogActivationEnabled: options.media?.catalogActivationEnabled ?? false,
+    });
+    registerStaffMediaRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      ...(options.media?.storage ? { storage: options.media.storage } : {}),
+      staffReviewEnabled: options.staffReviewEnabled ?? false,
+      catalogActivationEnabled: options.media?.catalogActivationEnabled ?? false,
     });
     if (options.mpesa) {
       registerMpesaRoutes(app, {
@@ -81,7 +103,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   }
 
   if (options.database) {
-    registerProductRoutes(app, options.database);
+    registerProductRoutes(app, options.database, options.media?.storage);
     app.addHook("onClose", async () => {
       await options.database?.close();
     });

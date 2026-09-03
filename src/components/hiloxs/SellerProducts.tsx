@@ -49,6 +49,7 @@ import {
   type SellerProductSubmission,
 } from "@/lib/seller-product-api";
 import { minorToKesInput, parseKesPriceToMinor } from "@/lib/seller-product-money";
+import { SellerMediaInventory } from "./SellerMediaInventory";
 
 const PRODUCT_TERMS = [
   "The listing represents the product accurately, and I have the legal right to sell it.",
@@ -414,6 +415,7 @@ function ProductSubmissionRow({
           {error}
         </p>
       )}
+      {submission.status === "APPROVED" && <SellerMediaInventory submissionId={submission.id} />}
     </article>
   );
 }

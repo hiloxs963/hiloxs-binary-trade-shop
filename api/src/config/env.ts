@@ -32,6 +32,19 @@ const EnvironmentSchema = z.object({
   MPESA_ENV: z.enum(["sandbox", "production"]).optional(),
   MPESA_PUBLIC_ENABLED: BooleanEnvironmentSchema,
   STAFF_REVIEW_ENABLED: FailSafeBooleanEnvironmentSchema,
+  MEDIA_UPLOAD_ENABLED: BooleanEnvironmentSchema,
+  CATALOG_ACTIVATION_ENABLED: BooleanEnvironmentSchema,
+  MEDIA_S3_ENDPOINT: z.url().optional(),
+  MEDIA_S3_REGION: z.string().trim().min(1).optional(),
+  MEDIA_S3_BUCKET: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, "must be a valid S3 bucket name")
+    .optional(),
+  MEDIA_S3_ACCESS_KEY_ID: z.string().trim().min(1).optional(),
+  MEDIA_S3_SECRET_ACCESS_KEY: z.string().trim().min(1).optional(),
+  MEDIA_S3_SESSION_TOKEN: z.string().trim().min(1).optional(),
+  MEDIA_S3_FORCE_PATH_STYLE: BooleanEnvironmentSchema,
   MPESA_CONSUMER_KEY: z.string().trim().min(1).optional(),
   MPESA_CONSUMER_SECRET: z.string().trim().min(1).optional(),
   MPESA_SHORTCODE: z.string().trim().regex(/^\d+$/).optional(),
@@ -72,6 +85,20 @@ export type MpesaRuntimeConfig = {
   callbackBaseURL: string;
   maxAmountKes: bigint;
   requestTimeoutMs: number;
+};
+
+export type MediaRuntimeConfig = {
+  uploadEnabled: boolean;
+  catalogActivationEnabled: boolean;
+  storage?: {
+    endpoint: string;
+    region: string;
+    bucket: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken?: string;
+    forcePathStyle: boolean;
+  };
 };
 
 const PRODUCTION_FRONTEND_ORIGIN = "https://hiloxs.co.ke";
@@ -191,6 +218,56 @@ export function resolveMpesaRuntimeConfig(env: AppEnv): MpesaRuntimeConfig | und
     callbackBaseURL: callbackBaseURL.origin,
     maxAmountKes: env.MPESA_MAX_AMOUNT_KES as bigint,
     requestTimeoutMs: env.MPESA_REQUEST_TIMEOUT_MS,
+  };
+}
+
+export function resolveMediaRuntimeConfig(env: AppEnv): MediaRuntimeConfig {
+  const values = [
+    env.MEDIA_S3_ENDPOINT,
+    env.MEDIA_S3_REGION,
+    env.MEDIA_S3_BUCKET,
+    env.MEDIA_S3_ACCESS_KEY_ID,
+    env.MEDIA_S3_SECRET_ACCESS_KEY,
+  ];
+  const configured =
+    values.some((value) => value !== undefined) ||
+    env.MEDIA_S3_SESSION_TOKEN !== undefined ||
+    env.MEDIA_S3_FORCE_PATH_STYLE;
+  const complete = values.every((value) => value !== undefined);
+  if (configured && !complete) {
+    throw new ConfigurationError(
+      "All required media S3 environment variables must be set together",
+    );
+  }
+  if ((env.MEDIA_UPLOAD_ENABLED || env.CATALOG_ACTIVATION_ENABLED) && !complete) {
+    throw new ConfigurationError(
+      "Media S3 configuration is required when Phase 8 writes are enabled",
+    );
+  }
+
+  let storage: MediaRuntimeConfig["storage"];
+  if (complete) {
+    const endpoint = new URL(env.MEDIA_S3_ENDPOINT as string);
+    if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+      throw new ConfigurationError(
+        "MEDIA_S3_ENDPOINT cannot include credentials, a query, or a fragment",
+      );
+    }
+    storage = {
+      endpoint: endpoint.origin + endpoint.pathname.replace(/\/$/, ""),
+      region: env.MEDIA_S3_REGION as string,
+      bucket: env.MEDIA_S3_BUCKET as string,
+      accessKeyId: env.MEDIA_S3_ACCESS_KEY_ID as string,
+      secretAccessKey: env.MEDIA_S3_SECRET_ACCESS_KEY as string,
+      ...(env.MEDIA_S3_SESSION_TOKEN ? { sessionToken: env.MEDIA_S3_SESSION_TOKEN } : {}),
+      forcePathStyle: env.MEDIA_S3_FORCE_PATH_STYLE,
+    };
+  }
+
+  return {
+    uploadEnabled: env.MEDIA_UPLOAD_ENABLED,
+    catalogActivationEnabled: env.CATALOG_ACTIVATION_ENABLED,
+    ...(storage ? { storage } : {}),
   };
 }
 

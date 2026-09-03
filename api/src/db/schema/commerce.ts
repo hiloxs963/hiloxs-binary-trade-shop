@@ -3,8 +3,10 @@ import {
   bigint,
   boolean,
   check,
+  foreignKey,
   index,
   integer,
+  pgSequence,
   pgTable,
   text,
   timestamp,
@@ -12,6 +14,15 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth.js";
+import { sellerProductSubmissions } from "./seller-products.js";
+import { sellerApplications } from "./sellers.js";
+
+export const PRODUCT_SOURCES = ["PLATFORM", "SELLER"] as const;
+export type ProductSource = (typeof PRODUCT_SOURCES)[number];
+
+export const productsSortOrderSequence = pgSequence("products_sort_order_seq", {
+  startWith: 44,
+});
 
 export const ORDER_STATUSES = [
   "PENDING_PAYMENT",
@@ -34,8 +45,16 @@ export const products = pgTable(
     description: text("description").notNull(),
     priceMinor: bigint("price_minor", { mode: "bigint" }).notNull(),
     currency: text("currency").notNull(),
-    isActive: boolean("is_active").notNull().default(true),
-    sortOrder: integer("sort_order").notNull(),
+    source: text("source").$type<ProductSource>().notNull().default("PLATFORM"),
+    isActive: boolean("is_active").notNull().default(false),
+    isPurchasable: boolean("is_purchasable").notNull().default(false),
+    sellerApplicationId: uuid("seller_application_id").references(() => sellerApplications.id, {
+      onDelete: "restrict",
+    }),
+    sellerProductSubmissionId: uuid("seller_product_submission_id"),
+    sortOrder: integer("sort_order")
+      .notNull()
+      .default(sql`nextval('products_sort_order_seq')`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -43,10 +62,25 @@ export const products = pgTable(
     uniqueIndex("products_catalog_key_uidx").on(table.catalogKey),
     uniqueIndex("products_slug_uidx").on(table.slug),
     uniqueIndex("products_sort_order_uidx").on(table.sortOrder),
+    uniqueIndex("products_seller_submission_uidx")
+      .on(table.sellerProductSubmissionId)
+      .where(sql`${table.sellerProductSubmissionId} is not null`),
     index("products_active_category_sort_idx").on(table.isActive, table.category, table.sortOrder),
+    index("products_active_purchasable_idx").on(table.isActive, table.isPurchasable),
     check("products_price_minor_check", sql`${table.priceMinor} >= 0`),
     check("products_currency_check", sql`${table.currency} = 'KES'`),
     check("products_sort_order_check", sql`${table.sortOrder} >= 0`),
+    check("products_source_check", sql`${table.source} in ('PLATFORM', 'SELLER')`),
+    check(
+      "products_source_linkage_check",
+      sql`(${table.source} = 'PLATFORM' and ${table.sellerApplicationId} is null and ${table.sellerProductSubmissionId} is null) or
+        (${table.source} = 'SELLER' and ${table.sellerApplicationId} is not null and ${table.sellerProductSubmissionId} is not null)`,
+    ),
+    foreignKey({
+      name: "products_seller_submission_owner_fk",
+      columns: [table.sellerApplicationId, table.sellerProductSubmissionId],
+      foreignColumns: [sellerProductSubmissions.sellerApplicationId, sellerProductSubmissions.id],
+    }).onDelete("restrict"),
   ],
 );
 

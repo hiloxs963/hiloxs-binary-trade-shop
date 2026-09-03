@@ -19,7 +19,11 @@ import {
   SellerApplicantReviewReasonSchema,
   SellerApplicationIdSchema,
 } from "../sellers/validation.js";
-import { assertPostMembershipSession, assertRecentSession } from "./authorization.js";
+import {
+  assertPostMembershipSession,
+  assertPostPermissionGrantSession,
+  assertRecentSession,
+} from "./authorization.js";
 import type { StaffAuthorization } from "./model.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -126,7 +130,7 @@ export async function reviewSellerProduct(
   });
 }
 
-async function lockAuthorizedActor(
+export async function lockAuthorizedActor(
   transaction: Transaction,
   authorization: StaffAuthorization,
   permission: StaffPermission,
@@ -150,7 +154,7 @@ async function lockAuthorizedActor(
   }
 
   const [grant] = await transaction
-    .select({ id: staffPermissionGrants.id })
+    .select({ id: staffPermissionGrants.id, grantedAt: staffPermissionGrants.grantedAt })
     .from(staffPermissionGrants)
     .where(
       and(
@@ -190,6 +194,7 @@ async function lockAuthorizedActor(
     throw new StaffPermissionRequiredError();
   }
   assertPostMembershipSession(security.sessionCreatedAt, membership.createdAt);
+  assertPostPermissionGrantSession(security.sessionCreatedAt, grant.grantedAt);
   assertRecentSession(security.sessionCreatedAt, new Date());
 }
 

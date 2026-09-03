@@ -35,7 +35,13 @@ export async function priceCart(executor: SelectExecutor, input: CartInput): Pro
       currency: products.currency,
     })
     .from(products)
-    .where(and(inArray(products.catalogKey, productIds), eq(products.isActive, true)));
+    .where(
+      and(
+        inArray(products.catalogKey, productIds),
+        eq(products.isActive, true),
+        eq(products.isPurchasable, true),
+      ),
+    );
   const byCatalogKey = new Map(rows.map((row) => [row.catalogKey, row]));
 
   if (rows.length !== productIds.length) {

@@ -4,6 +4,7 @@ import {
   parseEnv,
   requireDatabaseUrl,
   resolveAuthRuntimeConfig,
+  resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
   resolveProductionEmailConfig,
 } from "../../src/config/env.js";
@@ -19,6 +20,9 @@ describe("environment configuration", () => {
       MPESA_PUBLIC_ENABLED: false,
       MPESA_REQUEST_TIMEOUT_MS: 10_000,
       STAFF_REVIEW_ENABLED: false,
+      MEDIA_UPLOAD_ENABLED: false,
+      CATALOG_ACTIVATION_ENABLED: false,
+      MEDIA_S3_FORCE_PATH_STYLE: false,
     });
   });
 
@@ -170,6 +174,66 @@ describe("environment configuration", () => {
     expect(parseEnv({ STAFF_REVIEW_ENABLED: "true" }).STAFF_REVIEW_ENABLED).toBe(true);
     expect(parseEnv({ STAFF_REVIEW_ENABLED: "TRUE" }).STAFF_REVIEW_ENABLED).toBe(false);
     expect(parseEnv({ STAFF_REVIEW_ENABLED: "1" }).STAFF_REVIEW_ENABLED).toBe(false);
+  });
+
+  it("keeps media writes disabled without storage and requires complete storage when enabled", () => {
+    expect(resolveMediaRuntimeConfig(parseEnv({}))).toEqual({
+      uploadEnabled: false,
+      catalogActivationEnabled: false,
+    });
+    expect(() =>
+      resolveMediaRuntimeConfig(
+        parseEnv({ MEDIA_UPLOAD_ENABLED: "true", MEDIA_S3_ENDPOINT: "http://localhost:9000" }),
+      ),
+    ).toThrow("All required media S3 environment variables must be set together");
+    expect(() => resolveMediaRuntimeConfig(parseEnv({ MEDIA_UPLOAD_ENABLED: "true" }))).toThrow(
+      "Media S3 configuration is required",
+    );
+    expect(() =>
+      resolveMediaRuntimeConfig(parseEnv({ MEDIA_S3_SESSION_TOKEN: "orphaned-test-token" })),
+    ).toThrow("All required media S3 environment variables must be set together");
+    expect(() =>
+      resolveMediaRuntimeConfig(parseEnv({ MEDIA_S3_FORCE_PATH_STYLE: "true" })),
+    ).toThrow("All required media S3 environment variables must be set together");
+  });
+
+  it("parses complete media storage configuration without exposing it through flags", () => {
+    const config = resolveMediaRuntimeConfig(
+      parseEnv({
+        MEDIA_UPLOAD_ENABLED: "true",
+        CATALOG_ACTIVATION_ENABLED: "true",
+        MEDIA_S3_ENDPOINT: "http://127.0.0.1:9000",
+        MEDIA_S3_REGION: "us-east-1",
+        MEDIA_S3_BUCKET: "hiloxs-media-test",
+        MEDIA_S3_ACCESS_KEY_ID: "test-access-key",
+        MEDIA_S3_SECRET_ACCESS_KEY: "test-secret-key",
+        MEDIA_S3_FORCE_PATH_STYLE: "true",
+      }),
+    );
+
+    expect(config).toEqual({
+      uploadEnabled: true,
+      catalogActivationEnabled: true,
+      storage: {
+        endpoint: "http://127.0.0.1:9000",
+        region: "us-east-1",
+        bucket: "hiloxs-media-test",
+        accessKeyId: "test-access-key",
+        secretAccessKey: "test-secret-key",
+        forcePathStyle: true,
+      },
+    });
+    expect(() =>
+      resolveMediaRuntimeConfig(
+        parseEnv({
+          MEDIA_S3_ENDPOINT: "http://user:password@127.0.0.1:9000",
+          MEDIA_S3_REGION: "us-east-1",
+          MEDIA_S3_BUCKET: "hiloxs-media-test",
+          MEDIA_S3_ACCESS_KEY_ID: "test-access-key",
+          MEDIA_S3_SECRET_ACCESS_KEY: "test-secret-key",
+        }),
+      ),
+    ).toThrow("cannot include credentials");
   });
 
   it("requires HTTPS for the production M-Pesa callback", () => {

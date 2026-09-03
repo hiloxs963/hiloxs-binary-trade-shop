@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { restoreInitialCatalog } from "./helpers.js";
 import { buildApp } from "../../src/app.js";
 import { createAuthService } from "../../src/auth/auth.js";
 import { InMemoryAuthEmailSender } from "../../src/auth/email.js";
@@ -48,6 +49,7 @@ beforeEach(async () => {
   await database.pool.query(
     'truncate table "order_items", "orders", "verification", "session", "account", "user" cascade',
   );
+  await restoreInitialCatalog(database);
   await database.db
     .update(products)
     .set({
@@ -86,6 +88,8 @@ describe("server-authoritative commerce", () => {
       description: approvedLaptop.description,
       priceMinor: approvedLaptop.priceMinor.toString(),
       currency: "KES",
+      isPurchasable: true,
+      media: [],
     });
     expect(body.products[0]).not.toHaveProperty("stock");
     expect(body.products[0]).not.toHaveProperty("seller");

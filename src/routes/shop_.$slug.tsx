@@ -1,29 +1,43 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { ChevronRight, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
-import { ProductMedia } from "@/components/hiloxs/ProductMedia";
+import { CatalogProductMedia } from "@/components/hiloxs/CatalogProductMedia";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  PRODUCTS,
-  discountPct,
-  findProductBySlug,
-  kes,
-  productImages,
-  productSlug,
-} from "@/lib/hiloxs";
+  CatalogApiError,
+  catalogMediaUrl,
+  catalogPriceKes,
+  getPublicCatalog,
+  getPublicCatalogProduct,
+  type PublicCatalogProduct,
+} from "@/lib/catalog-api";
+import { PRODUCTS, discountPct, kes, productImages } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { absoluteUrl, pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/shop_/$slug")({
-  loader: ({ params }) => {
-    const product = findProductBySlug(params.slug);
-    if (!product) throw notFound();
-    return product;
+  loader: async ({ params }) => {
+    try {
+      const [product, catalog] = await Promise.all([
+        getPublicCatalogProduct(params.slug),
+        getPublicCatalog(),
+      ]);
+      return {
+        product,
+        related: catalog
+          .filter(
+            (candidate) => candidate.category === product.category && candidate.id !== product.id,
+          )
+          .slice(0, 3),
+      };
+    } catch (error) {
+      if (error instanceof CatalogApiError && error.status === 404) throw notFound();
+      throw error;
+    }
   },
-  head: ({ params }) => {
-    const product = findProductBySlug(params.slug);
-    if (!product) {
+  head: ({ loaderData, params }) => {
+    if (!loaderData) {
       return pageSeo({
         title: "Product Not Found | HILOXS",
         description: "The requested product listing is not available.",
@@ -31,32 +45,42 @@ export const Route = createFileRoute("/shop_/$slug")({
         noindex: true,
       });
     }
-    const path = `/shop/${productSlug(product)}`;
-    const image = productImages(product)[0]?.src;
+    const { product } = loaderData;
+    const path = `/shop/${product.slug}`;
     const productUrl = absoluteUrl(path);
+    const legacy = legacyProduct(product);
+    const mediaPath = product.media[0]?.variants.LARGE?.path;
+    const image =
+      (mediaPath && catalogMediaUrl(mediaPath)) ||
+      (legacy ? productImages(legacy)[0]?.src : undefined);
+    const productData: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: product.name,
+      description: product.description,
+      sku: product.id,
+      category: product.category,
+      url: productUrl,
+      ...(image ? { image: [absoluteUrl(image)] } : {}),
+      ...(product.isPurchasable
+        ? {
+            offers: {
+              "@type": "Offer",
+              url: productUrl,
+              priceCurrency: product.currency,
+              price: catalogPriceKes(product).toFixed(2),
+            },
+          }
+        : {}),
+    };
     return pageSeo({
       title: `${product.name} | HILOXS Shop`,
-      description: `${product.blurb} View the listed price and product details on HILOXS.`,
+      description: `${product.description} View the listed price and product details on HILOXS.`,
       path,
       type: "product",
-      ...(image && !image.startsWith("data:") ? { image } : {}),
+      ...(image ? { image } : {}),
       structuredData: [
-        {
-          "@context": "https://schema.org",
-          "@type": "Product",
-          name: product.name,
-          description: product.blurb,
-          sku: product.id,
-          category: product.category,
-          url: productUrl,
-          ...(image ? { image: [absoluteUrl(image)] } : {}),
-          offers: {
-            "@type": "Offer",
-            url: productUrl,
-            priceCurrency: "KES",
-            price: product.priceKes.toFixed(2),
-          },
-        },
+        productData,
         {
           "@context": "https://schema.org",
           "@type": "BreadcrumbList",
@@ -73,11 +97,10 @@ export const Route = createFileRoute("/shop_/$slug")({
 });
 
 function ProductDetailPage() {
-  const product = Route.useLoaderData();
+  const { product, related } = Route.useLoaderData();
   const { addToCart } = useHiloxs();
-  const related = PRODUCTS.filter(
-    (candidate) => candidate.category === product.category && candidate.id !== product.id,
-  ).slice(0, 3);
+  const legacy = legacyProduct(product);
+  const priceKes = catalogPriceKes(product);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
@@ -99,49 +122,52 @@ function ProductDetailPage() {
       </nav>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
-        <ProductMedia
+        <CatalogProductMedia
           product={product}
+          {...(legacy ? { fallbackProduct: legacy } : {})}
           priority
           className="aspect-square rounded-lg border border-border"
         />
-
         <section aria-labelledby="product-title" className="lg:py-3">
           <Badge variant="secondary">{product.category}</Badge>
           <h1 id="product-title" className="mt-3 text-3xl font-bold sm:text-4xl">
             {product.name}
           </h1>
-          <p className="mt-4 text-base leading-7 text-muted-foreground">{product.blurb}</p>
-
+          <p className="mt-4 text-base leading-7 text-muted-foreground">{product.description}</p>
           <div className="mt-6 border-y border-border py-5">
-            <p className="text-2xl font-bold text-primary">{kes(product.priceKes)}</p>
-            {product.oldPriceKes && (
+            <p className="text-2xl font-bold text-primary">{kes(priceKes)}</p>
+            {legacy?.oldPriceKes && (
               <p className="mt-1 text-sm text-muted-foreground">
-                Previously listed at{" "}
-                <span className="line-through">{kes(product.oldPriceKes)}</span> (
-                {discountPct(product)}% difference)
+                Previously listed at <span className="line-through">{kes(legacy.oldPriceKes)}</span>{" "}
+                ({discountPct(legacy)}% difference)
               </p>
             )}
             <p className="mt-3 text-sm text-muted-foreground">
-              Availability is confirmed before checkout.
+              {product.isPurchasable
+                ? "Availability is confirmed before checkout."
+                : "Currently unavailable"}
             </p>
           </div>
-
-          <Button
-            variant="hero"
-            size="lg"
-            className="mt-6 w-full sm:w-auto"
-            onClick={() => {
-              addToCart(product.id);
-              toast.success(`${product.name} added to cart`);
-            }}
-          >
-            <ShoppingCart aria-hidden /> Add to cart
-          </Button>
-          <Button asChild variant="outline" size="lg" className="mt-3 w-full sm:ml-3 sm:w-auto">
-            <Link to="/shop" hash="cart">
-              View cart
-            </Link>
-          </Button>
+          {product.isPurchasable && (
+            <>
+              <Button
+                variant="hero"
+                size="lg"
+                className="mt-6 w-full sm:w-auto"
+                onClick={() => {
+                  addToCart(product.id);
+                  toast.success(`${product.name} added to cart`);
+                }}
+              >
+                <ShoppingCart aria-hidden /> Add to cart
+              </Button>
+              <Button asChild variant="outline" size="lg" className="mt-3 w-full sm:ml-3 sm:w-auto">
+                <Link to="/shop" hash="cart">
+                  View cart
+                </Link>
+              </Button>
+            </>
+          )}
         </section>
       </div>
 
@@ -155,11 +181,14 @@ function ProductDetailPage() {
               <Link
                 key={item.id}
                 to="/shop/$slug"
-                params={{ slug: productSlug(item) }}
+                params={{ slug: item.slug }}
                 className="panel p-4 transition-colors hover:border-primary"
               >
                 <p className="text-sm font-semibold">{item.name}</p>
-                <p className="mt-2 text-sm font-bold text-primary">{kes(item.priceKes)}</p>
+                <p className="mt-2 text-sm font-bold text-primary">{kes(catalogPriceKes(item))}</p>
+                {!item.isPurchasable && (
+                  <p className="mt-2 text-xs font-medium">Currently unavailable</p>
+                )}
                 <span className="mt-3 inline-block text-xs text-muted-foreground">
                   View product details
                 </span>
@@ -170,4 +199,8 @@ function ProductDetailPage() {
       )}
     </div>
   );
+}
+
+function legacyProduct(product: PublicCatalogProduct) {
+  return PRODUCTS.find((candidate) => candidate.id === product.id);
 }

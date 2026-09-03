@@ -9,6 +9,9 @@ export type ErrorCode =
   | "STAFF_REAUTH_REQUIRED"
   | "STAFF_RECENT_AUTH_REQUIRED"
   | "STAFF_REVIEW_DISABLED"
+  | "MEDIA_UPLOAD_DISABLED"
+  | "CATALOG_ACTIVATION_DISABLED"
+  | "MEDIA_STORAGE_UNAVAILABLE"
   | "ORIGIN_NOT_ALLOWED"
   | "CONFLICT"
   | "IDEMPOTENCY_KEY_REUSED"
@@ -143,6 +146,37 @@ export class StaffReviewDisabledError extends AppError {
       code: "STAFF_REVIEW_DISABLED",
       statusCode: 503,
       expose: true,
+    });
+  }
+}
+
+export class MediaUploadDisabledError extends AppError {
+  constructor() {
+    super("Product media uploads are currently disabled", {
+      code: "MEDIA_UPLOAD_DISABLED",
+      statusCode: 503,
+      expose: true,
+    });
+  }
+}
+
+export class CatalogActivationDisabledError extends AppError {
+  constructor() {
+    super("Catalog activation is currently disabled", {
+      code: "CATALOG_ACTIVATION_DISABLED",
+      statusCode: 503,
+      expose: true,
+    });
+  }
+}
+
+export class MediaStorageUnavailableError extends AppError {
+  constructor(cause?: unknown) {
+    super("Product media is temporarily unavailable", {
+      code: "MEDIA_STORAGE_UNAVAILABLE",
+      statusCode: 503,
+      expose: true,
+      ...(cause === undefined ? {} : { cause }),
     });
   }
 }

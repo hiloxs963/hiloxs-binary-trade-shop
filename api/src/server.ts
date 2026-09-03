@@ -5,18 +5,22 @@ import {
   parseEnv,
   requireDatabaseUrl,
   resolveAuthRuntimeConfig,
+  resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
 } from "./config/env.js";
 import { createDatabaseClient } from "./db/client.js";
 import { createLoggerOptions, writeFatalLog } from "./lib/logger.js";
 import { safeErrorForLog } from "./lib/redact.js";
 import { DarajaClient } from "./payments/daraja-client.js";
+import { S3MediaStorage } from "./media/s3-storage.js";
 
 async function start(): Promise<void> {
   const env = parseEnv(process.env);
   const database = createDatabaseClient(requireDatabaseUrl(env));
   const authRuntime = resolveAuthRuntimeConfig(env);
   const mpesaConfig = resolveMpesaRuntimeConfig(env);
+  const mediaRuntime = resolveMediaRuntimeConfig(env);
+  const mediaStorage = mediaRuntime.storage ? new S3MediaStorage(mediaRuntime.storage) : undefined;
   const auth = createAuthService({
     database,
     emailSender: createRuntimeEmailSender(env),
@@ -29,6 +33,11 @@ async function start(): Promise<void> {
     allowedOrigins: authRuntime.trustedOrigins,
     logger: createLoggerOptions(env.LOG_LEVEL),
     staffReviewEnabled: env.STAFF_REVIEW_ENABLED,
+    media: {
+      ...(mediaStorage ? { storage: mediaStorage } : {}),
+      uploadEnabled: mediaRuntime.uploadEnabled,
+      catalogActivationEnabled: mediaRuntime.catalogActivationEnabled,
+    },
     ...(mpesaConfig
       ? { mpesa: { provider: new DarajaClient(mpesaConfig), config: mpesaConfig } }
       : {}),

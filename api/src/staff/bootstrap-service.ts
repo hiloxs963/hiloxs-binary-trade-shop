@@ -115,3 +115,67 @@ export async function revokeStaffPermission(
       .where(eq(staffPermissionGrants.id, grant.id));
   });
 }
+
+export async function grantStaffPermissionBySystem(
+  database: DatabaseClient,
+  input: { staffUserId: string; permission: StaffPermission; requestId: string },
+): Promise<void> {
+  if (!input.staffUserId.trim() || !input.requestId.trim()) {
+    throw new ValidationError("A staff user ID and request ID are required");
+  }
+  await database.db.transaction(async (transaction) => {
+    const [target] = await transaction
+      .select({
+        userId: staffMemberships.userId,
+        role: staffMemberships.role,
+        membershipStatus: staffMemberships.status,
+        accountStatus: user.status,
+        emailVerified: user.emailVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
+        factorVerified: twoFactor.verified,
+      })
+      .from(staffMemberships)
+      .innerJoin(user, eq(user.id, staffMemberships.userId))
+      .innerJoin(twoFactor, eq(twoFactor.userId, staffMemberships.userId))
+      .where(eq(staffMemberships.userId, input.staffUserId))
+      .for("update")
+      .limit(1);
+    if (!target) throw new NotFoundError();
+    if (
+      target.membershipStatus !== "ACTIVE" ||
+      target.accountStatus !== "ACTIVE" ||
+      !target.emailVerified ||
+      !target.twoFactorEnabled ||
+      !target.factorVerified
+    ) {
+      throw new ConflictError("The account is not eligible for a staff permission grant");
+    }
+    const [existing] = await transaction
+      .select({ id: staffPermissionGrants.id })
+      .from(staffPermissionGrants)
+      .where(
+        and(
+          eq(staffPermissionGrants.staffUserId, input.staffUserId),
+          eq(staffPermissionGrants.permission, input.permission),
+          isNull(staffPermissionGrants.revokedAt),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    if (existing) throw new ConflictError("The staff permission is already active");
+
+    await transaction.insert(staffPermissionGrants).values({
+      staffUserId: input.staffUserId,
+      permission: input.permission,
+      grantSource: "BOOTSTRAP",
+    });
+    await transaction.insert(staffAuditEvents).values({
+      actorType: "SYSTEM_BOOTSTRAP",
+      actorRole: target.role,
+      permission: input.permission,
+      action: "STAFF_PERMISSION_GRANTED",
+      requestId: input.requestId,
+    });
+    await transaction.delete(session).where(eq(session.userId, input.staffUserId));
+  });
+}

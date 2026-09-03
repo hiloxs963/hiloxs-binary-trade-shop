@@ -20,15 +20,19 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts",
     "db:migrate:prod": "node dist/db/migrate.js",
-    "db:check": "drizzle-kit check --config=drizzle.config.ts"
+    "db:check": "drizzle-kit check --config=drizzle.config.ts",
+    "media:worker:prod": "node dist/media/worker.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1125.0",
+    "@aws-sdk/s3-presigned-post": "3.1125.0",
     "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.1",
     "better-auth": "1.7.2",
     "drizzle-orm": "0.45.2",
     "fastify": "5.12.1",
     "pg": "8.23.0",
+    "sharp": "0.35.4",
     "zod": "4.5.4"
   },
   "devDependencies": {
