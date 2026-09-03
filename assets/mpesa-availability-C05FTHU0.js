@@ -1,0 +1,1 @@
+import{t as e}from"./createLucideIcon-Cq4gx-J7.js";var t=e(`smartphone`,[[`rect`,{width:`14`,height:`20`,x:`5`,y:`2`,rx:`2`,ry:`2`,key:`1yt0o3`}],[`path`,{d:`M12 18h.01`,key:`mhygvu`}]]);function n(e,t){let n=e?.mpesa.mode===`sandbox`&&t.startsWith(`HX-SBX-`);return{canInitiate:e?.mpesa.mode===`production`&&e.mpesa.available||n,sandboxTest:n}}export{t as n,n as t};
