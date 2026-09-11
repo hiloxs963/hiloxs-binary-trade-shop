@@ -1,28 +1,68 @@
-# HILOXS PowerTrade
+# HILOXS
 
-Build a web combining sales and marketing, binary trading and shopping strategy close to kilimall with the overall name HILOXS For sales and marketing only use electronic products such as laptops, screens, woofers. I want this project to be a binary system when it comes to marketing. So sales and marketing may be in a binary system. this means most of the individuals who are going to use this platform, they are going to get a little commission for every referral that, they are going to do. So for each referral, they'll be earning four thousand for each referral. Therefore, since it's a binary system, for one particular person......when he gets two people into the system, he'll be getting eight thousand Kenyan shillings as the referral bonus. And after that, a matching pairing bonus that of two thousand, two thousand, two thousand. And, let it be in, in dollars. You can convert, the digits that I have just said into dollars. Therefore, when the system reaches, some particular people,the system is gonna cut, three thousand from the entry package of 25000 as the registration fee the remaining are the profits So this one is going to be, uh, left aside directly. HILOXS project has something .... in network marketing that is.....a little bit close to MLM companies such as Bonan Vivon. So use the same structure, but the products should be electrical products. Yeah, not healthy products,, such as Bonan Vivon, but electrical, products. And no PMAs also. In the binary plan make it possible for all users to register there referrals by there own and the system to detect both direct and pairing activities and release bonuses automatically to there PayPal or mini pay accounts registered under their names in the system so that they can withdraw into their mpesa.wire a Paypal account and a mini pay account in my binary system.Also leave space for registered till number only (not pay bill) that am going to create in -Shop, binary, sell with us domains. On the same HILOXS project, please add a section where I could be doing my trainings, then I upload them from my YouTube channel so that the people who are going to join the system, they are going to learn how I usually work through all the systems. Please categorize into: the binary system of the network marketing. the trading system of the market. shoppings Then training so that, when I upload videos from, YouTube, people are going to learn from there. Yeah, those ones I'm going to upload something that I have done it myself. Yeah. Thank you. Upgrade the demo trading desk with live-style candlestick charts, selectable expiry timers, and real-time market movement visuals. Arrange the app as follows
+HILOXS is a Kenya-focused commerce frontend and API. The repository contains the public product
+catalog, authenticated checkout and order flows, seller application and fulfillment foundations,
+staff review controls, and a clearly labelled browser-only training/trading prototype.
 
-Home - explaining what app contains and works
-
-Shop
-
-Training
-
-Binary plan
-
-Trading
-
-Sell with us
-
-My orders
+Production commerce behavior is server-authoritative. Prices, availability, order totals, payment
+state, inventory reservations, seller permissions, and staff permissions are not trusted from the
+browser. Operational features remain disabled until their explicit server-side flags and external
+dependencies have been reviewed.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+The frontend requires Node.js 24 and npm (or the pinned Bun version used by CI):
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
 npm run dev
 ```
+
+The API has its own deterministic lockfile and commands:
+
+```sh
+cd api
+cp .env.example .env
+npm ci
+npm run db:migrate
+npm run dev
+```
+
+Use disposable local credentials and PostgreSQL for development. Never commit `.env` files.
+
+## Validation
+
+Frontend:
+
+```sh
+npm run lint
+npx tsc --noEmit
+npm run build
+npm run verify:production
+```
+
+Backend:
+
+```sh
+cd api
+npm ci
+npm run lint
+npm run typecheck
+npm run test
+npm run test:integration
+npm run build
+npm run db:check
+```
+
+Integration tests must only use a disposable PostgreSQL database. Their safety guard rejects missing
+or production-looking database URLs.
+
+## Operations
+
+Architecture decisions are in [`docs/adr`](docs/adr). Production and incident runbooks are in
+[`docs/operations`](docs/operations). Policy drafts under [`docs/policies`](docs/policies) are
+templates only and are not approved public legal terms.
+
+Database migrations are forward-only and explicit. API startup does not run migrations. Railway
+Auto Deploy remains disabled, and the static frontend workflow publishes a validated artifact to the
+existing `cpanel-deploy` branch.

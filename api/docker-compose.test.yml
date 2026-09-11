@@ -14,3 +14,16 @@ services:
       retries: 20
     tmpfs:
       - /var/lib/postgresql/data
+
+  minio-test:
+    image: bitnamilegacy/minio@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
+    environment:
+      MINIO_ROOT_USER: hiloxs_test_access
+      MINIO_ROOT_PASSWORD: hiloxs_test_secret_12345
+    ports:
+      - "59000:9000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

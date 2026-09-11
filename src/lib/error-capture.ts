@@ -5,6 +5,7 @@ let lastCapturedError: { error: unknown; at: number } | undefined;
 const TTL_MS = 5_000;
 
 function record(error: unknown) {
+  if (import.meta.env.PROD) return;
   lastCapturedError = { error, at: Date.now() };
 }
 
@@ -54,6 +55,20 @@ function isErrorLike(value: unknown): value is Error {
 // recorded for consumeLastCapturedError and expanded before serialization.
 const originalConsoleError = console.error.bind(console);
 console.error = (...args: unknown[]) => {
+  if (import.meta.env.PROD) {
+    if (
+      args.length === 1 &&
+      args[0] != null &&
+      typeof args[0] === "object" &&
+      "event" in args[0] &&
+      (args[0].event === "application_error" || args[0].event === "server_error")
+    ) {
+      originalConsoleError(args[0]);
+      return;
+    }
+    originalConsoleError({ event: "server_error", message: "An application error occurred" });
+    return;
+  }
   const expanded = args.map((arg) => {
     if (!isErrorLike(arg)) return arg;
     record(arg);
