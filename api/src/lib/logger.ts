@@ -1,4 +1,4 @@
-import { LOG_REDACT_PATHS, redactRequestUrl, safeErrorForLog } from "./redact.js";
+import { LOG_REDACT_PATHS, redactRequestUrl, redactSensitive, safeErrorForLog } from "./redact.js";
 
 export function createLoggerOptions(level: string) {
   return {
@@ -22,4 +22,13 @@ export function writeFatalLog(message: string, error: unknown): void {
   process.stderr.write(
     `${JSON.stringify({ level: "fatal", message, error: safeErrorForLog(error) })}\n`,
   );
+}
+
+export function writeOperationalLog(
+  level: "info" | "warn" | "error",
+  message: string,
+  fields: Record<string, unknown> = {},
+): void {
+  const safeFields = redactSensitive(fields) as Record<string, unknown>;
+  process.stdout.write(`${JSON.stringify({ level, message, ...safeFields })}\n`);
 }

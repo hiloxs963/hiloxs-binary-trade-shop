@@ -12,7 +12,11 @@ export function registerReadyRoute(app: FastifyInstance, database?: ReadinessDat
       return { status: "ready" as const, database: "up" as const };
     } catch (error) {
       request.log.warn({ error: safeErrorForLog(error) }, "Readiness database check failed");
-      return reply.status(503).send({ status: "not_ready" as const, database: "down" as const });
+      return reply.status(503).send({
+        status: "not_ready" as const,
+        database: "down" as const,
+        requestId: request.id,
+      });
     }
   });
 }

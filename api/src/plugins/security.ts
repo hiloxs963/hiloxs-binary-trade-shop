@@ -8,6 +8,7 @@ export async function securityPlugin(
   allowedOrigins: readonly string[],
 ): Promise<void> {
   const allowed = new Set(allowedOrigins);
+  const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
   app.addHook("onRequest", (request, _reply, done) => {
     const origin = request.headers.origin;
@@ -15,7 +16,7 @@ export async function securityPlugin(
       request.method === "POST" &&
       /^\/api\/v1\/payments\/mpesa\/callback\/[^/?]+(?:\?.*)?$/.test(request.url);
     const protectedMutation =
-      request.method === "POST" &&
+      mutationMethods.has(request.method) &&
       !providerCallback &&
       (request.url.startsWith("/api/auth/") || request.url.startsWith("/api/v1/"));
     if ((protectedMutation && !origin) || (origin && !allowed.has(origin))) {
@@ -28,7 +29,7 @@ export async function securityPlugin(
   await app.register(cors, {
     origin: [...allowed],
     credentials: true,
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "X-Requested-With", "Idempotency-Key"],
     maxAge: 86_400,
   });
