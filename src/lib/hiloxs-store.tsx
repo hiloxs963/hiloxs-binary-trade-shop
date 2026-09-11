@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { PLAN, PRODUCTS, type Product, type ShopCategory } from "./hiloxs";
+import {
+  DEMO_TRADING_PAYOUT_RATE,
+  PLAN,
+  PRODUCTS,
+  type Product,
+  type ShopCategory,
+} from "./hiloxs";
 import { HiloxsContext, type HiloxsContextValue } from "./hiloxs-context";
-
-/** A product uploaded by the admin from the Shop page. */
-export type CustomProduct = Product & { image?: string; custom: true; at: number };
 
 export type Leg = "L" | "R";
 
@@ -45,13 +48,6 @@ export type Trade = {
   at: number;
 };
 
-export type AdminTrading = {
-  /** Only the admin can change these. */
-  unlocked: boolean;
-  outcome: "market" | "win" | "loss";
-  payoutRate: number;
-};
-
 export type TrainingLevel = "Beginner" | "Intermediate" | "Advanced";
 
 export type CustomVideo = {
@@ -72,13 +68,12 @@ export type HiloxsState = {
   cart: Record<string, number>;
   trades: Trade[];
   demoBalanceUsd: number;
-  admin: AdminTrading;
   paybillFloatUsd: number;
   videos: CustomVideo[];
-  customProducts: CustomProduct[];
 };
 
-const STORAGE_KEY = "hiloxs.state.v2";
+const CART_STORAGE_KEY = "hiloxs.cart.v1";
+const LEGACY_STORAGE_KEYS = ["hiloxs.state.v2"] as const;
 
 const initialState: HiloxsState = {
   member: { name: "Guest Member", activated: false, joinedAt: Date.now() },
@@ -89,10 +84,8 @@ const initialState: HiloxsState = {
   cart: {},
   trades: [],
   demoBalanceUsd: 1000,
-  admin: { unlocked: false, outcome: "market", payoutRate: 1.85 },
   paybillFloatUsd: 0,
   videos: [],
-  customProducts: [],
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -112,27 +105,34 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    let cart: Record<string, number> = {};
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const stored = JSON.parse(raw) as Partial<HiloxsState> & { orders?: unknown };
-        delete stored.orders;
-        setState({ ...initialState, ...stored });
+      const current = window.localStorage.getItem(CART_STORAGE_KEY);
+      if (current) cart = sanitizeStoredCart(JSON.parse(current));
+      else {
+        const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEYS[0]);
+        if (legacy) {
+          const parsed = JSON.parse(legacy) as { cart?: unknown };
+          cart = sanitizeStoredCart(parsed.cart);
+        }
       }
     } catch {
       /* ignore corrupt state */
+    } finally {
+      for (const key of LEGACY_STORAGE_KEYS) window.localStorage.removeItem(key);
     }
+    setState((current) => ({ ...current, cart }));
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state.cart));
     } catch {
       /* storage full or blocked */
     }
-  }, [state, hydrated]);
+  }, [state.cart, hydrated]);
 
   const walletKes = useMemo(
     () => state.ledger.reduce((sum, e) => sum + e.amountKes, 0),
@@ -295,9 +295,8 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
       const trade = prev.trades.find((t) => t.id === id);
       if (!trade || trade.result) return prev;
       const marketWin = trade.direction === "UP" ? exit > trade.entry : exit < trade.entry;
-      const win =
-        prev.admin.outcome === "win" ? true : prev.admin.outcome === "loss" ? false : marketWin;
-      const payoutUsd = win ? trade.stakeUsd * prev.admin.payoutRate : 0;
+      const win = marketWin;
+      const payoutUsd = win ? trade.stakeUsd * DEMO_TRADING_PAYOUT_RATE : 0;
       return {
         ...prev,
         demoBalanceUsd: prev.demoBalanceUsd + payoutUsd,
@@ -309,10 +308,6 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
         ),
       };
     });
-  }, []);
-
-  const setAdmin = useCallback((patch: Partial<AdminTrading>) => {
-    setState((prev) => ({ ...prev, admin: { ...prev.admin, ...patch } }));
   }, []);
 
   const withdrawTrading: Ctx["withdrawTrading"] = useCallback(
@@ -370,47 +365,7 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, videos: prev.videos.filter((v) => v.id !== id) }));
   }, []);
 
-  const addProduct: Ctx["addProduct"] = useCallback((input) => {
-    if (!input.name.trim()) return "Give the product a name.";
-    if (!input.priceKes || input.priceKes <= 0) return "Enter a price greater than zero.";
-    if (input.oldPriceKes && input.oldPriceKes <= input.priceKes)
-      return "The old price must be higher than the selling price.";
-    setState((prev) => ({
-      ...prev,
-      customProducts: [
-        {
-          id: `cp-${uid()}`,
-          name: input.name.trim(),
-          category: input.category,
-          priceKes: input.priceKes,
-          ...(input.oldPriceKes ? { oldPriceKes: input.oldPriceKes } : {}),
-          rating: 5,
-          sold: Math.max(0, Math.round(input.reviews || 0)),
-          blurb: input.blurb.trim() || "New arrival on HILOXS.",
-          emoji: "🆕",
-          ...(input.badge ? { badge: input.badge } : {}),
-          ...(input.image ? { image: input.image } : {}),
-          custom: true as const,
-          at: Date.now(),
-        },
-        ...prev.customProducts,
-      ],
-    }));
-    return null;
-  }, []);
-
-  const removeProduct = useCallback((id: string) => {
-    setState((prev) => {
-      const cart = { ...prev.cart };
-      delete cart[id];
-      return { ...prev, cart, customProducts: prev.customProducts.filter((p) => p.id !== id) };
-    });
-  }, []);
-
-  const allProducts = useMemo<Product[]>(
-    () => [...state.customProducts, ...PRODUCTS],
-    [state.customProducts],
-  );
+  const allProducts = PRODUCTS;
 
   const value: Ctx = {
     state,
@@ -427,14 +382,25 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     clearCart,
     recordTrade,
     settleTrade,
-    setAdmin,
     withdrawTrading,
     addVideo,
     removeVideo,
-    addProduct,
-    removeProduct,
     allProducts,
   };
 
   return <HiloxsContext.Provider value={value}>{children}</HiloxsContext.Provider>;
+}
+
+function sanitizeStoredCart(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([productId, quantity]) =>
+        /^[a-z0-9-]{1,80}$/i.test(productId) &&
+        typeof quantity === "number" &&
+        Number.isInteger(quantity) &&
+        quantity > 0 &&
+        quantity <= 99,
+    ),
+  );
 }

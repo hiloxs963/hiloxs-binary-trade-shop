@@ -21,7 +21,6 @@ import {
   PRODUCTS,
   SHOP_CATEGORIES,
   SUPPORT,
-  discountPct,
   dual,
   kes,
   type Product,
@@ -90,15 +89,6 @@ function ShopPage() {
       ),
     [viewProducts, category, query],
   );
-  const flashDeals = useMemo(
-    () =>
-      viewProducts
-        .filter(({ legacy }) => legacy?.oldPriceKes)
-        .sort((left, right) => discountPct(right.legacy!) - discountPct(left.legacy!))
-        .slice(0, 4),
-    [viewProducts],
-  );
-
   const cartLines = hydrated
     ? Object.entries(state.cart)
         .map(([id, qty]) => ({ product: allProducts.find((p) => p.id === id)!, qty }))
@@ -132,32 +122,6 @@ function ShopPage() {
           ))}
         </div>
       </section>
-
-      {flashDeals.length > 0 && (
-        <section className="mt-10">
-          <div className="flex items-end justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Flash deals</h2>
-              <p className="text-sm text-muted-foreground">Biggest markdowns right now</p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setCategory("All")}>
-              See all
-            </Button>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {flashDeals.map((item) => (
-              <ProductCard
-                key={item.product.id}
-                item={item}
-                onAdd={() => {
-                  addToCart(item.product.id);
-                  toast.success(`${item.product.name} added to cart`);
-                }}
-              />
-            ))}
-          </div>
-        </section>
-      )}
 
       <h2 className="mt-12 text-2xl font-bold">Trending on HILOXS</h2>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -323,7 +287,6 @@ function ShopPage() {
 
 function ProductCard({ item, onAdd }: { item: CatalogViewProduct; onAdd: () => void }) {
   const { product, legacy, priceKes } = item;
-  const off = legacy ? discountPct(legacy) : 0;
   return (
     <article className="panel flex flex-col overflow-hidden">
       <div className="relative">
@@ -333,11 +296,6 @@ function ProductCard({ item, onAdd }: { item: CatalogViewProduct; onAdd: () => v
           className="aspect-[4/3]"
           imageClassName="object-contain p-3"
         />
-        {off > 0 && (
-          <span className="absolute right-2 top-2 rounded-md bg-background/85 px-2 py-1 text-[11px] font-semibold">
-            -{off}%
-          </span>
-        )}
       </div>
       <div className="flex flex-1 flex-col p-4">
         <Badge variant="secondary" className="w-fit">
@@ -352,14 +310,7 @@ function ProductCard({ item, onAdd }: { item: CatalogViewProduct; onAdd: () => v
         </Link>
         <p className="mt-1 flex-1 text-xs text-muted-foreground">{product.description}</p>
         <div className="mt-2">
-          <p className="text-base font-bold text-primary">
-            {kes(priceKes)}{" "}
-            {legacy?.oldPriceKes && (
-              <span className="text-xs font-normal text-muted-foreground line-through">
-                {kes(legacy.oldPriceKes)}
-              </span>
-            )}
-          </p>
+          <p className="text-base font-bold text-primary">{kes(priceKes)}</p>
           <p className="text-xs text-muted-foreground">{dual(priceKes).split(" (")[0]}</p>
         </div>
         {product.isPurchasable ? (

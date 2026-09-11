@@ -8,29 +8,17 @@ import {
   CatalogApiError,
   catalogMediaUrl,
   catalogPriceKes,
-  getPublicCatalog,
   getPublicCatalogProduct,
   type PublicCatalogProduct,
 } from "@/lib/catalog-api";
-import { PRODUCTS, discountPct, kes, productImages } from "@/lib/hiloxs";
+import { PRODUCTS, kes, productImages } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { absoluteUrl, pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/shop_/$slug")({
   loader: async ({ params }) => {
     try {
-      const [product, catalog] = await Promise.all([
-        getPublicCatalogProduct(params.slug),
-        getPublicCatalog(),
-      ]);
-      return {
-        product,
-        related: catalog
-          .filter(
-            (candidate) => candidate.category === product.category && candidate.id !== product.id,
-          )
-          .slice(0, 3),
-      };
+      return await getPublicCatalogProduct(params.slug);
     } catch (error) {
       if (error instanceof CatalogApiError && error.status === 404) throw notFound();
       throw error;
@@ -136,12 +124,6 @@ function ProductDetailPage() {
           <p className="mt-4 text-base leading-7 text-muted-foreground">{product.description}</p>
           <div className="mt-6 border-y border-border py-5">
             <p className="text-2xl font-bold text-primary">{kes(priceKes)}</p>
-            {legacy?.oldPriceKes && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Previously listed at <span className="line-through">{kes(legacy.oldPriceKes)}</span>{" "}
-                ({discountPct(legacy)}% difference)
-              </p>
-            )}
             <p className="mt-3 text-sm text-muted-foreground">
               {product.isPurchasable
                 ? "Availability is confirmed before checkout."

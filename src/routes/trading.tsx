@@ -9,7 +9,7 @@ import { CandleChart } from "@/components/hiloxs/CandleChart";
 import { makeSeed, stepCandles, type Candle } from "@/components/hiloxs/CandleChart.helpers";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { type Trade } from "@/lib/hiloxs-store";
-import { SUPPORT } from "@/lib/hiloxs";
+import { DEMO_TRADING_PAYOUT_RATE, SUPPORT } from "@/lib/hiloxs";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/trading")({
@@ -207,10 +207,11 @@ function TradingPage() {
 
           <div className="mt-5 grid gap-2">
             <Button variant="up" onClick={() => place("UP")} disabled={!!openTrade}>
-              <TrendingUp /> UP · {Math.round((state.admin.payoutRate - 1) * 100)}% demo return
+              <TrendingUp /> UP · {Math.round((DEMO_TRADING_PAYOUT_RATE - 1) * 100)}% demo return
             </Button>
             <Button variant="down" onClick={() => place("DOWN")} disabled={!!openTrade}>
-              <TrendingDown /> DOWN · {Math.round((state.admin.payoutRate - 1) * 100)}% demo return
+              <TrendingDown /> DOWN · {Math.round((DEMO_TRADING_PAYOUT_RATE - 1) * 100)}% demo
+              return
             </Button>
           </div>
 
