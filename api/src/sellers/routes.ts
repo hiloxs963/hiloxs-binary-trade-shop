@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { requireActiveUser } from "../auth/active-user.js";
 import type { AuthService } from "../auth/auth.js";
-import { FixedWindowRateLimiter } from "../commerce/rate-limit.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import type { DatabaseClient } from "../db/client.js";
 import { sellerApplications } from "../db/schema/sellers.js";
 import { ConflictError, NotFoundError } from "../lib/errors.js";
@@ -19,10 +19,8 @@ type SellerApplication = typeof sellerApplications.$inferSelect;
 
 export function registerSellerRoutes(
   app: FastifyInstance,
-  options: { auth: AuthService; database: DatabaseClient },
+  options: { auth: AuthService; database: DatabaseClient; rateLimiter: RateLimiter },
 ): void {
-  const limiter = new FixedWindowRateLimiter();
-
   app.get("/api/v1/seller/application", async (request) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
     const application = await findApplication(options.database, owner.id);
@@ -31,7 +29,11 @@ export function registerSellerRoutes(
 
   app.post("/api/v1/seller/application", async (request, reply) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`seller-create:${owner.id}`, 5, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-application-create",
+      key: owner.id,
+      ...RATE_LIMITS.sellerMutation,
+    });
     const input = SellerDraftSchema.parse(request.body);
     const [created] = await options.database.db
       .insert(sellerApplications)
@@ -44,7 +46,11 @@ export function registerSellerRoutes(
 
   app.post("/api/v1/seller/application/edit", async (request) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`seller-edit:${owner.id}`, 20, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-application-edit",
+      key: owner.id,
+      ...RATE_LIMITS.sellerMutation,
+    });
     const input = SellerDraftSchema.parse(request.body);
     const application = await options.database.db.transaction(async (transaction) => {
       const existing = await lockApplication(transaction, owner.id);
@@ -64,7 +70,11 @@ export function registerSellerRoutes(
 
   app.post("/api/v1/seller/application/submit", async (request) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`seller-submit:${owner.id}`, 5, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-application-submit",
+      key: owner.id,
+      ...RATE_LIMITS.sellerMutation,
+    });
     SellerSubmissionConsentSchema.parse(request.body);
     const application = await options.database.db.transaction(async (transaction) => {
       const existing = await lockApplication(transaction, owner.id);
@@ -95,7 +105,11 @@ export function registerSellerRoutes(
 
   app.post("/api/v1/seller/application/withdraw", async (request) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`seller-withdraw:${owner.id}`, 5, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-application-withdraw",
+      key: owner.id,
+      ...RATE_LIMITS.sellerMutation,
+    });
     SellerEmptyBodySchema.parse(request.body ?? {});
     const application = await options.database.db.transaction(async (transaction) => {
       const existing = await lockApplication(transaction, owner.id);

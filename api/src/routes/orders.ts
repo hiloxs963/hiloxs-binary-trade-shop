@@ -2,13 +2,18 @@ import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { requireActiveUser } from "../auth/active-user.js";
 import type { AuthService } from "../auth/auth.js";
-import { FixedWindowRateLimiter } from "../commerce/rate-limit.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import { EmptyBodySchema, IdempotencyKeySchema, OrderIdSchema } from "../commerce/validation.js";
 import type { DatabaseClient } from "../db/client.js";
 import { orders } from "../db/schema/commerce.js";
 import { NotFoundError } from "../lib/errors.js";
 import { confirmDelivery } from "../orders/fulfillment-service.js";
-import { cancelPendingOrder, createPendingOrder, loadOrder } from "../orders/service.js";
+import {
+  cancelPendingOrder,
+  createPendingOrder,
+  loadOrder,
+  loadOrders,
+} from "../orders/service.js";
 import { FulfillmentIdSchema, OrderCreateSchema } from "../orders/validation.js";
 
 export function registerOrderRoutes(
@@ -17,13 +22,16 @@ export function registerOrderRoutes(
     auth: AuthService;
     database: DatabaseClient;
     sellerCommerceEnabled: boolean;
+    rateLimiter: RateLimiter;
   },
 ): void {
-  const limiter = new FixedWindowRateLimiter();
-
   app.post("/api/v1/orders", async (request, reply) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`create:${owner.id}`, 10, 60_000);
+    await options.rateLimiter.consume({
+      scope: "order-create",
+      key: owner.id,
+      ...RATE_LIMITS.orderCreate,
+    });
     const input = OrderCreateSchema.parse(request.body);
     const idempotencyKey = IdempotencyKeySchema.parse(request.headers["idempotency-key"]);
     const result = await createPendingOrder(options.database, {
@@ -45,7 +53,7 @@ export function registerOrderRoutes(
       .orderBy(desc(orders.createdAt))
       .limit(50);
     return {
-      orders: await Promise.all(rows.map((order) => loadOrder(options.database.db, order))),
+      orders: await loadOrders(options.database.db, rows),
     };
   });
 
@@ -63,7 +71,11 @@ export function registerOrderRoutes(
 
   app.post("/api/v1/orders/:orderId/cancel", async (request) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`cancel:${owner.id}`, 20, 60_000);
+    await options.rateLimiter.consume({
+      scope: "order-cancel",
+      key: owner.id,
+      ...RATE_LIMITS.orderCancel,
+    });
     const orderId = OrderIdSchema.parse((request.params as { orderId?: unknown }).orderId);
     EmptyBodySchema.parse(request.body ?? {});
     const order = await cancelPendingOrder(options.database, owner.id, orderId, request.id);
@@ -75,6 +87,11 @@ export function registerOrderRoutes(
     "/api/v1/orders/:orderId/fulfillments/:fulfillmentId/confirm-delivery",
     async (request) => {
       const owner = await requireActiveUser(options.auth, options.database, request.headers);
+      await options.rateLimiter.consume({
+        scope: "order-confirm-delivery",
+        key: owner.id,
+        ...RATE_LIMITS.sellerMutation,
+      });
       EmptyBodySchema.parse(request.body ?? {});
       const params = request.params as { orderId?: unknown; fulfillmentId?: unknown };
       const fulfillment = await confirmDelivery(

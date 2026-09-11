@@ -1,6 +1,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../auth/auth.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import type { DatabaseClient } from "../db/client.js";
 import {
   products,
@@ -33,6 +34,7 @@ export function registerSellerInventoryRoutes(
     auth: AuthService;
     database: DatabaseClient;
     sellerCommerceEnabled: boolean;
+    rateLimiter: RateLimiter;
   },
 ): void {
   app.get("/api/v1/seller/fulfillment-config", async (request) => {
@@ -51,6 +53,11 @@ export function registerSellerInventoryRoutes(
 
   app.put("/api/v1/seller/fulfillment-config", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
+    await options.rateLimiter.consume({
+      scope: "seller-fulfillment-config",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     FulfillmentConfigInputSchema.parse(request.body);
     const now = new Date();
     const [config] = await options.database.db
@@ -120,6 +127,11 @@ export function registerSellerInventoryRoutes(
 
   app.post("/api/v1/seller/catalog-products/:productId/inventory", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
+    await options.rateLimiter.consume({
+      scope: "seller-live-inventory",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     const productId = productIdFrom(request.params);
     const input = LiveInventoryInputSchema.parse(request.body);
     const inventory = await options.database.db.transaction(async (transaction) => {

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../auth/auth.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import { EmptyBodySchema } from "../commerce/validation.js";
 import type { DatabaseClient } from "../db/client.js";
 import { requireStaffPermission } from "../staff/authorization.js";
@@ -8,7 +9,12 @@ import { SellerCatalogProductIdSchema } from "./validation.js";
 
 export function registerStaffCommerceRoutes(
   app: FastifyInstance,
-  options: { auth: AuthService; database: DatabaseClient; sellerCommerceEnabled: boolean },
+  options: {
+    auth: AuthService;
+    database: DatabaseClient;
+    sellerCommerceEnabled: boolean;
+    rateLimiter: RateLimiter;
+  },
 ): void {
   app.get("/api/v1/staff/catalog-products/:productId/commerce-readiness", async (request) => {
     await requireStaffPermission(
@@ -35,6 +41,11 @@ export function registerStaffCommerceRoutes(
         "SELLER_COMMERCE_ACTIVATE",
         { recent: true },
       );
+      await options.rateLimiter.consume({
+        scope: `staff-commerce-${action}`,
+        key: authorization.actor.userId,
+        ...RATE_LIMITS.staffMutation,
+      });
       EmptyBodySchema.parse(request.body ?? {});
       const product = await setSellerCommerce(
         options.database,

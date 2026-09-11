@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../auth/auth.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import type { DatabaseClient } from "../db/client.js";
 import { sellerProductSubmissions } from "../db/schema/seller-products.js";
 import { sellerApplications } from "../db/schema/sellers.js";
@@ -22,6 +23,7 @@ type StaffRouteOptions = {
   database: DatabaseClient;
   reviewEnabled: boolean;
   catalogActivationEnabled: boolean;
+  rateLimiter: RateLimiter;
 };
 
 export function registerStaffRoutes(app: FastifyInstance, options: StaffRouteOptions): void {
@@ -79,6 +81,11 @@ export function registerStaffRoutes(app: FastifyInstance, options: StaffRouteOpt
         "SELLER_REVIEW",
         { recent: true },
       );
+      await options.rateLimiter.consume({
+        scope: `staff-seller-application-${action}`,
+        key: authorization.actor.userId,
+        ...RATE_LIMITS.staffMutation,
+      });
       if (!options.reviewEnabled) throw new StaffReviewDisabledError();
       const body =
         action === "reject"
@@ -127,6 +134,11 @@ export function registerStaffRoutes(app: FastifyInstance, options: StaffRouteOpt
         "PRODUCT_REVIEW",
         { recent: true },
       );
+      await options.rateLimiter.consume({
+        scope: `staff-seller-product-${action}`,
+        key: authorization.actor.userId,
+        ...RATE_LIMITS.staffMutation,
+      });
       if (!options.reviewEnabled) throw new StaffReviewDisabledError();
       const body =
         action === "reject"

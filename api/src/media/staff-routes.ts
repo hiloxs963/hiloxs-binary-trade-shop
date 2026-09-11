@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../auth/auth.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import {
   activateSellerProduct,
   deactivateSellerProduct,
@@ -34,6 +35,7 @@ export function registerStaffMediaRoutes(
     storage?: MediaStorage;
     staffReviewEnabled: boolean;
     catalogActivationEnabled: boolean;
+    rateLimiter: RateLimiter;
   },
 ): void {
   app.get("/api/v1/staff/seller-products/:submissionId/media", async (request) => {
@@ -112,6 +114,11 @@ export function registerStaffMediaRoutes(
         "PRODUCT_REVIEW",
         { recent: true },
       );
+      await options.rateLimiter.consume({
+        scope: `staff-media-${action}`,
+        key: authorization.actor.userId,
+        ...RATE_LIMITS.staffMutation,
+      });
       if (!options.staffReviewEnabled) throw new StaffReviewDisabledError();
       const mediaId = MediaIdSchema.parse((request.params as { mediaId?: unknown }).mediaId);
       const reason =
@@ -153,6 +160,11 @@ export function registerStaffMediaRoutes(
       "CATALOG_ACTIVATE",
       { recent: true },
     );
+    await options.rateLimiter.consume({
+      scope: "staff-catalog-activate",
+      key: authorization.actor.userId,
+      ...RATE_LIMITS.staffMutation,
+    });
     EmptyMediaBodySchema.parse(request.body ?? {});
     if (!options.catalogActivationEnabled) throw new CatalogActivationDisabledError();
     if (!options.storage) throw new CatalogActivationDisabledError();
@@ -173,6 +185,11 @@ export function registerStaffMediaRoutes(
       "CATALOG_ACTIVATE",
       { recent: true },
     );
+    await options.rateLimiter.consume({
+      scope: "staff-catalog-deactivate",
+      key: authorization.actor.userId,
+      ...RATE_LIMITS.staffMutation,
+    });
     EmptyMediaBodySchema.parse(request.body ?? {});
     if (!options.catalogActivationEnabled) throw new CatalogActivationDisabledError();
     return deactivateSellerProduct(
