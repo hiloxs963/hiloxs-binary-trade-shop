@@ -1,4 +1,15 @@
 User-agent: *
 Allow: /
+Disallow: /account/
+Disallow: /checkout
+Disallow: /forgot-password
+Disallow: /login
+Disallow: /my-orders
+Disallow: /register
+Disallow: /reset-password
+Disallow: /sell-with-us
+Disallow: /staff
+Disallow: /verify-email
+Disallow: /api/
 
 Sitemap: https://hiloxs.co.ke/sitemap.xml

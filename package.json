@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && node scripts/finalize-static-build.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
+    "verify:production": "node scripts/verify-static-build.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {

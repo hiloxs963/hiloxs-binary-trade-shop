@@ -3,14 +3,30 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
+import { PUBLIC_PRERENDER_PATHS } from "./src/lib/public-routes.ts";
 
 export default defineConfig({
   plugins: [
     tailwindcss(),
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     tanstackStart({
+      pages: PUBLIC_PRERENDER_PATHS.map((path) => ({
+        path,
+        prerender: { crawlLinks: false },
+      })),
+      prerender: {
+        enabled: true,
+        autoStaticPathsDiscovery: false,
+        crawlLinks: false,
+        failOnError: true,
+      },
+      sitemap: {
+        enabled: true,
+        host: "https://hiloxs.co.ke",
+      },
       spa: {
         enabled: true,
+        maskPath: "/login",
       },
       importProtection: {
         behavior: "error",
