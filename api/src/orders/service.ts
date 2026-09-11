@@ -18,6 +18,7 @@ import { paymentAttempts } from "../db/schema/payments.js";
 import {
   ConflictError,
   IdempotencyKeyReusedError,
+  InternalError,
   PaymentInProgressError,
   ValidationError,
 } from "../lib/errors.js";
@@ -396,58 +397,96 @@ export async function expirePendingReservations(
   database: DatabaseClient,
   now = new Date(),
   limit = RESERVATION_WORKER_BATCH_SIZE,
+  onFailure?: (error: unknown) => void,
 ): Promise<number> {
-  return database.db.transaction(async (transaction) => {
-    const expiredOrders = await transaction
-      .select()
-      .from(orders)
-      .where(and(eq(orders.status, "PENDING_PAYMENT"), lte(orders.reservationExpiresAt, now)))
-      .orderBy(asc(orders.reservationExpiresAt), asc(orders.id))
-      .limit(limit)
-      .for("update", { skipLocked: true });
-    for (const order of expiredOrders) {
-      const requestId = `reservation-expiry:${order.id}:${order.reservationExpiresAt?.getTime() ?? 0}`;
-      await releaseReservations(
-        transaction,
-        order.id,
-        "EXPIRED",
-        "RESERVATION_EXPIRED",
-        requestId,
-        now,
-      );
-      await cancelAwaitingFulfillments(
-        transaction,
-        order.id,
-        "RESERVATION_EXPIRED",
-        requestId,
-        now,
-      );
-      await transaction
-        .update(orders)
-        .set({
-          status: "CANCELLED",
-          cancelledAt: now,
-          cancellationReason: "RESERVATION_EXPIRED",
-          updatedAt: now,
-        })
-        .where(and(eq(orders.id, order.id), eq(orders.status, "PENDING_PAYMENT")));
+  const candidates = await database.db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.status, "PENDING_PAYMENT"), lte(orders.reservationExpiresAt, now)))
+    .orderBy(asc(orders.reservationExpiresAt), asc(orders.id))
+    .limit(limit);
+  let processed = 0;
+  for (const candidate of candidates) {
+    try {
+      const changed = await database.db.transaction(async (transaction) => {
+        const [order] = await transaction
+          .select()
+          .from(orders)
+          .where(
+            and(
+              eq(orders.id, candidate.id),
+              eq(orders.status, "PENDING_PAYMENT"),
+              lte(orders.reservationExpiresAt, now),
+            ),
+          )
+          .for("update", { skipLocked: true })
+          .limit(1);
+        if (!order) return false;
+        const requestId = `reservation-expiry:${order.id}:${order.reservationExpiresAt?.getTime() ?? 0}`;
+        await releaseReservations(
+          transaction,
+          order.id,
+          "EXPIRED",
+          "RESERVATION_EXPIRED",
+          requestId,
+          now,
+        );
+        await cancelAwaitingFulfillments(
+          transaction,
+          order.id,
+          "RESERVATION_EXPIRED",
+          requestId,
+          now,
+        );
+        await transaction
+          .update(orders)
+          .set({
+            status: "CANCELLED",
+            cancelledAt: now,
+            cancellationReason: "RESERVATION_EXPIRED",
+            updatedAt: now,
+          })
+          .where(and(eq(orders.id, order.id), eq(orders.status, "PENDING_PAYMENT")));
+        return true;
+      });
+      if (changed) processed += 1;
+    } catch (error) {
+      if (!onFailure) throw error;
+      onFailure(error);
     }
-    return expiredOrders.length;
-  });
+  }
+  return processed;
 }
 
 export async function loadOrder(executor: Pick<Database, "select">, order: OrderRow) {
-  const items = await executor.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-  const fulfillments = await executor
-    .select()
-    .from(sellerOrderFulfillments)
-    .where(eq(sellerOrderFulfillments.orderId, order.id))
-    .orderBy(asc(sellerOrderFulfillments.createdAt), asc(sellerOrderFulfillments.id));
-  const addresses = await executor
-    .select()
-    .from(orderDeliveryAddresses)
-    .where(eq(orderDeliveryAddresses.orderId, order.id));
-  return serializeOrder(order, items, fulfillments, addresses[0]);
+  const [loaded] = await loadOrders(executor, [order]);
+  if (!loaded) throw new InternalError();
+  return loaded;
+}
+
+export async function loadOrders(executor: Pick<Database, "select">, orderRows: OrderRow[]) {
+  if (orderRows.length === 0) return [];
+  const orderIds = orderRows.map((order) => order.id);
+  const [items, fulfillments, addresses] = await Promise.all([
+    executor.select().from(orderItems).where(inArray(orderItems.orderId, orderIds)),
+    executor
+      .select()
+      .from(sellerOrderFulfillments)
+      .where(inArray(sellerOrderFulfillments.orderId, orderIds))
+      .orderBy(asc(sellerOrderFulfillments.createdAt), asc(sellerOrderFulfillments.id)),
+    executor
+      .select()
+      .from(orderDeliveryAddresses)
+      .where(inArray(orderDeliveryAddresses.orderId, orderIds)),
+  ]);
+  return orderRows.map((order) =>
+    serializeOrder(
+      order,
+      items.filter((item) => item.orderId === order.id),
+      fulfillments.filter((fulfillment) => fulfillment.orderId === order.id),
+      addresses.find((address) => address.orderId === order.id),
+    ),
+  );
 }
 
 export function serializeOrder(
