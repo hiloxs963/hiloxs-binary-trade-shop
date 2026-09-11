@@ -4,6 +4,7 @@ import { createRuntimeEmailSender } from "./auth/email.js";
 import {
   parseEnv,
   requireDatabaseUrl,
+  requireRateLimitHmacKey,
   resolveAuthRuntimeConfig,
   resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
@@ -13,10 +14,16 @@ import { createLoggerOptions, writeFatalLog } from "./lib/logger.js";
 import { safeErrorForLog } from "./lib/redact.js";
 import { DarajaClient } from "./payments/daraja-client.js";
 import { S3MediaStorage } from "./media/s3-storage.js";
+import { installGracefulShutdown } from "./lib/graceful-shutdown.js";
 
 async function start(): Promise<void> {
   const env = parseEnv(process.env);
-  const database = createDatabaseClient(requireDatabaseUrl(env));
+  const database = createDatabaseClient(requireDatabaseUrl(env), {
+    applicationName: "hiloxs-api",
+    statementTimeoutMs: env.PG_STATEMENT_TIMEOUT_MS,
+    lockTimeoutMs: env.PG_LOCK_TIMEOUT_MS,
+    idleInTransactionTimeoutMs: env.PG_IDLE_IN_TRANSACTION_TIMEOUT_MS,
+  });
   const authRuntime = resolveAuthRuntimeConfig(env);
   const mpesaConfig = resolveMpesaRuntimeConfig(env);
   const mediaRuntime = resolveMediaRuntimeConfig(env);
@@ -32,6 +39,7 @@ async function start(): Promise<void> {
     authRuntime,
     allowedOrigins: authRuntime.trustedOrigins,
     logger: createLoggerOptions(env.LOG_LEVEL),
+    rateLimitHmacKey: requireRateLimitHmacKey(env),
     staffReviewEnabled: env.STAFF_REVIEW_ENABLED,
     sellerCommerceEnabled: env.SELLER_COMMERCE_ENABLED,
     sellerOrderActionsEnabled: env.SELLER_ORDER_ACTIONS_ENABLED,
@@ -44,23 +52,13 @@ async function start(): Promise<void> {
       ? { mpesa: { provider: new DarajaClient(mpesaConfig), config: mpesaConfig } }
       : {}),
   });
-  let shuttingDown = false;
-
-  const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    app.log.info({ signal }, "Shutdown signal received");
-    try {
-      await app.close();
-      app.log.info({ signal }, "Graceful shutdown complete");
-    } catch (error) {
-      app.log.error({ signal, error: safeErrorForLog(error) }, "Graceful shutdown failed");
-      process.exitCode = 1;
-    }
-  };
-
-  process.once("SIGTERM", () => void shutdown("SIGTERM"));
-  process.once("SIGINT", () => void shutdown("SIGINT"));
+  installGracefulShutdown({
+    shutdown: async () => app.close(),
+    onStart: (signal) => app.log.info({ signal }, "Shutdown signal received"),
+    onComplete: (signal) => app.log.info({ signal }, "Graceful shutdown complete"),
+    onFailure: (signal, error) =>
+      app.log.error({ signal, error: safeErrorForLog(error) }, "Graceful shutdown failed"),
+  });
 
   try {
     await app.listen({ host: env.HOST, port: env.PORT });
