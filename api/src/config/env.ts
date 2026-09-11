@@ -20,6 +20,15 @@ const EnvironmentSchema = z.object({
     .trim()
     .refine((value) => /^postgres(?:ql)?:\/\//i.test(value), "must be a PostgreSQL URL")
     .optional(),
+  RATE_LIMIT_HMAC_KEY: z.string().min(32).optional(),
+  PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
+  PG_LOCK_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
+  PG_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(10_000)
+    .max(300_000)
+    .default(60_000),
   BETTER_AUTH_URL: z.url().optional(),
   BETTER_AUTH_SECRET: z.string().min(32).optional(),
   RESEND_API_KEY: z
@@ -131,6 +140,14 @@ export function requireDatabaseUrl(env: AppEnv): string {
   return env.DATABASE_URL;
 }
 
+export function requireRateLimitHmacKey(env: AppEnv): string {
+  if (env.RATE_LIMIT_HMAC_KEY) return env.RATE_LIMIT_HMAC_KEY;
+  if (env.NODE_ENV === "production") {
+    throw new ConfigurationError("RATE_LIMIT_HMAC_KEY is required in production");
+  }
+  return "development-only-rate-limit-hmac-key-change-me";
+}
+
 export function resolveAuthRuntimeConfig(env: AppEnv): AuthRuntimeConfig {
   const production = env.NODE_ENV === "production";
   const baseURL = env.BETTER_AUTH_URL ?? (production ? undefined : `http://127.0.0.1:${env.PORT}`);
@@ -193,7 +210,7 @@ export function resolveMpesaRuntimeConfig(env: AppEnv): MpesaRuntimeConfig | und
     env.MPESA_MAX_AMOUNT_KES,
   ];
   const configured = values.some((value) => value !== undefined);
-  if (!configured && env.NODE_ENV !== "production") return undefined;
+  if (!configured && !env.MPESA_PUBLIC_ENABLED) return undefined;
   if (values.some((value) => value === undefined)) {
     throw new ConfigurationError("All M-Pesa environment variables are required together");
   }
