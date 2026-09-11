@@ -108,16 +108,7 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
       storeIdentifier: "hashed",
     },
     rateLimit: {
-      enabled: true,
-      storage: "memory",
-      window: 60,
-      max: 100,
-      customRules: {
-        "/sign-up/email": { window: 15 * 60, max: 5 },
-        "/sign-in/email": { window: 60, max: 5 },
-        "/request-password-reset": { window: 15 * 60, max: 3 },
-        "/send-verification-email": { window: 15 * 60, max: 3 },
-      },
+      enabled: false,
     },
     databaseHooks: {
       session: {

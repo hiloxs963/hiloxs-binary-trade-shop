@@ -2,6 +2,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ValidationError } from "../lib/errors.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import type { AuthService } from "./auth.js";
 import {
   LoginSchema,
@@ -17,11 +18,12 @@ type RegisterAuthRoutesOptions = {
   baseURL: string;
   frontendURL: string;
   trustedOrigins: readonly string[];
+  rateLimiter: RateLimiter;
 };
 
 export function registerAuthRoutes(
   app: FastifyInstance,
-  { auth, baseURL, frontendURL, trustedOrigins }: RegisterAuthRoutesOptions,
+  { auth, baseURL, frontendURL, trustedOrigins, rateLimiter }: RegisterAuthRoutesOptions,
 ): void {
   app.route({
     method: ["GET", "POST"],
@@ -34,15 +36,25 @@ export function registerAuthRoutes(
         frontendURL,
         trustedOrigins,
       );
+      await applyAuthRateLimit(
+        rateLimiter,
+        auth,
+        requestUrl.pathname,
+        body,
+        request.ip,
+        request.headers,
+      );
       if (requestUrl.pathname.endsWith("/verify-email")) {
         return reply
           .header("allow", "POST")
           .status(405)
           .send({ code: "METHOD_NOT_ALLOWED", message: "Use explicit email verification" });
       }
+      const forwardedHeaders = fromNodeHeaders(request.headers);
+      forwardedHeaders.set("x-real-ip", request.ip);
       const authRequest = new Request(requestUrl, {
         method: request.method,
-        headers: fromNodeHeaders(request.headers),
+        headers: forwardedHeaders,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       const response = await auth.handler(authRequest);
@@ -62,6 +74,50 @@ export function registerAuthRoutes(
       return reply.send(payload);
     },
   });
+}
+
+async function applyAuthRateLimit(
+  limiter: RateLimiter,
+  auth: AuthService,
+  path: string,
+  body: unknown,
+  requestIp: string,
+  requestHeaders: Parameters<typeof fromNodeHeaders>[0],
+): Promise<void> {
+  const email = emailFrom(body);
+  const preAuthKey = email ? `${requestIp}|${email}` : requestIp;
+  const policy = path.endsWith("/sign-up/email")
+    ? { scope: "auth-sign-up", ...RATE_LIMITS.signUp }
+    : path.endsWith("/sign-in/email")
+      ? { scope: "auth-sign-in", ...RATE_LIMITS.signIn }
+      : path.endsWith("/request-password-reset")
+        ? { scope: "auth-password-reset-request", ...RATE_LIMITS.passwordResetRequest }
+        : path.endsWith("/send-verification-email")
+          ? { scope: "auth-verification-resend", ...RATE_LIMITS.verificationResend }
+          : undefined;
+  if (policy) {
+    await limiter.consume({ ...policy, key: preAuthKey });
+    return;
+  }
+  const passwordReset = path.endsWith("/reset-password");
+  const sensitiveTwoFactor =
+    path.includes("/two-factor/") &&
+    /\/(enable|disable|verify-totp|verify-backup-code|generate-backup-codes)$/.test(path);
+  if (!passwordReset && !sensitiveTwoFactor) {
+    return;
+  }
+  const session = await auth.api.getSession({ headers: fromNodeHeaders(requestHeaders) });
+  await limiter.consume({
+    scope: passwordReset ? "auth-password-reset-consume" : "auth-two-factor",
+    key: session?.user.id ?? preAuthKey,
+    ...RATE_LIMITS.security,
+  });
+}
+
+function emailFrom(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || !("email" in value)) return undefined;
+  const email = value.email;
+  return typeof email === "string" ? email.trim().toLowerCase() : undefined;
 }
 
 function normalizeAuthBody(
