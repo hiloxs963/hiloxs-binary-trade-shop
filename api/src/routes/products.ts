@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { ProductListQuerySchema, ProductSlugSchema } from "../commerce/validation.js";
 import type { DatabaseClient } from "../db/client.js";
@@ -47,12 +47,31 @@ export function registerProductRoutes(
       .where(and(eq(products.slug, slug), eq(products.isActive, true)))
       .limit(1);
     if (!product) throw new NotFoundError();
-    const media = await publicMediaForProducts(database, [product.databaseId]);
+    const related = await database.db
+      .select(publicProductSelection)
+      .from(products)
+      .leftJoin(productInventory, eq(productInventory.productId, products.id))
+      .where(
+        and(
+          eq(products.isActive, true),
+          eq(products.category, product.category),
+          ne(products.id, product.databaseId),
+        ),
+      )
+      .orderBy(asc(products.sortOrder))
+      .limit(3);
+    const media = await publicMediaForProducts(database, [
+      product.databaseId,
+      ...related.map((item) => item.databaseId),
+    ]);
     return {
       product: serializeProduct(
         product,
         media.get(product.databaseId) ?? [],
         sellerCommerceEnabled,
+      ),
+      related: related.map((item) =>
+        serializeProduct(item, media.get(item.databaseId) ?? [], sellerCommerceEnabled),
       ),
     };
   });
