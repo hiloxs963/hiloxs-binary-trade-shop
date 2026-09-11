@@ -3,6 +3,7 @@ import {
   assertSafeTestDatabaseUrl,
   parseEnv,
   requireDatabaseUrl,
+  requireRateLimitHmacKey,
   resolveAuthRuntimeConfig,
   resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
@@ -16,6 +17,9 @@ describe("environment configuration", () => {
       NODE_ENV: "development",
       HOST: "127.0.0.1",
       PORT: 3000,
+      PG_STATEMENT_TIMEOUT_MS: 30_000,
+      PG_LOCK_TIMEOUT_MS: 10_000,
+      PG_IDLE_IN_TRANSACTION_TIMEOUT_MS: 60_000,
       LOG_LEVEL: "info",
       MPESA_PUBLIC_ENABLED: false,
       MPESA_REQUEST_TIMEOUT_MS: 10_000,
@@ -26,6 +30,19 @@ describe("environment configuration", () => {
       SELLER_COMMERCE_ENABLED: false,
       SELLER_ORDER_ACTIONS_ENABLED: false,
     });
+  });
+
+  it("requires a strong rate-limit HMAC key in production", () => {
+    expect(requireRateLimitHmacKey(parseEnv({}))).toContain("development-only");
+    expect(() => requireRateLimitHmacKey(parseEnv({ NODE_ENV: "production" }))).toThrow(
+      "RATE_LIMIT_HMAC_KEY is required",
+    );
+    expect(() => parseEnv({ RATE_LIMIT_HMAC_KEY: "too-short" })).toThrow(ConfigurationError);
+    expect(
+      requireRateLimitHmacKey(
+        parseEnv({ NODE_ENV: "production", RATE_LIMIT_HMAC_KEY: "r".repeat(32) }),
+      ),
+    ).toBe("r".repeat(32));
   });
 
   it("parses explicit values", () => {
@@ -131,9 +148,10 @@ describe("environment configuration", () => {
 
   it("requires complete M-Pesa configuration and selects the configured environment", () => {
     expect(resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "test" }))).toBeUndefined();
-    expect(() => resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production" }))).toThrow(
-      "All M-Pesa environment variables are required together",
-    );
+    expect(resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production" }))).toBeUndefined();
+    expect(() =>
+      resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production", MPESA_PUBLIC_ENABLED: "true" })),
+    ).toThrow("All M-Pesa environment variables are required together");
     expect(() => resolveMpesaRuntimeConfig(parseEnv({ MPESA_ENV: "sandbox" }))).toThrow(
       ConfigurationError,
     );

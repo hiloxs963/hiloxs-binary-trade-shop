@@ -67,7 +67,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await database.pool.query(
-    'truncate table "order_items", "orders", "verification", "session", "account", "user" cascade',
+    'truncate table "security_rate_limit_windows", "order_items", "orders", "verification", "session", "account", "user" cascade',
   );
   await restoreInitialCatalog(database);
   await database.db
@@ -115,7 +115,16 @@ describe("server-authoritative commerce", () => {
     expect(body.products[0]).not.toHaveProperty("seller");
     expect(body.products[0]).not.toHaveProperty("reviews");
     expect(detail.statusCode).toBe(200);
-    expect(detail.json()).toEqual({ product: body.products[0] });
+    const detailBody = detail.json<{
+      product: Record<string, unknown>;
+      related: Array<Record<string, unknown>>;
+    }>();
+    expect(detailBody.product).toEqual(body.products[0]);
+    expect(detailBody.related.map((product) => product["id"])).toEqual([
+      INITIAL_CATALOG[1]?.catalogKey,
+      INITIAL_CATALOG[2]?.catalogKey,
+      INITIAL_CATALOG[3]?.catalogKey,
+    ]);
   });
 
   it("filters categories and never returns inactive products", async () => {

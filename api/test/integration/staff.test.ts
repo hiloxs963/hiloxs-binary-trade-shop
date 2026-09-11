@@ -19,6 +19,7 @@ import {
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
 import { session, user } from "../../src/db/schema/auth.js";
 import {
+  orders,
   products,
   SELLER_FULFILLMENT_TERMS_VERSION,
   sellerFulfillmentConfigs,
@@ -85,7 +86,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await database.pool.query(
-    'truncate table "staff_audit_events", "staff_permission_grants", "staff_memberships", "seller_product_submissions", "seller_applications", "payment_events", "payment_attempts", "order_items", "orders", "verification", "two_factor", "session", "account", "user" cascade',
+    'truncate table "security_rate_limit_windows", "staff_audit_events", "staff_permission_grants", "staff_memberships", "seller_product_submissions", "seller_applications", "payment_events", "payment_attempts", "order_items", "orders", "verification", "two_factor", "session", "account", "user" cascade',
   );
   await restoreInitialCatalog(database);
   emailSender.messages.length = 0;
@@ -889,6 +890,64 @@ describe("Phase 9 staff commerce capabilities", () => {
       "SELLER_COMMERCE_ENABLED",
       "SELLER_COMMERCE_DISABLED",
     ]);
+  });
+});
+
+describe("order support pagination", () => {
+  it("uses a validated, deterministic keyset cursor", async () => {
+    const staff = await createStaff("order-support@example.com", ["ORDER_SUPPORT"]);
+    const customer = await createVerifiedIdentity("support-customer@example.com");
+    const timestamps = [
+      new Date("2026-09-04T09:00:00.000Z"),
+      new Date("2026-09-04T09:01:00.000Z"),
+      new Date("2026-09-04T09:02:00.000Z"),
+    ];
+    const inserted = await database.db
+      .insert(orders)
+      .values(
+        timestamps.map((updatedAt, index) => ({
+          orderNumber: `HX-SUPPORT-${index}`,
+          userId: customer.userId,
+          status: "PAYMENT_REVIEW_REQUIRED" as const,
+          currency: "KES",
+          subtotalMinor: 1_000n,
+          totalMinor: 1_000n,
+          idempotencyKey: randomUUID(),
+          requestFingerprint: String(index).repeat(64),
+          createdAt: updatedAt,
+          updatedAt,
+        })),
+      )
+      .returning({ id: orders.id });
+
+    const first = await get(
+      "/api/v1/staff/order-support?type=PAYMENT_REVIEW_REQUIRED&limit=2",
+      staff.cookie,
+    );
+    const firstBody = first.json<{
+      items: Array<{ orderId: string }>;
+      nextCursor: string | null;
+    }>();
+    const second = await get(
+      `/api/v1/staff/order-support?type=PAYMENT_REVIEW_REQUIRED&limit=2&cursor=${firstBody.nextCursor}`,
+      staff.cookie,
+    );
+    const malformed = await get(
+      "/api/v1/staff/order-support?type=PAYMENT_REVIEW_REQUIRED&cursor=not-a-uuid",
+      staff.cookie,
+    );
+
+    expect(first.statusCode).toBe(200);
+    expect(firstBody.items.map((item) => item.orderId)).toEqual([inserted[2]!.id, inserted[1]!.id]);
+    expect(firstBody.nextCursor).toBe(inserted[1]!.id);
+    expect(second.json()).toEqual({
+      items: [expect.objectContaining({ orderId: inserted[0]!.id })],
+      nextCursor: null,
+    });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json()).toMatchObject({
+      error: { code: "VALIDATION_ERROR", requestId: expect.any(String) },
+    });
   });
 });
 

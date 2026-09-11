@@ -67,8 +67,78 @@ describe("API application", () => {
     expect(allowed.statusCode).toBe(204);
     expect(allowed.headers["access-control-allow-origin"]).toBe("http://localhost:8080");
     expect(allowed.headers["access-control-allow-credentials"]).toBe("true");
+    expect(allowed.headers["access-control-allow-methods"]).toBe(
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    );
     expect(rejected.statusCode).toBe(403);
     expect(rejected.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("protects PUT mutations and returns the safe error contract", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    const trusted = await app.inject({
+      method: "PUT",
+      url: "/api/v1/seller/fulfillment-config",
+      headers: { origin: "http://localhost:8080" },
+      payload: {},
+    });
+    const missing = await app.inject({
+      method: "PUT",
+      url: "/api/v1/seller/fulfillment-config",
+      payload: {},
+    });
+    const untrusted = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { origin: "https://attacker.example" },
+      payload: {},
+    });
+
+    expect(trusted.statusCode).toBe(404);
+    for (const response of [missing, untrusted]) {
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({
+        error: {
+          code: "ORIGIN_NOT_ALLOWED",
+          message: "The request origin is not allowed",
+          requestId: response.headers["x-request-id"],
+        },
+      });
+    }
+  });
+
+  it("does not require an Origin for ordinary GET and HEAD requests", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    const get = await app.inject({ method: "GET", url: "/health" });
+    const head = await app.inject({ method: "HEAD", url: "/health" });
+
+    expect(get.statusCode).toBe(200);
+    expect(head.statusCode).toBe(200);
+  });
+
+  it("applies bounded JSON body limits by route class", async () => {
+    app = await buildApp({ allowedOrigins: ["http://localhost:8080"] });
+    app.post("/api/auth/body-limit-test", (request) => request.body);
+    app.post("/api/v1/body-limit-test", (request) => request.body);
+
+    const headers = { origin: "http://localhost:8080", "content-type": "application/json" };
+    const auth = await app.inject({
+      method: "POST",
+      url: "/api/auth/body-limit-test",
+      headers,
+      payload: JSON.stringify({ value: "x".repeat(17 * 1024) }),
+    });
+    const api = await app.inject({
+      method: "POST",
+      url: "/api/v1/body-limit-test",
+      headers,
+      payload: JSON.stringify({ value: "x".repeat(65 * 1024) }),
+    });
+
+    expect(auth.statusCode).toBe(413);
+    expect(api.statusCode).toBe(413);
+    expect(auth.json<{ error: { requestId: string } }>().error.requestId).toBeTruthy();
+    expect(api.json<{ error: { requestId: string } }>().error.requestId).toBeTruthy();
   });
 
   it("requires a trusted Origin on authentication mutations", async () => {
