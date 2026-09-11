@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../auth/auth.js";
 import type { DatabaseClient } from "../db/client.js";
@@ -15,27 +15,17 @@ export function registerOrderSupportRoutes(
   app.get("/api/v1/staff/order-support", async (request) => {
     await requireStaffPermission(options.auth, options.database, request.headers, "ORDER_SUPPORT");
     const query = SupportListQuerySchema.parse(request.query);
-    const rows = await options.database.db
-      .select({
-        orderId: orders.id,
-        orderNumber: orders.orderNumber,
-        orderStatus: orders.status,
-        fulfillmentId: sellerOrderFulfillments.id,
-        fulfillmentStatus: sellerOrderFulfillments.status,
-        issueReason: sellerOrderFulfillments.issueReason,
-        updatedAt: orders.updatedAt,
-      })
-      .from(orders)
-      .leftJoin(sellerOrderFulfillments, eq(sellerOrderFulfillments.orderId, orders.id))
-      .where(
-        query.type === "PAYMENT_REVIEW_REQUIRED"
-          ? eq(orders.status, "PAYMENT_REVIEW_REQUIRED")
-          : eq(sellerOrderFulfillments.status, "FULFILLMENT_ISSUE"),
-      )
-      .orderBy(desc(orders.updatedAt), desc(orders.id))
-      .limit(query.limit);
+    const rows =
+      query.type === "PAYMENT_REVIEW_REQUIRED"
+        ? await paymentReviewRows(options.database, query.cursor, query.limit + 1)
+        : await fulfillmentIssueRows(options.database, query.cursor, query.limit + 1);
+    const visible = rows.slice(0, query.limit);
     return {
-      items: rows.map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() })),
+      items: visible.map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() })),
+      nextCursor:
+        rows.length > query.limit
+          ? (visible.at(-1)?.fulfillmentId ?? visible.at(-1)?.orderId ?? null)
+          : null,
     };
   });
 
@@ -89,4 +79,88 @@ export function registerOrderSupportRoutes(
       },
     };
   });
+}
+
+async function paymentReviewRows(
+  database: DatabaseClient,
+  cursor: string | undefined,
+  limit: number,
+) {
+  let cursorCondition;
+  if (cursor) {
+    const [row] = await database.db
+      .select({ id: orders.id, updatedAt: orders.updatedAt })
+      .from(orders)
+      .where(and(eq(orders.id, cursor), eq(orders.status, "PAYMENT_REVIEW_REQUIRED")))
+      .limit(1);
+    if (!row) throw new NotFoundError();
+    cursorCondition = or(
+      lt(orders.updatedAt, row.updatedAt),
+      and(eq(orders.updatedAt, row.updatedAt), lt(orders.id, row.id)),
+    );
+  }
+  const conditions = [eq(orders.status, "PAYMENT_REVIEW_REQUIRED")];
+  if (cursorCondition) conditions.push(cursorCondition);
+  const rows = await database.db
+    .select({
+      orderId: orders.id,
+      orderNumber: orders.orderNumber,
+      orderStatus: orders.status,
+      updatedAt: orders.updatedAt,
+    })
+    .from(orders)
+    .where(and(...conditions))
+    .orderBy(desc(orders.updatedAt), desc(orders.id))
+    .limit(limit);
+  return rows.map((row) => ({
+    ...row,
+    fulfillmentId: null,
+    fulfillmentStatus: null,
+    issueReason: null,
+  }));
+}
+
+async function fulfillmentIssueRows(
+  database: DatabaseClient,
+  cursor: string | undefined,
+  limit: number,
+) {
+  let cursorCondition;
+  if (cursor) {
+    const [row] = await database.db
+      .select({ id: sellerOrderFulfillments.id, updatedAt: sellerOrderFulfillments.updatedAt })
+      .from(sellerOrderFulfillments)
+      .where(
+        and(
+          eq(sellerOrderFulfillments.id, cursor),
+          eq(sellerOrderFulfillments.status, "FULFILLMENT_ISSUE"),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new NotFoundError();
+    cursorCondition = or(
+      lt(sellerOrderFulfillments.updatedAt, row.updatedAt),
+      and(
+        eq(sellerOrderFulfillments.updatedAt, row.updatedAt),
+        lt(sellerOrderFulfillments.id, row.id),
+      ),
+    );
+  }
+  const conditions = [eq(sellerOrderFulfillments.status, "FULFILLMENT_ISSUE")];
+  if (cursorCondition) conditions.push(cursorCondition);
+  return database.db
+    .select({
+      orderId: orders.id,
+      orderNumber: orders.orderNumber,
+      orderStatus: orders.status,
+      fulfillmentId: sellerOrderFulfillments.id,
+      fulfillmentStatus: sellerOrderFulfillments.status,
+      issueReason: sellerOrderFulfillments.issueReason,
+      updatedAt: sellerOrderFulfillments.updatedAt,
+    })
+    .from(sellerOrderFulfillments)
+    .innerJoin(orders, eq(orders.id, sellerOrderFulfillments.orderId))
+    .where(and(...conditions))
+    .orderBy(desc(sellerOrderFulfillments.updatedAt), desc(sellerOrderFulfillments.id))
+    .limit(limit);
 }
