@@ -76,7 +76,7 @@ export function registerAuthRoutes(
   });
 }
 
-async function applyAuthRateLimit(
+export async function applyAuthRateLimit(
   limiter: RateLimiter,
   auth: AuthService,
   path: string,
@@ -104,6 +104,7 @@ async function applyAuthRateLimit(
     path.includes("/two-factor/") &&
     /\/(enable|disable|verify-totp|verify-backup-code|generate-backup-codes)$/.test(path);
   if (!passwordReset && !sensitiveTwoFactor) {
+    await limiter.consume({ scope: "auth-default", ...RATE_LIMITS.authDefault, key: requestIp });
     return;
   }
   const session = await auth.api.getSession({ headers: fromNodeHeaders(requestHeaders) });

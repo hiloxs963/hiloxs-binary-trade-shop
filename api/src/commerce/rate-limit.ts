@@ -87,6 +87,7 @@ export const RATE_LIMITS = {
   passwordResetRequest: { limit: 3, windowMs: 15 * 60_000 },
   verificationResend: { limit: 3, windowMs: 15 * 60_000 },
   security: { limit: 5, windowMs: 10 * 60_000 },
+  authDefault: { limit: 100, windowMs: 60_000 },
   quote: { limit: 30, windowMs: 60_000 },
   orderCreate: { limit: 10, windowMs: 60_000 },
   orderCancel: { limit: 20, windowMs: 60_000 },
