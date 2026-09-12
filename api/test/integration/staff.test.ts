@@ -85,7 +85,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await database.pool.query(
-    'truncate table "staff_audit_events", "staff_permission_grants", "staff_memberships", "seller_product_submissions", "seller_applications", "payment_events", "payment_attempts", "order_items", "orders", "verification", "two_factor", "session", "account", "user" cascade',
+    'truncate table "security_rate_limit_windows", "staff_audit_events", "staff_permission_grants", "staff_memberships", "seller_product_submissions", "seller_applications", "payment_events", "payment_attempts", "order_items", "orders", "verification", "two_factor", "session", "account", "user" cascade',
   );
   await restoreInitialCatalog(database);
   emailSender.messages.length = 0;
@@ -891,6 +891,7 @@ describe("Phase 9 staff commerce capabilities", () => {
     ]);
   });
 });
+
 
 async function createStaff(
   email: string,

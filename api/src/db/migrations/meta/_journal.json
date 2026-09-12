@@ -64,6 +64,13 @@
       "when": 1788460790477,
       "tag": "0008_closed_callisto",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788478804710,
+      "tag": "0009_phase11_rate_limits",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,8 @@ export class CatalogApiError extends Error {
 }
 
 export async function getPublicCatalog(): Promise<PublicCatalogProduct[]> {
+  if (import.meta.env.SSR && import.meta.env.PROD) return staticPlatformCatalog;
+
   const response = await fetch(`${API_ORIGIN}/api/v1/products`, {
     headers: { Accept: "application/json" },
   });
@@ -44,12 +46,31 @@ export async function getPublicCatalog(): Promise<PublicCatalogProduct[]> {
   return ((await response.json()) as { products: PublicCatalogProduct[] }).products;
 }
 
-export async function getPublicCatalogProduct(slug: string): Promise<PublicCatalogProduct> {
+export async function getPublicCatalogProduct(slug: string): Promise<{
+  product: PublicCatalogProduct;
+  related: PublicCatalogProduct[];
+}> {
+  if (import.meta.env.SSR && import.meta.env.PROD) {
+    const product = staticPlatformCatalog.find((candidate) => candidate.slug === slug);
+    if (!product) throw new CatalogApiError("The product could not be loaded", 404);
+    return {
+      product,
+      related: staticPlatformCatalog
+        .filter(
+          (candidate) => candidate.id !== product.id && candidate.category === product.category,
+        )
+        .slice(0, 3),
+    };
+  }
+
   const response = await fetch(`${API_ORIGIN}/api/v1/products/${encodeURIComponent(slug)}`, {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new CatalogApiError("The product could not be loaded", response.status);
-  return ((await response.json()) as { product: PublicCatalogProduct }).product;
+  return (await response.json()) as {
+    product: PublicCatalogProduct;
+    related: PublicCatalogProduct[];
+  };
 }
 
 export function catalogMediaUrl(path: string): string | null {
@@ -62,3 +83,16 @@ export function catalogMediaUrl(path: string): string | null {
 export function catalogPriceKes(product: PublicCatalogProduct): number {
   return Number(BigInt(product.priceMinor)) / 100;
 }
+
+const staticPlatformCatalog: PublicCatalogProduct[] = PRODUCTS.map((product) => ({
+  id: product.id,
+  slug: productSlug(product),
+  name: product.name,
+  category: product.category,
+  description: product.blurb,
+  priceMinor: String(product.priceKes * 100),
+  currency: "KES",
+  isPurchasable: true,
+  media: [],
+}));
+import { PRODUCTS, productSlug } from "./hiloxs";

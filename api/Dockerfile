@@ -1,4 +1,4 @@
-FROM node:24-alpine AS build
+FROM node:24.15.0-alpine AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -9,7 +9,7 @@ COPY src ./src
 RUN npm run build
 RUN test -f dist/db/migrations/meta/_journal.json
 
-FROM node:24-alpine AS runtime
+FROM node:24.15.0-alpine AS runtime
 
 ENV NODE_ENV=production
 WORKDIR /app

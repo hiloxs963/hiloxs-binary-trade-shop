@@ -61,7 +61,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await database.pool.query(
-    'truncate table "seller_product_submissions", "seller_applications", "verification", "session", "account", "user" cascade',
+    'truncate table "security_rate_limit_windows", "seller_product_submissions", "seller_applications", "verification", "session", "account", "user" cascade',
   );
   await restoreInitialCatalog(database);
   emailSender.messages.length = 0;

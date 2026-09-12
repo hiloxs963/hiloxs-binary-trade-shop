@@ -50,7 +50,9 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await database.pool.query('truncate table "verification", "session", "account", "user" cascade');
+  await database.pool.query(
+    'truncate table "security_rate_limit_windows", "verification", "session", "account", "user" cascade',
+  );
   await restoreInitialCatalog(database);
   emailSender.messages.length = 0;
 });

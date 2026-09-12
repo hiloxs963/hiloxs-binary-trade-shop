@@ -20,6 +20,15 @@ const EnvironmentSchema = z.object({
     .trim()
     .refine((value) => /^postgres(?:ql)?:\/\//i.test(value), "must be a PostgreSQL URL")
     .optional(),
+  RATE_LIMIT_HMAC_KEY: z.string().min(32).optional(),
+  PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
+  PG_LOCK_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
+  PG_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(10_000)
+    .max(300_000)
+    .default(60_000),
   BETTER_AUTH_URL: z.url().optional(),
   BETTER_AUTH_SECRET: z.string().min(32).optional(),
   RESEND_API_KEY: z
@@ -131,6 +140,14 @@ export function requireDatabaseUrl(env: AppEnv): string {
   return env.DATABASE_URL;
 }
 
+export function requireRateLimitHmacKey(env: AppEnv): string {
+  if (env.RATE_LIMIT_HMAC_KEY) return env.RATE_LIMIT_HMAC_KEY;
+  if (env.NODE_ENV === "production") {
+    throw new ConfigurationError("RATE_LIMIT_HMAC_KEY is required in production");
+  }
+  return "development-only-rate-limit-hmac-key-change-me";
+}
+
 export function resolveAuthRuntimeConfig(env: AppEnv): AuthRuntimeConfig {
   const production = env.NODE_ENV === "production";
   const baseURL = env.BETTER_AUTH_URL ?? (production ? undefined : `http://127.0.0.1:${env.PORT}`);
@@ -181,21 +198,30 @@ export function resolveProductionEmailConfig(env: AppEnv): ProductionEmailConfig
 }
 
 export function resolveMpesaRuntimeConfig(env: AppEnv): MpesaRuntimeConfig | undefined {
-  const values = [
-    env.MPESA_ENV,
-    env.MPESA_CONSUMER_KEY,
-    env.MPESA_CONSUMER_SECRET,
-    env.MPESA_SHORTCODE,
-    env.MPESA_PASSKEY,
-    env.MPESA_TRANSACTION_TYPE,
-    env.MPESA_PARTY_B,
-    env.MPESA_CALLBACK_BASE_URL,
-    env.MPESA_MAX_AMOUNT_KES,
+  const entries: Array<[string, unknown]> = [
+    ["MPESA_ENV", env.MPESA_ENV],
+    ["MPESA_CONSUMER_KEY", env.MPESA_CONSUMER_KEY],
+    ["MPESA_CONSUMER_SECRET", env.MPESA_CONSUMER_SECRET],
+    ["MPESA_SHORTCODE", env.MPESA_SHORTCODE],
+    ["MPESA_PASSKEY", env.MPESA_PASSKEY],
+    ["MPESA_TRANSACTION_TYPE", env.MPESA_TRANSACTION_TYPE],
+    ["MPESA_PARTY_B", env.MPESA_PARTY_B],
+    ["MPESA_CALLBACK_BASE_URL", env.MPESA_CALLBACK_BASE_URL],
+    ["MPESA_MAX_AMOUNT_KES", env.MPESA_MAX_AMOUNT_KES],
   ];
-  const configured = values.some((value) => value !== undefined);
-  if (!configured && env.NODE_ENV !== "production") return undefined;
-  if (values.some((value) => value === undefined)) {
-    throw new ConfigurationError("All M-Pesa environment variables are required together");
+  const missingNames = entries.filter(([, value]) => value === undefined).map(([name]) => name);
+  if (missingNames.length > 0) {
+    if (env.MPESA_PUBLIC_ENABLED) {
+      throw new ConfigurationError(
+        `MPESA_PUBLIC_ENABLED is true but the following variables are not set: ${missingNames.join(", ")}`,
+      );
+    }
+    if (env.NODE_ENV === "production") {
+      throw new ConfigurationError(
+        `M-Pesa must be fully configured in production even when the gate is off. Missing: ${missingNames.join(", ")}`,
+      );
+    }
+    return undefined;
   }
 
   const callbackBaseURL = new URL(env.MPESA_CALLBACK_BASE_URL as string);

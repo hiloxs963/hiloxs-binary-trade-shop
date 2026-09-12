@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../auth/auth.js";
-import { FixedWindowRateLimiter } from "../commerce/rate-limit.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import type { Database, DatabaseClient } from "../db/client.js";
 import { sellerProductSubmissions } from "../db/schema/seller-products.js";
 import { ConflictError, NotFoundError } from "../lib/errors.js";
@@ -23,13 +23,15 @@ type SellerProductSubmission = typeof sellerProductSubmissions.$inferSelect;
 
 export function registerSellerProductRoutes(
   app: FastifyInstance,
-  options: { auth: AuthService; database: DatabaseClient },
+  options: { auth: AuthService; database: DatabaseClient; rateLimiter: RateLimiter },
 ): void {
-  const limiter = new FixedWindowRateLimiter();
-
   app.post("/api/v1/seller/products", async (request, reply) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
-    limiter.consume(`seller-product-create:${seller.userId}`, 10, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-product-create",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     const input = SellerProductDraftSchema.parse(request.body);
     const [created] = await options.database.db
       .insert(sellerProductSubmissions)
@@ -67,7 +69,11 @@ export function registerSellerProductRoutes(
 
   app.post("/api/v1/seller/products/:submissionId/edit", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
-    limiter.consume(`seller-product-edit:${seller.userId}`, 30, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-product-edit",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     const submissionId = submissionIdFrom(request.params);
     const input = SellerProductDraftSchema.parse(request.body);
     const submission = await options.database.db.transaction(async (transaction) => {
@@ -92,7 +98,11 @@ export function registerSellerProductRoutes(
 
   app.post("/api/v1/seller/products/:submissionId/submit", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
-    limiter.consume(`seller-product-submit:${seller.userId}`, 10, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-product-submit",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     SellerProductConsentSchema.parse(request.body);
     const submissionId = submissionIdFrom(request.params);
     const submission = await options.database.db.transaction(async (transaction) => {
@@ -126,7 +136,11 @@ export function registerSellerProductRoutes(
 
   app.post("/api/v1/seller/products/:submissionId/withdraw", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
-    limiter.consume(`seller-product-withdraw:${seller.userId}`, 10, 60_000);
+    await options.rateLimiter.consume({
+      scope: "seller-product-withdraw",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     SellerProductEmptyBodySchema.parse(request.body ?? {});
     const submissionId = submissionIdFrom(request.params);
     const submission = await options.database.db.transaction(async (transaction) => {

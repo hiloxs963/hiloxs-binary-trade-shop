@@ -74,7 +74,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await database.pool.query(
-    'truncate table "payment_events", "payment_attempts", "order_items", "orders", "verification", "session", "account", "user" cascade',
+    'truncate table "security_rate_limit_windows", "payment_events", "payment_attempts", "order_items", "orders", "verification", "session", "account", "user" cascade',
   );
   await restoreInitialCatalog(database);
   await database.db

@@ -482,7 +482,7 @@ function CreatedOrderPayment({
             </Button>
           </div>
         ) : paymentStateAllowsInitiation ? (
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="mt-4 text-sm text-muted-foreground" role="status">
             {paymentConfig === undefined
               ? "Checking M-Pesa availability..."
               : "M-Pesa payments are not currently available."}
@@ -490,7 +490,11 @@ function CreatedOrderPayment({
         ) : (
           <PaymentMessage payment={payment} />
         )}
-        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        {error && (
+          <p className="mt-3 text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
         {payment && isRefreshableStatus(payment.paymentStatus) && (
           <Button
             className="mt-4"
@@ -529,14 +533,16 @@ function PaymentMessage({ payment }: { payment: OrderPaymentStatus }) {
   }
   if (payment.paymentStatus === "UNKNOWN") {
     return (
-      <p className="mt-4 text-sm text-muted-foreground">
+      <p className="mt-4 text-sm text-muted-foreground" role="status">
         The prompt outcome is unresolved. Do not send another payment; check the status below.
       </p>
     );
   }
   if (payment.paymentStatus === "REVIEW_REQUIRED") {
     return (
-      <p className="mt-4 text-sm text-destructive">Payment confirmation requires support review.</p>
+      <p className="mt-4 text-sm text-destructive" role="status">
+        Payment confirmation requires support review.
+      </p>
     );
   }
   return (

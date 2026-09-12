@@ -411,7 +411,7 @@ function OrderPaymentControls({
       )}
 
       {paymentStateAllowsInitiation && !availability.canInitiate && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground" role="status">
           {paymentConfig === undefined
             ? "Checking M-Pesa availability..."
             : "M-Pesa payments are not currently available."}
@@ -424,7 +424,7 @@ function OrderPaymentControls({
         </p>
       )}
       {payment && isPollingPayment(payment.paymentStatus) && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground" role="status">
           Waiting for M-Pesa confirmation. Check your phone and enter your M-Pesa PIN.
         </p>
       )}
@@ -434,7 +434,9 @@ function OrderPaymentControls({
         </p>
       )}
       {payment?.paymentStatus === "REVIEW_REQUIRED" && (
-        <p className="text-sm text-destructive">Payment confirmation requires support review.</p>
+        <p className="text-sm text-destructive" role="status">
+          Payment confirmation requires support review.
+        </p>
       )}
       {payment && isRefreshablePayment(payment.paymentStatus) && (
         <Button
@@ -457,7 +459,11 @@ function OrderPaymentControls({
           <RefreshCw aria-hidden /> Check payment status
         </Button>
       )}
-      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="mt-3 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

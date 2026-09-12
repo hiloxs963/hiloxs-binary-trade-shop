@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { and, asc, count, eq, inArray, max, notInArray, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../auth/auth.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import type { Database, DatabaseClient } from "../db/client.js";
 import {
   sellerProductActivations,
@@ -44,6 +45,7 @@ export function registerSellerMediaRoutes(
     database: DatabaseClient;
     storage?: MediaStorage;
     uploadEnabled: boolean;
+    rateLimiter: RateLimiter;
   },
 ): void {
   app.get("/api/v1/seller/products/:submissionId/media", async (request) => {
@@ -59,6 +61,11 @@ export function registerSellerMediaRoutes(
 
   app.post("/api/v1/seller/products/:submissionId/media/upload-intents", async (request, reply) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
+    await options.rateLimiter.consume({
+      scope: "seller-media-upload-intent",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     if (!options.uploadEnabled) throw new MediaUploadDisabledError();
     if (!options.storage) throw new MediaStorageUnavailableError();
     const submissionId = submissionIdFrom(request.params);
@@ -134,6 +141,11 @@ export function registerSellerMediaRoutes(
 
   app.post("/api/v1/seller/products/:submissionId/media/:mediaId/finalize", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
+    await options.rateLimiter.consume({
+      scope: "seller-media-finalize",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     if (!options.uploadEnabled) throw new MediaUploadDisabledError();
     if (!options.storage) throw new MediaStorageUnavailableError();
     EmptyMediaBodySchema.parse(request.body ?? {});
@@ -189,6 +201,11 @@ export function registerSellerMediaRoutes(
 
   app.post("/api/v1/seller/products/:submissionId/media/:mediaId/abandon", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
+    await options.rateLimiter.consume({
+      scope: "seller-media-abandon",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     EmptyMediaBodySchema.parse(request.body ?? {});
     const { submissionId, mediaId } = mediaParams(request.params);
     const media = await options.database.db.transaction(async (transaction) => {
@@ -213,6 +230,11 @@ export function registerSellerMediaRoutes(
 
   app.post("/api/v1/seller/products/:submissionId/media/arrange", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
+    await options.rateLimiter.consume({
+      scope: "seller-media-arrange",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     const submissionId = submissionIdFrom(request.params);
     const input = MediaArrangementSchema.parse(request.body);
     await options.database.db.transaction(async (transaction) => {
@@ -265,6 +287,11 @@ export function registerSellerMediaRoutes(
 
   app.put("/api/v1/seller/products/:submissionId/inventory", async (request) => {
     const seller = await requireApprovedSeller(options.auth, options.database, request.headers);
+    await options.rateLimiter.consume({
+      scope: "seller-product-inventory",
+      key: seller.userId,
+      ...RATE_LIMITS.sellerMutation,
+    });
     const submissionId = submissionIdFrom(request.params);
     const input = InventoryInputSchema.parse(request.body);
     const inventory = await options.database.db.transaction(async (transaction) => {

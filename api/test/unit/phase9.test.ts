@@ -93,4 +93,5 @@ describe("Phase 9 request trust boundaries", () => {
     expect(fingerprintOrderRequest(request)).toBe(fingerprintOrderRequest(reordered));
     expect(fingerprintOrderRequest(request)).not.toBe(fingerprintOrderRequest(changed));
   });
+
 });

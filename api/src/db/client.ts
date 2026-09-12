@@ -8,6 +8,8 @@ import * as paymentSchema from "./schema/payments.js";
 import * as sellerProductSchema from "./schema/seller-products.js";
 import * as sellerSchema from "./schema/sellers.js";
 import * as staffSchema from "./schema/staff.js";
+import * as securitySchema from "./schema/security.js";
+import { safeErrorForLog } from "../lib/redact.js";
 
 const schema = {
   ...authSchema,
@@ -18,6 +20,7 @@ const schema = {
   ...sellerProductSchema,
   ...sellerSchema,
   ...staffSchema,
+  ...securitySchema,
 };
 
 export type Database = NodePgDatabase<typeof schema>;
@@ -33,6 +36,10 @@ type DatabaseClientOptions = {
   maxConnections?: number;
   connectionTimeoutMs?: number;
   idleTimeoutMs?: number;
+  applicationName?: string;
+  statementTimeoutMs?: number;
+  lockTimeoutMs?: number;
+  idleInTransactionTimeoutMs?: number;
 };
 
 export function createDatabaseClient(
@@ -44,6 +51,15 @@ export function createDatabaseClient(
     max: options.maxConnections ?? 10,
     connectionTimeoutMillis: options.connectionTimeoutMs ?? 5_000,
     idleTimeoutMillis: options.idleTimeoutMs ?? 30_000,
+    application_name: options.applicationName ?? "hiloxs-api",
+    statement_timeout: options.statementTimeoutMs ?? 30_000,
+    lock_timeout: options.lockTimeoutMs ?? 10_000,
+    idle_in_transaction_session_timeout: options.idleInTransactionTimeoutMs ?? 60_000,
+  });
+  pool.on("error", (error) => {
+    process.stderr.write(
+      `${JSON.stringify({ level: "error", message: "PostgreSQL pool error", error: safeErrorForLog(error) })}\n`,
+    );
   });
   const db = drizzle(pool, { schema });
 

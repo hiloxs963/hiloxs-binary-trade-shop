@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { requireActiveUser } from "../auth/active-user.js";
 import type { AuthService } from "../auth/auth.js";
-import { FixedWindowRateLimiter } from "../commerce/rate-limit.js";
+import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import { EmptyBodySchema, IdempotencyKeySchema, OrderIdSchema } from "../commerce/validation.js";
 import type { MpesaRuntimeConfig } from "../config/env.js";
 import type { DatabaseClient } from "../db/client.js";
@@ -50,10 +50,9 @@ export function registerMpesaRoutes(
     database: DatabaseClient;
     provider: MpesaProvider;
     config: MpesaRuntimeConfig;
+    rateLimiter: RateLimiter;
   },
 ): void {
-  const limiter = new FixedWindowRateLimiter();
-
   app.get("/api/v1/payments/config", () => ({
     mpesa: {
       available: options.config.environment === "production" && options.config.publicEnabled,
@@ -63,7 +62,11 @@ export function registerMpesaRoutes(
 
   app.post("/api/v1/orders/:orderId/payments/mpesa", async (request, reply) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`mpesa-initiate:${owner.id}`, 5, 60_000);
+    await options.rateLimiter.consume({
+      scope: "mpesa-initiate",
+      key: owner.id,
+      ...RATE_LIMITS.paymentInitiate,
+    });
     const orderId = OrderIdSchema.parse((request.params as { orderId?: unknown }).orderId);
     const input = MpesaInitiationSchema.parse(request.body);
     const idempotencyKey = IdempotencyKeySchema.parse(request.headers["idempotency-key"]);
@@ -179,7 +182,11 @@ export function registerMpesaRoutes(
 
   app.post("/api/v1/orders/:orderId/payments/mpesa/refresh", async (request) => {
     const owner = await requireActiveUser(options.auth, options.database, request.headers);
-    limiter.consume(`mpesa-refresh:${owner.id}`, 6, 60_000);
+    await options.rateLimiter.consume({
+      scope: "mpesa-refresh",
+      key: owner.id,
+      ...RATE_LIMITS.paymentRefresh,
+    });
     EmptyBodySchema.parse(request.body ?? {});
     const orderId = OrderIdSchema.parse((request.params as { orderId?: unknown }).orderId);
     const { order, attempt } = await loadOwnedPayment(options.database, owner.id, orderId);

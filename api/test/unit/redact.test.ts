@@ -53,6 +53,10 @@ describe("log redaction", () => {
           landmark: "Test landmark",
         },
         trackingReference: "TRACK-TEST",
+        mpesaReceiptNumber: "RECEIPT-TEST",
+        providerEvidence: "evidence-value",
+        providerResultDescription: "provider-detail",
+        responseBody: "raw-provider-response",
       }),
     ).toEqual({
       user: "safe",
@@ -75,6 +79,10 @@ describe("log redaction", () => {
       backupCodes: "[REDACTED]",
       deliveryAddress: "[REDACTED]",
       trackingReference: "[REDACTED]",
+      mpesaReceiptNumber: "[REDACTED]",
+      providerEvidence: "[REDACTED]",
+      providerResultDescription: "[REDACTED]",
+      responseBody: "[REDACTED]",
     });
   });
 

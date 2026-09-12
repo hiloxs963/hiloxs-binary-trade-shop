@@ -118,7 +118,7 @@ beforeEach(async () => {
   await emptyTestBucket();
   await database.pool.query(`
     truncate table
-      "staff_audit_events", "seller_product_activations", "product_media_variants",
+      "security_rate_limit_windows", "staff_audit_events", "seller_product_activations", "product_media_variants",
       "product_media", "product_inventory", "seller_product_media_variants",
       "seller_product_media", "seller_product_inventory", "staff_permission_grants",
       "staff_memberships", "seller_product_submissions", "seller_applications",

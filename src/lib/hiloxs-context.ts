@@ -1,14 +1,6 @@
 import { createContext, useContext } from "react";
-import type { Product, ShopCategory } from "./hiloxs";
-import type {
-  AdminTrading,
-  CustomProduct,
-  HiloxsState,
-  Leg,
-  PayoutAccounts,
-  TrainingLevel,
-  Trade,
-} from "./hiloxs-store";
+import type { HiloxsState, Leg, PayoutAccounts, TrainingLevel, Trade } from "./hiloxs-store";
+import type { Product } from "./hiloxs";
 
 export type HiloxsContextValue = {
   state: HiloxsState;
@@ -25,21 +17,9 @@ export type HiloxsContextValue = {
   clearCart: () => void;
   recordTrade: (trade: Trade) => void;
   settleTrade: (id: string, exit: number) => void;
-  setAdmin: (patch: Partial<AdminTrading>) => void;
   withdrawTrading: (amountUsd: number, to: "paypal" | "minipay" | "mpesa") => string | null;
   addVideo: (input: { title: string; level: TrainingLevel; url: string }) => string | null;
   removeVideo: (id: string) => void;
-  addProduct: (input: {
-    name: string;
-    category: ShopCategory;
-    priceKes: number;
-    oldPriceKes?: number;
-    reviews: number;
-    blurb: string;
-    image?: string;
-    badge?: Product["badge"];
-  }) => string | null;
-  removeProduct: (id: string) => void;
   allProducts: Product[];
 };
 

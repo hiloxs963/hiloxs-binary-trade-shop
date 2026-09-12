@@ -3,6 +3,7 @@ import Fastify, { type FastifyServerOptions } from "fastify";
 import { ZodError } from "zod";
 import type { AuthService } from "./auth/auth.js";
 import { registerAuthRoutes } from "./auth/fastify.js";
+import { PostgresRateLimiter } from "./commerce/rate-limit.js";
 import type { AuthRuntimeConfig, MpesaRuntimeConfig } from "./config/env.js";
 import type { DatabaseClient } from "./db/client.js";
 import {
@@ -49,6 +50,7 @@ export type BuildAppOptions = {
     uploadEnabled: boolean;
     catalogActivationEnabled: boolean;
   };
+  rateLimitHmacKey?: string;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -59,55 +61,118 @@ export async function buildApp(options: BuildAppOptions = {}) {
     requestTimeout: 15_000,
     connectionTimeout: 10_000,
     keepAliveTimeout: 5_000,
+    forceCloseConnections: "idle",
+  });
+
+  app.addHook("onRoute", (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    if (!methods.some((method) => ["POST", "PUT", "PATCH", "DELETE"].includes(method))) return;
+    route.bodyLimit = route.url.startsWith("/api/auth/") ? 16 * 1024 : 64 * 1024;
+  });
+
+  app.setNotFoundHandler((request, reply) => {
+    const serialized = serializeError(new NotFoundError(), request.id);
+    return reply.status(serialized.statusCode).send(serialized.body);
+  });
+
+  app.setErrorHandler((error, request, reply) => {
+    const normalized = isPayloadTooLarge(error)
+      ? new PayloadTooLargeError(error)
+      : isValidationFailure(error) || isInvalidJsonBody(error) || error instanceof ZodError
+        ? new ValidationError("The request is invalid", error)
+        : error;
+    const serialized = serializeError(normalized, request.id);
+    const log =
+      serialized.statusCode >= 500
+        ? request.log.error.bind(request.log)
+        : request.log.warn.bind(request.log);
+    log({ error: safeErrorForLog(normalized), requestId: request.id }, "Request failed");
+    return reply.status(serialized.statusCode).send(serialized.body);
   });
 
   requestContextPlugin(app);
+  app.addHook("onResponse", (request, reply, done) => {
+    const route = request.routeOptions.url ?? "unmatched";
+    const event = operationalFailureEvent(route, request.method, reply.statusCode);
+    if (event) {
+      request.log.warn(
+        {
+          event,
+          method: request.method,
+          route,
+          statusCode: reply.statusCode,
+          responseTimeMs: Math.round(reply.elapsedTime),
+        },
+        "Operational request signal",
+      );
+    }
+    done();
+  });
   await securityPlugin(app, options.allowedOrigins ?? ["http://localhost:8080"]);
   registerHealthRoute(app);
   registerReadyRoute(app, options.database);
 
+  const rateLimiter = options.database
+    ? new PostgresRateLimiter(
+        options.database,
+        options.rateLimitHmacKey ?? "development-only-rate-limit-hmac-key-change-me",
+      )
+    : undefined;
+
   if (options.auth && options.authRuntime && options.database) {
+    if (!rateLimiter) throw new Error("Rate limiter was not initialized");
     registerAuthRoutes(app, {
       auth: options.auth,
       baseURL: options.authRuntime.baseURL,
       frontendURL: options.authRuntime.frontendURL,
       trustedOrigins: options.authRuntime.trustedOrigins,
+      rateLimiter,
     });
-    registerEmailVerificationRoute(app, { auth: options.auth });
+    registerEmailVerificationRoute(app, { auth: options.auth, rateLimiter });
     registerCurrentUserRoute(app, { auth: options.auth, database: options.database });
     registerCheckoutRoute(app, {
       auth: options.auth,
       database: options.database,
       sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+      rateLimiter,
     });
     registerOrderRoutes(app, {
       auth: options.auth,
       database: options.database,
       sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+      rateLimiter,
     });
-    registerSellerRoutes(app, { auth: options.auth, database: options.database });
-    registerSellerProductRoutes(app, { auth: options.auth, database: options.database });
+    registerSellerRoutes(app, { auth: options.auth, database: options.database, rateLimiter });
+    registerSellerProductRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      rateLimiter,
+    });
     registerSellerInventoryRoutes(app, {
       auth: options.auth,
       database: options.database,
       sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+      rateLimiter,
     });
     registerSellerOrderRoutes(app, {
       auth: options.auth,
       database: options.database,
       sellerOrderActionsEnabled: options.sellerOrderActionsEnabled ?? false,
+      rateLimiter,
     });
     registerSellerMediaRoutes(app, {
       auth: options.auth,
       database: options.database,
       ...(options.media?.storage ? { storage: options.media.storage } : {}),
       uploadEnabled: options.media?.uploadEnabled ?? false,
+      rateLimiter,
     });
     registerStaffRoutes(app, {
       auth: options.auth,
       database: options.database,
       reviewEnabled: options.staffReviewEnabled ?? false,
       catalogActivationEnabled: options.media?.catalogActivationEnabled ?? false,
+      rateLimiter,
     });
     registerStaffMediaRoutes(app, {
       auth: options.auth,
@@ -115,11 +180,13 @@ export async function buildApp(options: BuildAppOptions = {}) {
       ...(options.media?.storage ? { storage: options.media.storage } : {}),
       staffReviewEnabled: options.staffReviewEnabled ?? false,
       catalogActivationEnabled: options.media?.catalogActivationEnabled ?? false,
+      rateLimiter,
     });
     registerStaffCommerceRoutes(app, {
       auth: options.auth,
       database: options.database,
       sellerCommerceEnabled: options.sellerCommerceEnabled ?? false,
+      rateLimiter,
     });
     registerOrderSupportRoutes(app, { auth: options.auth, database: options.database });
     if (options.mpesa) {
@@ -128,6 +195,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
         database: options.database,
         provider: options.mpesa.provider,
         config: options.mpesa.config,
+        rateLimiter,
       });
     }
   }
@@ -143,25 +211,6 @@ export async function buildApp(options: BuildAppOptions = {}) {
       await options.database?.close();
     });
   }
-
-  app.setNotFoundHandler((request, reply) => {
-    const serialized = serializeError(new NotFoundError(), request.id);
-    return reply.status(serialized.statusCode).send(serialized.body);
-  });
-
-  app.setErrorHandler((error, request, reply) => {
-    const normalized = isPayloadTooLarge(error)
-      ? new PayloadTooLargeError(error)
-      : isValidationFailure(error) || isInvalidJsonBody(error) || error instanceof ZodError
-        ? new ValidationError("The request is invalid", error)
-        : error;
-    const serialized = serializeError(normalized, request.id);
-    request.log.error(
-      { error: safeErrorForLog(normalized), requestId: request.id },
-      "Request failed",
-    );
-    return reply.status(serialized.statusCode).send(serialized.body);
-  });
 
   return app;
 }
@@ -191,4 +240,14 @@ function isValidationFailure(error: unknown): error is { validation: unknown } {
     "validation" in error &&
     Boolean(error.validation)
   );
+}
+
+function operationalFailureEvent(route: string, method: string, statusCode: number) {
+  if (statusCode >= 500) return "api-server-error";
+  if (statusCode < 400) return undefined;
+  if (route.includes("/api/auth/sign-in")) return "auth-sign-in-failure";
+  if (route === "/api/v1/checkout/quote") return "checkout-failure";
+  if (route === "/api/v1/orders" && method === "POST") return "order-create-failure";
+  if (route.includes("/payments/mpesa")) return "payment-operation-failure";
+  return undefined;
 }

@@ -8,29 +8,17 @@ import {
   CatalogApiError,
   catalogMediaUrl,
   catalogPriceKes,
-  getPublicCatalog,
   getPublicCatalogProduct,
   type PublicCatalogProduct,
 } from "@/lib/catalog-api";
-import { PRODUCTS, discountPct, kes, productImages } from "@/lib/hiloxs";
+import { PRODUCTS, kes, productImages } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { absoluteUrl, pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/shop_/$slug")({
   loader: async ({ params }) => {
     try {
-      const [product, catalog] = await Promise.all([
-        getPublicCatalogProduct(params.slug),
-        getPublicCatalog(),
-      ]);
-      return {
-        product,
-        related: catalog
-          .filter(
-            (candidate) => candidate.category === product.category && candidate.id !== product.id,
-          )
-          .slice(0, 3),
-      };
+      return await getPublicCatalogProduct(params.slug);
     } catch (error) {
       if (error instanceof CatalogApiError && error.status === 404) throw notFound();
       throw error;
@@ -97,7 +85,7 @@ export const Route = createFileRoute("/shop_/$slug")({
 });
 
 function ProductDetailPage() {
-  const { product, related } = Route.useLoaderData();
+  const { product } = Route.useLoaderData();
   const { addToCart } = useHiloxs();
   const legacy = legacyProduct(product);
   const priceKes = catalogPriceKes(product);
@@ -136,12 +124,6 @@ function ProductDetailPage() {
           <p className="mt-4 text-base leading-7 text-muted-foreground">{product.description}</p>
           <div className="mt-6 border-y border-border py-5">
             <p className="text-2xl font-bold text-primary">{kes(priceKes)}</p>
-            {legacy?.oldPriceKes && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Previously listed at <span className="line-through">{kes(legacy.oldPriceKes)}</span>{" "}
-                ({discountPct(legacy)}% difference)
-              </p>
-            )}
             <p className="mt-3 text-sm text-muted-foreground">
               {product.isPurchasable
                 ? "Availability is confirmed before checkout."
@@ -170,33 +152,6 @@ function ProductDetailPage() {
           )}
         </section>
       </div>
-
-      {related.length > 0 && (
-        <section className="mt-14" aria-labelledby="related-products">
-          <h2 id="related-products" className="text-2xl font-bold">
-            More in {product.category}
-          </h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            {related.map((item) => (
-              <Link
-                key={item.id}
-                to="/shop/$slug"
-                params={{ slug: item.slug }}
-                className="panel p-4 transition-colors hover:border-primary"
-              >
-                <p className="text-sm font-semibold">{item.name}</p>
-                <p className="mt-2 text-sm font-bold text-primary">{kes(catalogPriceKes(item))}</p>
-                {!item.isPurchasable && (
-                  <p className="mt-2 text-xs font-medium">Currently unavailable</p>
-                )}
-                <span className="mt-3 inline-block text-xs text-muted-foreground">
-                  View product details
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
