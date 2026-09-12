@@ -148,13 +148,13 @@ describe("environment configuration", () => {
 
   it("requires complete M-Pesa configuration and selects the configured environment", () => {
     expect(resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "test" }))).toBeUndefined();
-    expect(resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production" }))).toBeUndefined();
+    expect(() =>
+      resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production" })),
+    ).toThrow("M-Pesa must be fully configured in production");
     expect(() =>
       resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production", MPESA_PUBLIC_ENABLED: "true" })),
-    ).toThrow("All M-Pesa environment variables are required together");
-    expect(() => resolveMpesaRuntimeConfig(parseEnv({ MPESA_ENV: "sandbox" }))).toThrow(
-      ConfigurationError,
-    );
+    ).toThrow("MPESA_PUBLIC_ENABLED is true but");
+    expect(resolveMpesaRuntimeConfig(parseEnv({ MPESA_ENV: "sandbox" }))).toBeUndefined();
 
     const config = resolveMpesaRuntimeConfig(
       parseEnv({
@@ -177,6 +177,29 @@ describe("environment configuration", () => {
       publicEnabled: true,
       baseURL: "https://sandbox.safaricom.co.ke",
       maxAmountKes: 100_000n,
+    });
+  });
+
+  it("accepts complete M-Pesa configuration in production even when the public gate is off", () => {
+    const config = resolveMpesaRuntimeConfig(
+      parseEnv({
+        NODE_ENV: "production",
+        MPESA_ENV: "sandbox",
+        MPESA_PUBLIC_ENABLED: "false",
+        MPESA_CONSUMER_KEY: "test-consumer-key",
+        MPESA_CONSUMER_SECRET: "test-consumer-secret",
+        MPESA_SHORTCODE: "174379",
+        MPESA_PASSKEY: "test-passkey",
+        MPESA_TRANSACTION_TYPE: "CustomerPayBillOnline",
+        MPESA_PARTY_B: "174379",
+        MPESA_CALLBACK_BASE_URL: "https://api.hiloxs.co.ke",
+        MPESA_MAX_AMOUNT_KES: "100000",
+      }),
+    );
+    expect(config).toMatchObject({
+      environment: "sandbox",
+      publicEnabled: false,
+      baseURL: "https://sandbox.safaricom.co.ke",
     });
   });
 
