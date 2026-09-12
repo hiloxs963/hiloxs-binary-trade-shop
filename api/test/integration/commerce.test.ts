@@ -117,14 +117,8 @@ describe("server-authoritative commerce", () => {
     expect(detail.statusCode).toBe(200);
     const detailBody = detail.json<{
       product: Record<string, unknown>;
-      related: Array<Record<string, unknown>>;
     }>();
     expect(detailBody.product).toEqual(body.products[0]);
-    expect(detailBody.related.map((product) => product["id"])).toEqual([
-      INITIAL_CATALOG[1]?.catalogKey,
-      INITIAL_CATALOG[2]?.catalogKey,
-      INITIAL_CATALOG[3]?.catalogKey,
-    ]);
   });
 
   it("filters categories and never returns inactive products", async () => {

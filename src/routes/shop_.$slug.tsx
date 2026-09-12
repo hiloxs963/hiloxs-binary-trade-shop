@@ -85,7 +85,7 @@ export const Route = createFileRoute("/shop_/$slug")({
 });
 
 function ProductDetailPage() {
-  const { product, related } = Route.useLoaderData();
+  const { product } = Route.useLoaderData();
   const { addToCart } = useHiloxs();
   const legacy = legacyProduct(product);
   const priceKes = catalogPriceKes(product);
@@ -152,33 +152,6 @@ function ProductDetailPage() {
           )}
         </section>
       </div>
-
-      {related.length > 0 && (
-        <section className="mt-14" aria-labelledby="related-products">
-          <h2 id="related-products" className="text-2xl font-bold">
-            More in {product.category}
-          </h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            {related.map((item) => (
-              <Link
-                key={item.id}
-                to="/shop/$slug"
-                params={{ slug: item.slug }}
-                className="panel p-4 transition-colors hover:border-primary"
-              >
-                <p className="text-sm font-semibold">{item.name}</p>
-                <p className="mt-2 text-sm font-bold text-primary">{kes(catalogPriceKes(item))}</p>
-                {!item.isPurchasable && (
-                  <p className="mt-2 text-xs font-medium">Currently unavailable</p>
-                )}
-                <span className="mt-3 inline-block text-xs text-muted-foreground">
-                  View product details
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
