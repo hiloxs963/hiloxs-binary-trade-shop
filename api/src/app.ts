@@ -61,6 +61,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
     requestTimeout: 15_000,
     connectionTimeout: 10_000,
     keepAliveTimeout: 5_000,
+    forceCloseConnections: "idle",
   });
 
   app.addHook("onRoute", (route) => {
