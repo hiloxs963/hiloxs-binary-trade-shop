@@ -178,7 +178,10 @@ async function smokeTestStaticRoutes(productUrl) {
     ];
     for (const [pathname, status] of checks) {
       const response = await fetch(`${origin}${pathname}`);
-      assert(response.status === status, `Static HTTP ${pathname}: expected ${status}, got ${response.status}`);
+      assert(
+        response.status === status,
+        `Static HTTP ${pathname}: expected ${status}, got ${response.status}`,
+      );
     }
   } finally {
     await new Promise((resolve, reject) =>

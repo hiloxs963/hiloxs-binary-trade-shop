@@ -35,3 +35,4 @@ api/.dev-emails/
 *.njsproj
 *.sln
 *.sw?
+.claude/
