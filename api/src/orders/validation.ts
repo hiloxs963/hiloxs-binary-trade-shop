@@ -80,7 +80,6 @@ export const FulfillmentIssueInputSchema = z
 export const SupportListQuerySchema = z
   .object({
     type: z.enum(["PAYMENT_REVIEW_REQUIRED", "FULFILLMENT_ISSUE"]),
-    cursor: z.uuid().optional(),
     limit: z.coerce.number().int().min(1).max(50).default(20),
   })
   .strict();

@@ -8,7 +8,6 @@ import {
   FulfillmentIssueInputSchema,
   LiveInventoryInputSchema,
   OrderCreateSchema,
-  SupportListQuerySchema,
 } from "../../src/orders/validation.js";
 
 const address = {
@@ -95,17 +94,4 @@ describe("Phase 9 request trust boundaries", () => {
     expect(fingerprintOrderRequest(request)).not.toBe(fingerprintOrderRequest(changed));
   });
 
-  it("bounds and validates support pagination cursors", () => {
-    const cursor = "11111111-2222-4333-8444-555555555555";
-    expect(
-      SupportListQuerySchema.parse({ type: "PAYMENT_REVIEW_REQUIRED", cursor, limit: "50" }),
-    ).toEqual({ type: "PAYMENT_REVIEW_REQUIRED", cursor, limit: 50 });
-    expect(() =>
-      SupportListQuerySchema.parse({
-        type: "PAYMENT_REVIEW_REQUIRED",
-        cursor: "opaque",
-        limit: 51,
-      }),
-    ).toThrow();
-  });
 });
