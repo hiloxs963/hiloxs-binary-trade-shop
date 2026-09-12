@@ -24,7 +24,7 @@ describe("reservation worker failure logging", () => {
     });
 
     expect(lines).toHaveLength(1);
-    const entry = JSON.parse(lines[0]!.trim());
+    const entry = JSON.parse(lines[0]!.trim()) as { level: string; message: string; error?: string; tickFailureCount?: number };
     expect(entry.level).toBe("warn");
     expect(entry.message).toBe("Reservation expiry failed for an order");
     expect(entry.error).toBe("Error");
@@ -35,7 +35,7 @@ describe("reservation worker failure logging", () => {
       error: "UnknownError",
     });
 
-    const entry = JSON.parse(lines[0]!.trim());
+    const entry = JSON.parse(lines[0]!.trim()) as { level: string; message: string; error?: string; tickFailureCount?: number };
     expect(entry.error).toBe("UnknownError");
   });
 
@@ -45,7 +45,7 @@ describe("reservation worker failure logging", () => {
     });
 
     expect(lines).toHaveLength(1);
-    const entry = JSON.parse(lines[0]!.trim());
+    const entry = JSON.parse(lines[0]!.trim()) as { level: string; message: string; error?: string; tickFailureCount?: number };
     expect(entry.level).toBe("error");
     expect(entry.message).toBe("Multiple reservation expiry failures in one tick");
     expect(entry.tickFailureCount).toBe(3);

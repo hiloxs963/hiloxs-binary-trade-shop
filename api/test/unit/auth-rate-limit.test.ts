@@ -7,8 +7,9 @@ import type { AuthService } from "../../src/auth/auth.js";
 function makeLimiter(): { limiter: RateLimiter; calls: RateLimitInput[] } {
   const calls: RateLimitInput[] = [];
   const limiter: RateLimiter = {
-    async consume(input) {
+    consume(input) {
       calls.push(input);
+      return Promise.resolve();
     },
   };
   return { limiter, calls };
