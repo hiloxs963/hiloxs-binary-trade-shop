@@ -40,9 +40,19 @@ async function run(): Promise<void> {
   writeOperationalLog("info", "Reservation worker started");
   try {
     while (!controller.signal.aborted) {
-      const processed = await expirePendingReservations(database, new Date(), undefined, () => {
+      let tickFailureCount = 0;
+      const processed = await expirePendingReservations(database, new Date(), undefined, (error) => {
         failureCount += 1;
+        tickFailureCount += 1;
+        writeOperationalLog("warn", "Reservation expiry failed for an order", {
+          error: error instanceof Error ? error.name : "UnknownError",
+        });
       });
+      if (tickFailureCount >= 3) {
+        writeOperationalLog("error", "Multiple reservation expiry failures in one tick", {
+          tickFailureCount,
+        });
+      }
       successCount += processed;
       if (!processed) await abortableDelay(2_000, controller.signal);
       if (Date.now() - lastHeartbeatAt >= 30_000) {
