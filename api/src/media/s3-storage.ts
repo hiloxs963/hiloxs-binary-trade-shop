@@ -5,7 +5,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { MediaRuntimeConfig } from "../config/env.js";
 import { MediaStorageUnavailableError } from "../lib/errors.js";
 import {
@@ -46,23 +46,22 @@ export class S3MediaStorage implements MediaStorage {
   }): Promise<UploadGrant> {
     const expires = Math.max(1, Math.floor((input.expiresAt.getTime() - Date.now()) / 1_000));
     try {
-      const grant = await createPresignedPost(this.#client, {
-        Bucket: this.#bucket,
-        Key: input.objectKey,
-        Expires: expires,
-        Fields: {
-          key: input.objectKey,
-          "Content-Type": input.declaredMime,
-          "x-amz-meta-hiloxs-media-id": input.mediaId,
+      const url = await getSignedUrl(
+        this.#client,
+        new PutObjectCommand({
+          Bucket: this.#bucket,
+          Key: input.objectKey,
+          ContentType: input.declaredMime,
+          ContentLength: input.exactByteSize,
+          Metadata: { "hiloxs-media-id": input.mediaId },
+        }),
+        {
+          expiresIn: expires,
+          signableHeaders: new Set(["content-type", "content-length"]),
+          unhoistableHeaders: new Set(["x-amz-meta-hiloxs-media-id"]),
         },
-        Conditions: [
-          ["eq", "$key", input.objectKey],
-          ["eq", "$Content-Type", input.declaredMime],
-          ["eq", "$x-amz-meta-hiloxs-media-id", input.mediaId],
-          ["content-length-range", input.exactByteSize, input.exactByteSize],
-        ],
-      });
-      return { method: "POST", url: grant.url, fields: grant.fields, expiresAt: input.expiresAt };
+      );
+      return { method: "PUT", url, expiresAt: input.expiresAt };
     } catch (error) {
       throw new MediaStorageUnavailableError(error);
     }

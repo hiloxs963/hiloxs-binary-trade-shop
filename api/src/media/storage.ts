@@ -3,9 +3,9 @@ import { MediaStorageUnavailableError } from "../lib/errors.js";
 import type { AllowedMediaMime } from "./model.js";
 
 export type UploadGrant = {
-  method: "POST";
+  method: "POST" | "PUT";
   url: string;
-  fields: Record<string, string>;
+  fields?: Record<string, string>;
   expiresAt: Date;
 };
 
