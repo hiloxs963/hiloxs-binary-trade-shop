@@ -892,7 +892,6 @@ describe("Phase 9 staff commerce capabilities", () => {
   });
 });
 
-
 async function createStaff(
   email: string,
   permissions: StaffPermission[],

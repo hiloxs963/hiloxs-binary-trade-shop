@@ -148,9 +148,9 @@ describe("environment configuration", () => {
 
   it("requires complete M-Pesa configuration and selects the configured environment", () => {
     expect(resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "test" }))).toBeUndefined();
-    expect(() =>
-      resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production" })),
-    ).toThrow("M-Pesa must be fully configured in production");
+    expect(() => resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production" }))).toThrow(
+      "M-Pesa must be fully configured in production",
+    );
     expect(() =>
       resolveMpesaRuntimeConfig(parseEnv({ NODE_ENV: "production", MPESA_PUBLIC_ENABLED: "true" })),
     ).toThrow("MPESA_PUBLIC_ENABLED is true but");
