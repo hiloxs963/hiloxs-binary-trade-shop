@@ -11,14 +11,15 @@ dependencies have been reviewed.
 
 ## Development
 
-The frontend requires Node.js 24 and npm (or the pinned Bun version used by CI):
+The frontend uses Bun. On Windows, `--backend=copyfile` is required; see
+[`docs/operations/local-development-environment.md`](docs/operations/local-development-environment.md).
 
 ```sh
-npm install
+bun install --frozen-lockfile --backend=copyfile
 npm run dev
 ```
 
-The API has its own deterministic lockfile and commands:
+The API has its own npm lockfile and commands:
 
 ```sh
 cd api

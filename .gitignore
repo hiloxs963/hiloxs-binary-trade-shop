@@ -36,3 +36,6 @@ api/.dev-emails/
 *.sln
 *.sw?
 .claude/
+
+# Guard against bun install in api/ migrating package-lock.json into a bun lockfile
+api/bun.lock
