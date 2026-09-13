@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { Check, CheckCircle2, Copy, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
+import QRCode from "react-qr-code";
 import { AuthRequired } from "@/components/hiloxs/AuthRequired";
 import { PasswordField } from "@/components/hiloxs/AuthForm";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,21 @@ function AccountSecurityPage() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [copied, setCopied] = useState<"manual-key" | "recovery-codes" | null>(null);
+  const setupKey = enrollment ? manualSetupKey(enrollment.totpURI) : null;
+
+  const copyLocally = async (
+    value: string,
+    target: "manual-key" | "recovery-codes",
+  ): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(target);
+      setNotice(target === "manual-key" ? "Setup key copied." : "Recovery codes copied.");
+    } catch {
+      setNotice("Copy was unavailable. Select the text and copy it manually.");
+    }
+  };
 
   if (auth.isLoading) return <SecurityStatus text="Checking account security..." />;
   if (!auth.isAuthenticated) {
@@ -70,17 +86,65 @@ function AccountSecurityPage() {
           <div className="space-y-5">
             <div>
               <h2 className="font-semibold">Add HILOXS to your authenticator</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Use this setup URI, then verify a six-digit code to finish enrollment.
+              <p className="mt-1 text-sm font-medium">
+                Scan this code with your authenticator app.
               </p>
-              <p className="mt-3 break-all rounded-md border border-border bg-secondary p-3 font-mono text-xs">
-                {enrollment.totpURI}
-              </p>
+              <div className="mt-4 w-56 bg-white p-4">
+                <QRCode
+                  value={enrollment.totpURI}
+                  size={224}
+                  level="M"
+                  title="HILOXS authenticator setup code"
+                  className="h-auto w-full"
+                />
+              </div>
+              {setupKey && (
+                <details className="mt-4 max-w-xl border-t border-border pt-3">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">
+                    Show manual setup key
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Enter this key manually and choose a time-based authenticator code.
+                    </p>
+                    <div className="flex items-start gap-2">
+                      <code className="min-w-0 flex-1 break-all rounded-md border border-border bg-secondary p-3 text-xs">
+                        {setupKey}
+                      </code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          void copyLocally(setupKey, "manual-key");
+                        }}
+                      >
+                        {copied === "manual-key" ? <Check aria-hidden /> : <Copy aria-hidden />}
+                        {copied === "manual-key" ? "Copied" : "Copy key"}
+                      </Button>
+                    </div>
+                  </div>
+                </details>
+              )}
             </div>
             <div>
-              <h3 className="text-sm font-semibold">Backup codes</h3>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold">One-time recovery codes</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    void copyLocally(enrollment.backupCodes.join("\n"), "recovery-codes")
+                  }
+                >
+                  {copied === "recovery-codes" ? <Check aria-hidden /> : <Copy aria-hidden />}
+                  {copied === "recovery-codes" ? "Copied" : "Copy codes"}
+                </Button>
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Store these securely now. They are shown only during this enrollment.
+                Each code works once. Store them offline in a secure place now. They will not be
+                shown again after you leave this enrollment flow.
               </p>
               <ul className="mt-3 grid gap-2 rounded-md border border-border p-4 font-mono text-sm sm:grid-cols-2">
                 {enrollment.backupCodes.map((backupCode) => (
@@ -103,6 +167,7 @@ function AccountSecurityPage() {
                   await auth.refresh();
                   setCode("");
                   setEnrollment(null);
+                  setCopied(null);
                   setNotice("Two-factor authentication is now enabled.");
                 } catch {
                   setNotice("The authenticator code could not be verified.");
@@ -137,6 +202,7 @@ function AccountSecurityPage() {
               try {
                 setEnrollment(await enableTwoFactor(password));
                 setPassword("");
+                setCopied(null);
               } catch {
                 setNotice("Two-factor enrollment could not be started.");
               } finally {
@@ -173,6 +239,17 @@ function AccountSecurityPage() {
       </div>
     </section>
   );
+}
+
+function manualSetupKey(totpURI: string): string | null {
+  try {
+    const url = new URL(totpURI);
+    if (url.protocol !== "otpauth:" || url.hostname !== "totp") return null;
+    const secret = url.searchParams.get("secret")?.trim();
+    return secret && /^[A-Z2-7]+=*$/i.test(secret) ? secret : null;
+  } catch {
+    return null;
+  }
 }
 
 function SecurityStatus({ text }: { text: string }) {
