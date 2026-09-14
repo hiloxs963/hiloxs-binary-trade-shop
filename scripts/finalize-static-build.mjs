@@ -5,11 +5,9 @@ import path from "node:path";
 import {
   CLIENT_DIR,
   SITE_ORIGIN,
-  executableInlineScripts,
   listFiles,
   parseSitemap,
   readHtmlFiles,
-  scriptHash,
 } from "./static-build-lib.mjs";
 
 const indexPath = path.join(CLIENT_DIR, "index.html");
@@ -45,20 +43,15 @@ const notFoundHtml = `<!doctype html>
 `;
 await writeFile(path.join(CLIENT_DIR, "404.html"), notFoundHtml);
 
-const inlineHashes = new Set();
-for (const { html } of await readHtmlFiles()) {
-  for (const body of executableInlineScripts(html)) inlineHashes.add(scriptHash(body));
-}
-
-// hotfix/csp-inline-blocking: 'unsafe-inline' is required for both directives.
-// script-src: the TanStack Start stream barrier embeds Date.now() (u: field) at SSR time,
-//   making its content byte-unstable across builds; hashes cannot be pre-committed.
-//   Build-time hashes are kept alongside 'unsafe-inline' for defence in depth on static scripts.
-// style-src: React injects inline styles at runtime; they have no build-time representation
-//   and cannot be covered by hashes on a static host with no per-request nonce.
+// CSP spec §8.2: when a directive contains hash or nonce values, 'unsafe-inline' is silently
+// ignored by the browser — hashes and 'unsafe-inline' are mutually exclusive. script-src must
+// therefore carry NO hashes. Hashes are not viable here anyway: the TanStack Start
+// $tsr-stream-barrier script embeds Date.now() at SSR time, making its body byte-unstable
+// across builds. style-src: React injects inline styles at runtime; they cannot be hashed on
+// a static host with no per-request nonce.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${[...inlineHashes].sort().join(" ")}`.trim(),
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' https://api.hiloxs.co.ke",

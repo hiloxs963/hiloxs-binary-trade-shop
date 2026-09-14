@@ -8,13 +8,11 @@ import {
   EXPECTED_PUBLIC_PAGE_COUNT,
   SITE_ORIGIN,
   assert,
-  executableInlineScripts,
   exists,
   expectedHtmlPath,
   listFiles,
   parseSitemap,
   readHtmlFiles,
-  scriptHash,
 } from "./static-build-lib.mjs";
 
 const sitemapXml = await readFile(path.join(CLIENT_DIR, "sitemap.xml"), "utf8");
@@ -60,14 +58,12 @@ assert(
 );
 
 const htmlFiles = await readHtmlFiles();
-const executableHashes = new Set();
 for (const { file, html } of htmlFiles) {
   assert(
     !/fonts\.(?:googleapis|gstatic)\.com/i.test(html),
     `External Google font reference in ${file}`,
   );
   assert(!/<script\b[^>]+src=["']https?:\/\//i.test(html), `External script in ${file}`);
-  for (const body of executableInlineScripts(html)) executableHashes.add(scriptHash(body));
 }
 
 for (const rawUrl of productUrls) {
@@ -108,17 +104,14 @@ for (const required of [
 // 'unsafe-eval' must never appear anywhere in the CSP.
 assert(!htaccess.includes("'unsafe-eval'"), "CSP contains 'unsafe-eval'");
 
-// Determine whether script-src opts into 'unsafe-inline'.
-const scriptSrcHasUnsafeInline = /script-src\s+[^;]*'unsafe-inline'/.test(htaccess);
-
-// Every inline script found in the build must be covered: either its hash appears in the CSP
-// or script-src carries 'unsafe-inline'. Hashes are kept for defence in depth even when
-// 'unsafe-inline' is present, so both conditions should hold in the hotfix configuration.
-for (const hash of executableHashes)
-  assert(
-    scriptSrcHasUnsafeInline || htaccess.includes(hash),
-    `CSP is missing inline script hash ${hash} and script-src has no 'unsafe-inline'`,
-  );
+// CSP spec §8.2: when a directive contains hash or nonce values, 'unsafe-inline' is silently
+// ignored. script-src must carry 'unsafe-inline' with NO sha256 hashes — having both is the
+// failure mode that caused the production outage.
+assert(/script-src\s+[^;]*'unsafe-inline'/.test(htaccess), "script-src is missing 'unsafe-inline'");
+assert(
+  !/script-src\s+[^;]*'sha256-/.test(htaccess),
+  "script-src contains sha256 hashes alongside 'unsafe-inline' — per CSP spec, hashes suppress 'unsafe-inline'",
+);
 
 // style-src must include 'unsafe-inline': React injects inline styles at runtime; they have
 // no build-time HTML representation and cannot be pre-hashed on a static host.
@@ -145,7 +138,7 @@ for (const file of await listFiles()) {
 await smokeTestStaticRoutes(productUrls[0]);
 
 console.log(
-  `Verified ${urls.length} prerendered public pages, ${productUrls.length} products, ${executableHashes.size} CSP inline-script hashes, and release checksums.`,
+  `Verified ${urls.length} prerendered public pages, ${productUrls.length} products, and release checksums.`,
 );
 
 async function smokeTestStaticRoutes(productUrl) {
