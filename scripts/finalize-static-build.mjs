@@ -50,10 +50,16 @@ for (const { html } of await readHtmlFiles()) {
   for (const body of executableInlineScripts(html)) inlineHashes.add(scriptHash(body));
 }
 
+// hotfix/csp-inline-blocking: 'unsafe-inline' is required for both directives.
+// script-src: the TanStack Start stream barrier embeds Date.now() (u: field) at SSR time,
+//   making its content byte-unstable across builds; hashes cannot be pre-committed.
+//   Build-time hashes are kept alongside 'unsafe-inline' for defence in depth on static scripts.
+// style-src: React injects inline styles at runtime; they have no build-time representation
+//   and cannot be covered by hashes on a static host with no per-request nonce.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' ${[...inlineHashes].sort().join(" ")}`.trim(),
-  "style-src 'self'",
+  `script-src 'self' 'unsafe-inline' ${[...inlineHashes].sort().join(" ")}`.trim(),
+  "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' https://api.hiloxs.co.ke",
   "connect-src 'self' https://api.hiloxs.co.ke",
