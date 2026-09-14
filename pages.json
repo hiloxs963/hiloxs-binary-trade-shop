@@ -1,0 +1,315 @@
+{
+  "pages": [
+    {
+      "path": "/",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/training",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/binary-plan",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/trading",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/hp-elitebook-840-g8-i7-16gb-512gb",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/dell-latitude-5420-i5-8gb-256gb",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/lenovo-thinkpad-x1-carbon-gen-9",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/macbook-air-m2-8gb-256gb",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/samsung-55-crystal-uhd-4k-smart-tv",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/lg-ultragear-27-165hz-gaming-monitor",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/dell-p2422h-24-ips-office-monitor",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/hisense-43-smart-frameless-tv",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/jbl-bar-5-1-soundbar-wireless-woofer",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/sony-sa-sw3-200w-active-subwoofer",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/vitron-3-1ch-home-theatre-woofer",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/edifier-r1280db-studio-monitors",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/anker-65w-gan-charger-usb-c-cable",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/logitech-mx-keys-s-wireless-keyboard",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/1500va-line-interactive-ups",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/hdmi-2-1-8k-braided-cable-3m",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/20000mah-fast-power-bank",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/smart-6-7-android-phone-128gb",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/airpulse-wireless-earbuds",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/10-kids-learning-tablet",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/6l-digital-air-fryer",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/non-stick-cookware-set-7pc",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/stainless-steel-cutlery-24pc",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/2l-electric-kettle-cordless",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/men-s-classic-polo-shirt",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/urban-canvas-sneakers",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/ladies-ankara-maxi-dress",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/minimalist-steel-watch",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/vitamin-c-brightening-serum",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/shea-and-argan-body-butter",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/digital-bathroom-scale",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/rechargeable-hair-clipper",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/school-backpack-waterproof",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/a4-exercise-books-10-pack",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/scientific-calculator-fx-991",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/office-desk-organiser-set",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/premium-aa-arabica-coffee-1kg",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/sunflower-cooking-oil-5l",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/long-grain-pishori-rice-5kg",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/assorted-spice-rack-12-jars",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/adjustable-dumbbell-set-20kg",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/size-5-match-football",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/6mm-yoga-mat-strap",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop/4-person-camping-tent",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/login",
+      "prerender": {
+        "outputPath": "/_shell",
+        "crawlLinks": false,
+        "retryCount": 0,
+        "enabled": true,
+        "headers": {
+          "X-TSS_SHELL": "true"
+        }
+      },
+      "sitemap": {
+        "exclude": true
+      }
+    }
+  ],
+  "host": "https://hiloxs.co.ke",
+  "lastBuilt": "2026-09-14T19:09:24.341Z"
+}
