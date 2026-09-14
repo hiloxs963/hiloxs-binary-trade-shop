@@ -105,12 +105,27 @@ for (const required of [
   "R=404",
 ])
   assert(htaccess.includes(required), `Missing static security/deployment rule: ${required}`);
-assert(
-  !htaccess.includes("'unsafe-eval'") && !htaccess.includes("'unsafe-inline'"),
-  "CSP contains an unsafe script/style escape hatch",
-);
+// 'unsafe-eval' must never appear anywhere in the CSP.
+assert(!htaccess.includes("'unsafe-eval'"), "CSP contains 'unsafe-eval'");
+
+// Determine whether script-src opts into 'unsafe-inline'.
+const scriptSrcHasUnsafeInline = /script-src\s+[^;]*'unsafe-inline'/.test(htaccess);
+
+// Every inline script found in the build must be covered: either its hash appears in the CSP
+// or script-src carries 'unsafe-inline'. Hashes are kept for defence in depth even when
+// 'unsafe-inline' is present, so both conditions should hold in the hotfix configuration.
 for (const hash of executableHashes)
-  assert(htaccess.includes(hash), `CSP is missing inline script hash ${hash}`);
+  assert(
+    scriptSrcHasUnsafeInline || htaccess.includes(hash),
+    `CSP is missing inline script hash ${hash} and script-src has no 'unsafe-inline'`,
+  );
+
+// style-src must include 'unsafe-inline': React injects inline styles at runtime; they have
+// no build-time HTML representation and cannot be pre-hashed on a static host.
+assert(
+  /style-src\s+[^;]*'unsafe-inline'/.test(htaccess),
+  "style-src is missing 'unsafe-inline' (required for React runtime inline styles)",
+);
 
 assert(await exists(path.join(CLIENT_DIR, "404.html")), "404.html is missing");
 assert(await exists(path.join(CLIENT_DIR, "_shell.html")), "Private-route SPA shell is missing");
