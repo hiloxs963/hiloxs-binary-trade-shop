@@ -165,7 +165,7 @@ export async function getSellerProductMedia(submissionId: string): Promise<Selle
 export async function uploadSellerProductMedia(submissionId: string, file: File): Promise<void> {
   const intent = await send<{
     media: SellerProductMedia;
-    upload: { method: "POST"; url: string; fields: Record<string, string> };
+    upload: { method: "POST" | "PUT"; url: string; fields?: Record<string, string> };
   }>(
     `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/upload-intents`,
     {
@@ -178,12 +178,31 @@ export async function uploadSellerProductMedia(submissionId: string, file: File)
     },
     "Unable to prepare the media upload",
   );
-  const form = new FormData();
-  for (const [key, value] of Object.entries(intent.upload.fields)) form.append(key, value);
-  form.append("file", file);
-  const uploaded = await fetch(intent.upload.url, { method: "POST", body: form });
+  let uploaded: Response;
+  if (intent.upload.method === "PUT") {
+    // Content-Length is a forbidden header in the Fetch API — browsers set it
+    // automatically from the File body, which matches the signed value (file.size).
+    uploaded = await fetch(intent.upload.url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type,
+        "x-amz-meta-hiloxs-media-id": intent.media.id,
+      },
+      body: file,
+    });
+  } else {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(intent.upload.fields ?? {})) form.append(key, value);
+    form.append("file", file);
+    uploaded = await fetch(intent.upload.url, { method: "POST", body: form });
+  }
   if (!uploaded.ok) {
-    throw new SellerProductApiError("The private media upload failed", uploaded.status);
+    throw new SellerProductApiError(
+      uploaded.status === 403
+        ? "The upload was rejected — the file may be too large, the wrong type, or the grant has expired"
+        : "The private media upload failed",
+      uploaded.status,
+    );
   }
   await send(
     `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(intent.media.id)}/finalize`,
