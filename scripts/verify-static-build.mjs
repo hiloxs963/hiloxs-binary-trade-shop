@@ -120,6 +120,15 @@ assert(
   "style-src is missing 'unsafe-inline' (required for React runtime inline styles)",
 );
 
+// Phase 12 uploads a file straight from the browser to R2 with a presigned PUT. If the R2
+// origin is dropped from connect-src that fetch is blocked by CSP and uploads fail silently.
+assert(
+  /connect-src\s+[^;]*https:\/\/8e21c80244678cbc435f75750047fea7\.r2\.cloudflarestorage\.com/.test(
+    htaccess,
+  ),
+  "connect-src is missing the R2 origin - direct browser presigned PUT uploads will be blocked by CSP",
+);
+
 assert(await exists(path.join(CLIENT_DIR, "404.html")), "404.html is missing");
 assert(await exists(path.join(CLIENT_DIR, "_shell.html")), "Private-route SPA shell is missing");
 
