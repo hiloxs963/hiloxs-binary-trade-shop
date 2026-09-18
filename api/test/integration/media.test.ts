@@ -137,7 +137,7 @@ afterAll(async () => {
 });
 
 describe("private S3-compatible media storage", () => {
-  it("enforces the exact server key, MIME, size, metadata, and short POST expiry", async () => {
+  it("enforces the exact key, MIME, size, metadata, and expiry as signed PUT headers", async () => {
     const key = `quarantine/test/${randomUUID()}`;
     const mediaId = randomUUID();
     const expiresAt = new Date(Date.now() + 5 * 60_000);
@@ -148,29 +148,18 @@ describe("private S3-compatible media storage", () => {
       mediaId,
       expiresAt,
     });
-    const policy = JSON.parse(
-      Buffer.from(grant.fields["policy"] ?? grant.fields["Policy"] ?? "", "base64").toString(
-        "utf8",
-      ),
-    ) as { expiration: string; conditions: unknown[] };
 
-    expect(grant.method).toBe("POST");
+    expect(grant.method).toBe("PUT");
     expect(grant.expiresAt).toEqual(expiresAt);
-    expect(Math.abs(new Date(policy.expiration).getTime() - expiresAt.getTime())).toBeLessThan(
-      2_000,
+    expect(grant.fields).toBeUndefined();
+    const headerList = (new URL(grant.url).searchParams.get("X-Amz-SignedHeaders") ?? "").split(
+      ";",
     );
-    expect(policy.conditions).toContainEqual({ bucket: mediaConfig.bucket });
-    expect(policy.conditions).toContainEqual(["eq", "$key", key]);
-    expect(policy.conditions).toContainEqual(["eq", "$Content-Type", "image/jpeg"]);
-    expect(policy.conditions).toContainEqual(["eq", "$x-amz-meta-hiloxs-media-id", mediaId]);
-    expect(policy.conditions).toContainEqual([
-      "content-length-range",
-      fixtureImage.byteLength,
-      fixtureImage.byteLength,
-    ]);
-    expect(grant.fields).not.toHaveProperty("acl");
+    expect(headerList).toContain("content-length");
+    expect(headerList).toContain("content-type");
+    expect(headerList).toContain("x-amz-meta-hiloxs-media-id");
 
-    expect(await uploadGrant(grant, fixtureImage, "image/jpeg")).toBe(204);
+    expect(await uploadGrant(grant, fixtureImage, "image/jpeg", {}, mediaId)).toBe(200);
     const head = await storage.head(key);
     expect(head).toMatchObject({
       byteSize: fixtureImage.byteLength,
@@ -184,32 +173,60 @@ describe("private S3-compatible media storage", () => {
     expect(await storage.head(key)).toBeNull();
   });
 
-  it("rejects browser changes to upload key, ACL, metadata, MIME, or byte size", async () => {
+  it("rejects browser changes to upload MIME, byte size, or signed metadata", async () => {
+    const mediaId = randomUUID();
     const grant = await storage.createUploadGrant({
       objectKey: `quarantine/test/${randomUUID()}`,
       declaredMime: "image/jpeg",
       exactByteSize: fixtureImage.byteLength,
-      mediaId: randomUUID(),
+      mediaId,
       expiresAt: new Date(Date.now() + 60_000),
     });
 
     expect(
-      await uploadGrant(grant, Buffer.concat([fixtureImage, Buffer.from([0])]), "image/jpeg"),
+      await uploadGrant(
+        grant,
+        Buffer.concat([fixtureImage, Buffer.from([0])]),
+        "image/jpeg",
+        {},
+        mediaId,
+      ),
     ).toBeGreaterThanOrEqual(400);
-    expect(await uploadGrant(grant, fixtureImage, "image/png")).toBeGreaterThanOrEqual(400);
+    expect(await uploadGrant(grant, fixtureImage, "image/png", {}, mediaId)).toBeGreaterThanOrEqual(
+      400,
+    );
     expect(
-      await uploadGrant(grant, fixtureImage, "image/jpeg", {
-        key: `quarantine/browser-chosen/${randomUUID()}`,
-      }),
+      await uploadGrant(
+        grant,
+        fixtureImage,
+        "image/jpeg",
+        {
+          "x-amz-meta-hiloxs-media-id": randomUUID(),
+        },
+        mediaId,
+      ),
     ).toBeGreaterThanOrEqual(400);
-    expect(
-      await uploadGrant(grant, fixtureImage, "image/jpeg", { "x-amz-acl": "public-read" }),
-    ).toBeGreaterThanOrEqual(400);
-    expect(
-      await uploadGrant(grant, fixtureImage, "image/jpeg", {
-        "x-amz-meta-browser-field": "untrusted",
-      }),
-    ).toBeGreaterThanOrEqual(400);
+  });
+
+  it("rejects an upload whose byte count differs from the signed content-length", async () => {
+    const mediaId = randomUUID();
+    const key = `quarantine/test/${randomUUID()}`;
+    const grant = await storage.createUploadGrant({
+      objectKey: key,
+      declaredMime: "image/jpeg",
+      exactByteSize: fixtureImage.byteLength,
+      mediaId,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const oversized = Buffer.concat([fixtureImage, Buffer.from([0])]);
+    expect(await uploadGrant(grant, oversized, "image/jpeg", {}, mediaId)).toBeGreaterThanOrEqual(
+      400,
+    );
+    const undersized = fixtureImage.subarray(0, fixtureImage.byteLength - 1);
+    expect(await uploadGrant(grant, undersized, "image/jpeg", {}, mediaId)).toBeGreaterThanOrEqual(
+      400,
+    );
   });
 
   it("allows an identical immutable retry but rejects a canonical overwrite", async () => {
@@ -259,10 +276,12 @@ describe("seller upload, inventory, and worker boundaries", () => {
 
     expect(injection.statusCode).toBe(400);
     expect(foreignAttempt.statusCode).toBe(404);
-    expect(intent.upload.fields).not.toHaveProperty("acl");
+    expect(intent.upload.method).toBe("PUT");
     expect(intent.media).not.toHaveProperty("quarantineObjectKey");
     expect(intent.media.rightsTermsVersion).toBe(SELLER_MEDIA_RIGHTS_VERSION);
-    expect(await uploadGrant(intent.upload, fixtureImage, "image/jpeg")).toBe(204);
+    expect(await uploadGrant(intent.upload, fixtureImage, "image/jpeg", {}, intent.media.id)).toBe(
+      200,
+    );
 
     const path = `/api/v1/seller/products/${owner.submissionId}/media/${intent.media.id}/finalize`;
     const first = await post(path, {}, owner.cookie);
@@ -318,7 +337,9 @@ describe("seller upload, inventory, and worker boundaries", () => {
     const mediaIds: string[] = [];
     for (let index = 0; index < 2; index += 1) {
       const intent = await createIntent(owner.cookie, owner.submissionId);
-      expect(await uploadGrant(intent.upload, fixtureImage, "image/jpeg")).toBe(204);
+      expect(
+        await uploadGrant(intent.upload, fixtureImage, "image/jpeg", {}, intent.media.id),
+      ).toBe(200);
       await post(
         `/api/v1/seller/products/${owner.submissionId}/media/${intent.media.id}/finalize`,
         {},
@@ -369,7 +390,9 @@ describe("seller upload, inventory, and worker boundaries", () => {
       mediaId: fixture.mediaId,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    expect(await uploadGrant(replacementGrant, replacement, "image/jpeg")).toBe(204);
+    expect(
+      await uploadGrant(replacementGrant, replacement, "image/jpeg", {}, fixture.mediaId),
+    ).toBe(200);
     await processNextMedia(database, storage);
     const [changed] = await database.db
       .select()
@@ -453,7 +476,7 @@ describe("seller upload, inventory, and worker boundaries", () => {
         mediaId,
         expiresAt: new Date(now.getTime() + 60_000),
       });
-      expect(await uploadGrant(grant, fixtureImage, "image/jpeg")).toBe(204);
+      expect(await uploadGrant(grant, fixtureImage, "image/jpeg", {}, mediaId)).toBe(200);
     }
     await database.db.insert(sellerProductMedia).values([
       {
@@ -564,9 +587,9 @@ describe("seller upload, inventory, and worker boundaries", () => {
     );
     const intent = intentResponse.json<{
       media: { id: string };
-      upload: { url: string; fields: Record<string, string> };
+      upload: { method: "POST" | "PUT"; url: string; fields?: Record<string, string> };
     }>();
-    expect(await uploadGrant(intent.upload, invalid, "image/jpeg")).toBe(204);
+    expect(await uploadGrant(intent.upload, invalid, "image/jpeg", {}, intent.media.id)).toBe(200);
     expect(
       (
         await post(
@@ -868,7 +891,9 @@ describe("controlled catalog activation", () => {
       mediaId: cleanupMediaId,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    expect(await uploadGrant(cleanupGrant, fixtureImage, "image/jpeg")).toBe(204);
+    expect(await uploadGrant(cleanupGrant, fixtureImage, "image/jpeg", {}, cleanupMediaId)).toBe(
+      200,
+    );
     await database.db.insert(sellerProductMedia).values({
       id: cleanupMediaId,
       sellerProductSubmissionId: fixture.submissionId,
@@ -1114,7 +1139,9 @@ async function insertApprovedMedia(submissionId: string) {
 async function directUploadedMedia() {
   const seller = await approvedSeller(`phase8-worker-${randomUUID()}@example.com`);
   const intent = await createIntent(seller.cookie, seller.submissionId);
-  expect(await uploadGrant(intent.upload, fixtureImage, "image/jpeg")).toBe(204);
+  expect(await uploadGrant(intent.upload, fixtureImage, "image/jpeg", {}, intent.media.id)).toBe(
+    200,
+  );
   const finalized = await post(
     `/api/v1/seller/products/${seller.submissionId}/media/${intent.media.id}/finalize`,
     {},
@@ -1137,18 +1164,37 @@ async function createIntent(cookie: string, submissionId: string) {
   expect(response.statusCode).toBe(201);
   return response.json<{
     media: { id: string; rightsTermsVersion: string } & Record<string, unknown>;
-    upload: { method: "POST"; url: string; fields: Record<string, string>; expiresAt: string };
+    upload: {
+      method: "POST" | "PUT";
+      url: string;
+      fields?: Record<string, string>;
+      expiresAt: string;
+    };
   }>();
 }
 
 async function uploadGrant(
-  grant: { url: string; fields: Record<string, string> },
+  grant: { url: string; method?: "POST" | "PUT"; fields?: Record<string, string> },
   body: Buffer,
   mime: string,
   overrides: Record<string, string> = {},
+  mediaId?: string,
 ): Promise<number> {
+  if (grant.method === "PUT") {
+    return (
+      await fetch(grant.url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": mime,
+          "x-amz-meta-hiloxs-media-id": mediaId ?? "",
+          ...overrides,
+        },
+        body,
+      })
+    ).status;
+  }
   const form = new FormData();
-  for (const [name, value] of Object.entries(grant.fields)) form.append(name, value);
+  for (const [name, value] of Object.entries(grant.fields ?? {})) form.append(name, value);
   form.set("Content-Type", mime);
   for (const [name, value] of Object.entries(overrides)) form.set(name, value);
   form.append("file", new Blob([body], { type: mime }));
