@@ -55,7 +55,11 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' https://api.hiloxs.co.ke",
-  "connect-src 'self' https://api.hiloxs.co.ke",
+  // The R2 bucket origin is required for the Phase 12 direct browser upload: the presigned
+  // PUT in src/lib/seller-product-api.ts is a cross-origin fetch straight to R2, so without
+  // this origin the upload is blocked by our own CSP with no visible error. It must stay in
+  // sync with MEDIA_S3_ENDPOINT in Railway — removing it breaks uploads silently.
+  "connect-src 'self' https://api.hiloxs.co.ke https://8e21c80244678cbc435f75750047fea7.r2.cloudflarestorage.com",
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
