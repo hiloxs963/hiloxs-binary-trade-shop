@@ -394,6 +394,27 @@ async function inventoryResponse(database: DatabaseClient, submissionId: string)
   };
 }
 
+// Seller-facing text for each MediaProcessingError code. The raw code stays internal:
+// sellers get the explanation, not the enum.
+const PROCESSING_ERROR_MESSAGES: Record<string, string> = {
+  DIMENSIONS_OUT_OF_RANGE: "Image must be at least 600×600 pixels.",
+  UNSUPPORTED_FORMAT: "Only JPEG, PNG, and WebP images are supported.",
+  MULTI_FRAME_IMAGE: "Animated images are not supported.",
+  TOO_MANY_CHANNELS: "The image has an unsupported colour profile.",
+  INVALID_IMAGE: "The file appears to be corrupt or is not a valid image.",
+  MISSING_FINALIZATION_DATA: "The upload was not finalized correctly.",
+  QUARANTINE_CHANGED: "The uploaded file changed unexpectedly. Please re-upload.",
+  STORAGE_OR_PROCESSING_FAILURE: "A temporary error occurred. The system will retry automatically.",
+};
+
+const PROCESSING_ERROR_FALLBACK = "Processing could not be completed.";
+
+function processingErrorMessage(media: typeof sellerProductMedia.$inferSelect): string | null {
+  if (media.status !== "PROCESSING_FAILED") return null;
+  if (!media.lastProcessingErrorCode) return PROCESSING_ERROR_FALLBACK;
+  return PROCESSING_ERROR_MESSAGES[media.lastProcessingErrorCode] ?? PROCESSING_ERROR_FALLBACK;
+}
+
 function serializeSellerMedia(media: typeof sellerProductMedia.$inferSelect) {
   return {
     id: media.id,
@@ -411,6 +432,7 @@ function serializeSellerMedia(media: typeof sellerProductMedia.$inferSelect) {
     processedAt: media.processedAt?.toISOString() ?? null,
     reviewedAt: media.reviewedAt?.toISOString() ?? null,
     reviewReason: media.status === "REJECTED" ? media.reviewReason : null,
+    processingError: processingErrorMessage(media),
   };
 }
 

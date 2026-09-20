@@ -64,6 +64,7 @@ export type SellerProductMedia = {
   processedAt: string | null;
   reviewedAt: string | null;
   reviewReason: string | null;
+  processingError: string | null;
 };
 
 export type SellerMediaState = {

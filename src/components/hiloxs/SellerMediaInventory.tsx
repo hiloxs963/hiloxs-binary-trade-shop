@@ -193,6 +193,9 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
                 {media.reviewReason && (
                   <p className="mt-2 text-xs text-destructive">{media.reviewReason}</p>
                 )}
+                {media.processingError && (
+                  <p className="mt-2 text-xs text-destructive">{media.processingError}</p>
+                )}
                 {!activated && media.status === "PENDING_UPLOAD" && (
                   <Button
                     className="mt-2"
