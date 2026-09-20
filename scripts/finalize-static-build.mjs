@@ -89,9 +89,13 @@ RewriteRule ^ https://hiloxs.co.ke%{REQUEST_URI} [R=308,L,NE]
 </IfModule>
 
 # Preserve client-side access to known private routes without exposing them in the sitemap.
+# shop/<slug> is included because only the static product list is prerendered: a seller product
+# activated after the build has no HTML file, so a direct load or refresh would otherwise hit the
+# catch-all 404 below. The client route resolves the slug against the API and renders its own
+# not-found for a bogus one, so this serves the shell rather than masking a genuine miss.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(?:login|register|forgot-password|reset-password|verify-email|checkout|my-orders|sell-with-us|staff|account/security)/?$ _shell.html [L]
+RewriteRule ^(?:login|register|forgot-password|reset-password|verify-email|checkout|my-orders|sell-with-us|staff|account/security|shop/[^/]+)/?$ _shell.html [L]
 
 # Existing prerendered routes and static assets are served directly. Everything else is a real 404.
 RewriteCond %{REQUEST_FILENAME} !-f
