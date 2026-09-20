@@ -163,7 +163,35 @@ export async function getSellerProductMedia(submissionId: string): Promise<Selle
   );
 }
 
+// Mirrors MIN_MEDIA_WIDTH / MIN_MEDIA_HEIGHT in api/src/media/model.ts. Checking here avoids
+// spending a presigned upload, a finalize call, and a worker cycle on an image that can never
+// pass processing. The server and worker remain authoritative.
+const MIN_MEDIA_DIMENSION = 600;
+
+export const MEDIA_DIMENSIONS_TOO_SMALL = "MEDIA_DIMENSIONS_TOO_SMALL";
+
+async function assertMinimumDimensions(file: File): Promise<void> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // Undecodable here, or createImageBitmap is unavailable. Let the server and the worker
+    // make the authoritative call rather than blocking an upload on a client-side limitation.
+    return;
+  }
+  const { width, height } = bitmap;
+  bitmap.close();
+  if (width < MIN_MEDIA_DIMENSION || height < MIN_MEDIA_DIMENSION) {
+    throw new SellerProductApiError(
+      `Image must be at least ${MIN_MEDIA_DIMENSION}×${MIN_MEDIA_DIMENSION} pixels. Yours is ${width}×${height}.`,
+      400,
+      MEDIA_DIMENSIONS_TOO_SMALL,
+    );
+  }
+}
+
 export async function uploadSellerProductMedia(submissionId: string, file: File): Promise<void> {
+  await assertMinimumDimensions(file);
   const intent = await send<{
     media: SellerProductMedia;
     upload: { method: "POST" | "PUT"; url: string; fields?: Record<string, string> };
