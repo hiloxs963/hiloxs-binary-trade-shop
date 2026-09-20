@@ -13,6 +13,7 @@ import {
   sellerMediaPreviewUrl,
   setSellerProductInventory,
   uploadSellerProductMedia,
+  SellerProductApiError,
   type SellerInventoryState,
   type SellerMediaState,
 } from "@/lib/seller-product-api";
@@ -59,6 +60,7 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
   const activated = Boolean(mediaState?.activated || inventoryState?.activated);
 
   const upload = async () => {
+    if (busy) return;
     if (!file || !rightsAccepted || activated) return;
     setBusy("upload");
     setNotice("");
@@ -68,8 +70,12 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
       setRightsAccepted(false);
       await load();
       setNotice("Upload received. Processing status will update after the media worker runs.");
-    } catch {
-      setNotice("The image could not be uploaded safely.");
+    } catch (error) {
+      setNotice(
+        error instanceof SellerProductApiError
+          ? error.message
+          : "The upload could not be completed. Please check your connection and try again.",
+      );
     } finally {
       setBusy("");
     }
