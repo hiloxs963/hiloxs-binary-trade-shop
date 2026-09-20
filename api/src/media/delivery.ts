@@ -27,9 +27,15 @@ export async function sendMediaVariant(
   ) {
     throw new MediaStorageUnavailableError();
   }
+  // @fastify/helmet defaults Cross-Origin-Resource-Policy to same-origin on every response, which
+  // stops the browser rendering these bytes: the frontend is hiloxs.co.ke and the API is
+  // api.hiloxs.co.ke. It is overridden for image responses only — JSON endpoints keep the stricter
+  // global default. Authorization is unaffected: private variants still require a session and stay
+  // no-store.
   return reply
     .type("image/webp")
     .header("X-Content-Type-Options", "nosniff")
+    .header("Cross-Origin-Resource-Policy", "cross-origin")
     .header("Content-Length", String(body.byteLength))
     .header("ETag", `"sha256-${variant.sha256}"`)
     .header(
