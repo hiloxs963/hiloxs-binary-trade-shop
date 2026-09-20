@@ -8,6 +8,7 @@ import {
   MEDIA_PROCESSING_RETRY_BASE_MS,
   QUARANTINE_RETENTION_MS,
 } from "./model.js";
+import { writeOperationalLog } from "../lib/logger.js";
 import { MediaProcessingError, processProductImage } from "./image-processor.js";
 import type { MediaStorage } from "./storage.js";
 import { readStoredObject, StoredObjectChangedError } from "./storage.js";
@@ -115,6 +116,12 @@ export async function processNextMedia(
         : error instanceof StoredObjectChangedError
           ? new MediaProcessingError("QUARANTINE_CHANGED")
           : new MediaProcessingError("STORAGE_OR_PROCESSING_FAILURE", true);
+    writeOperationalLog("warn", "Media processing rejected", {
+      mediaId: claimed.id,
+      errorCode: processingError.code,
+      retryable: processingError.retryable,
+      attempt: claimed.processingAttempts,
+    });
     await database.db
       .update(sellerProductMedia)
       .set({
