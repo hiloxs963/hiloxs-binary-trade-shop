@@ -13,6 +13,8 @@ import {
   sellerMediaPreviewUrl,
   setSellerProductInventory,
   uploadSellerProductMedia,
+  MEDIA_DIMENSIONS_TOO_SMALL,
+  SellerProductApiError,
   type SellerInventoryState,
   type SellerMediaState,
 } from "@/lib/seller-product-api";
@@ -68,8 +70,12 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
       setRightsAccepted(false);
       await load();
       setNotice("Upload received. Processing status will update after the media worker runs.");
-    } catch {
-      setNotice("The image could not be uploaded safely.");
+    } catch (error) {
+      setNotice(
+        error instanceof SellerProductApiError && error.code === MEDIA_DIMENSIONS_TOO_SMALL
+          ? error.message
+          : "The image could not be uploaded safely.",
+      );
     } finally {
       setBusy("");
     }
@@ -192,6 +198,9 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
                 </Badge>
                 {media.reviewReason && (
                   <p className="mt-2 text-xs text-destructive">{media.reviewReason}</p>
+                )}
+                {media.processingError && (
+                  <p className="mt-2 text-xs text-destructive">{media.processingError}</p>
                 )}
                 {!activated && media.status === "PENDING_UPLOAD" && (
                   <Button
