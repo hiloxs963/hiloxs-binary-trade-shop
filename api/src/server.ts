@@ -15,6 +15,7 @@ import { safeErrorForLog } from "./lib/redact.js";
 import { DarajaClient } from "./payments/daraja-client.js";
 import { S3MediaStorage } from "./media/s3-storage.js";
 import { installGracefulShutdown } from "./lib/graceful-shutdown.js";
+import { runStaffBootstrapGrants } from "./staff/startup-bootstrap.js";
 
 async function start(): Promise<void> {
   const env = parseEnv(process.env);
@@ -24,6 +25,10 @@ async function start(): Promise<void> {
     lockTimeoutMs: env.PG_LOCK_TIMEOUT_MS,
     idleInTransactionTimeoutMs: env.PG_IDLE_IN_TRANSACTION_TIMEOUT_MS,
   });
+  // One-time startup task, deliberately before the app is built and before listen: invalid
+  // bootstrap configuration must stop the deploy rather than serve traffic in a half-configured
+  // state. Not part of the request lifecycle.
+  await runStaffBootstrapGrants(database, env);
   const authRuntime = resolveAuthRuntimeConfig(env);
   const mpesaConfig = resolveMpesaRuntimeConfig(env);
   const mediaRuntime = resolveMediaRuntimeConfig(env);

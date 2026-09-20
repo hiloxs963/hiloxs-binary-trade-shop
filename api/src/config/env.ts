@@ -41,6 +41,8 @@ const EnvironmentSchema = z.object({
   MPESA_ENV: z.enum(["sandbox", "production"]).optional(),
   MPESA_PUBLIC_ENABLED: BooleanEnvironmentSchema,
   STAFF_REVIEW_ENABLED: FailSafeBooleanEnvironmentSchema,
+  STAFF_BOOTSTRAP_USER_ID: z.string().trim().min(1).optional(),
+  STAFF_BOOTSTRAP_PERMISSIONS: z.string().trim().min(1).optional(),
   MEDIA_UPLOAD_ENABLED: BooleanEnvironmentSchema,
   CATALOG_ACTIVATION_ENABLED: BooleanEnvironmentSchema,
   SELLER_COMMERCE_ENABLED: BooleanEnvironmentSchema,
