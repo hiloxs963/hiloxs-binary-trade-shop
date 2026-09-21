@@ -13,7 +13,6 @@ import {
   sellerMediaPreviewUrl,
   setSellerProductInventory,
   uploadSellerProductMedia,
-  MEDIA_DIMENSIONS_TOO_SMALL,
   SellerProductApiError,
   type SellerInventoryState,
   type SellerMediaState,
@@ -61,6 +60,7 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
   const activated = Boolean(mediaState?.activated || inventoryState?.activated);
 
   const upload = async () => {
+    if (busy) return;
     if (!file || !rightsAccepted || activated) return;
     setBusy("upload");
     setNotice("");
@@ -71,10 +71,13 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
       await load();
       setNotice("Upload received. Processing status will update after the media worker runs.");
     } catch (error) {
+      // Every SellerProductApiError message is already seller-facing: they are authored here, or
+      // come from an error the API explicitly marked exposable. That subsumes the dimension check,
+      // which no longer needs a code comparison of its own.
       setNotice(
-        error instanceof SellerProductApiError && error.code === MEDIA_DIMENSIONS_TOO_SMALL
+        error instanceof SellerProductApiError
           ? error.message
-          : "The image could not be uploaded safely.",
+          : "The upload could not be completed. Please check your connection and try again.",
       );
     } finally {
       setBusy("");

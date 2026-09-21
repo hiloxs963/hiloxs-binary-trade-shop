@@ -169,6 +169,7 @@ export async function getSellerProductMedia(submissionId: string): Promise<Selle
 const MIN_MEDIA_DIMENSION = 600;
 
 export const MEDIA_DIMENSIONS_TOO_SMALL = "MEDIA_DIMENSIONS_TOO_SMALL";
+export const UPLOAD_PUT_FAILED = "UPLOAD_PUT_FAILED";
 
 async function assertMinimumDimensions(file: File): Promise<void> {
   let bitmap: ImageBitmap;
@@ -207,37 +208,55 @@ export async function uploadSellerProductMedia(submissionId: string, file: File)
     },
     "Unable to prepare the media upload",
   );
-  let uploaded: Response;
-  if (intent.upload.method === "PUT") {
-    // Content-Length is a forbidden header in the Fetch API — browsers set it
-    // automatically from the File body, which matches the signed value (file.size).
-    uploaded = await fetch(intent.upload.url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": file.type,
-        "x-amz-meta-hiloxs-media-id": intent.media.id,
-      },
-      body: file,
-    });
-  } else {
-    const form = new FormData();
-    for (const [key, value] of Object.entries(intent.upload.fields ?? {})) form.append(key, value);
-    form.append("file", file);
-    uploaded = await fetch(intent.upload.url, { method: "POST", body: form });
-  }
-  if (!uploaded.ok) {
-    throw new SellerProductApiError(
-      uploaded.status === 403
-        ? "The upload was rejected — the file may be too large, the wrong type, or the grant has expired"
-        : "The private media upload failed",
-      uploaded.status,
+  // The intent has created a media row in PENDING_UPLOAD. Everything from here to finalize must
+  // clean that row up on failure, or it lingers on the seller's dashboard looking like a second
+  // upload and consumes one of their six active slots until the worker's 24-hour sweep.
+  try {
+    let uploaded: Response;
+    if (intent.upload.method === "PUT") {
+      // Content-Length is a forbidden header in the Fetch API — browsers set it
+      // automatically from the File body, which matches the signed value (file.size).
+      uploaded = await fetch(intent.upload.url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+          "x-amz-meta-hiloxs-media-id": intent.media.id,
+        },
+        body: file,
+      });
+    } else {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(intent.upload.fields ?? {}))
+        form.append(key, value);
+      form.append("file", file);
+      uploaded = await fetch(intent.upload.url, { method: "POST", body: form });
+    }
+    if (!uploaded.ok) {
+      throw new SellerProductApiError(
+        uploaded.status === 403
+          ? "The upload was rejected — the file may be too large, the wrong type, or the grant has expired"
+          : `The private media upload failed (status ${uploaded.status}). Please try again.`,
+        uploaded.status,
+        UPLOAD_PUT_FAILED,
+      );
+    }
+    await send(
+      `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(intent.media.id)}/finalize`,
+      { method: "POST", body: JSON.stringify({}) },
+      "Unable to finalize the media upload",
     );
+  } catch (error) {
+    // Mobile browsers surface almost nothing for a blocked or dropped upload, so leave a trace for
+    // anyone attaching a remote debugger.
+    console.error("Seller media upload failed", error);
+    try {
+      await abandonSellerProductMedia(submissionId, intent.media.id);
+    } catch {
+      // Best effort. If abandoning fails the row is still swept server-side after the quarantine
+      // retention window, and reporting a cleanup failure would bury the error that actually matters.
+    }
+    throw error;
   }
-  await send(
-    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(intent.media.id)}/finalize`,
-    { method: "POST", body: JSON.stringify({}) },
-    "Unable to finalize the media upload",
-  );
 }
 
 export async function arrangeSellerProductMedia(
