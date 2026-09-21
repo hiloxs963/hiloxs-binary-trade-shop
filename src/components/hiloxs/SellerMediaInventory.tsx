@@ -71,6 +71,9 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
       await load();
       setNotice("Upload received. Processing status will update after the media worker runs.");
     } catch (error) {
+      // Every SellerProductApiError message is already seller-facing: they are authored here, or
+      // come from an error the API explicitly marked exposable. That subsumes the dimension check,
+      // which no longer needs a code comparison of its own.
       setNotice(
         error instanceof SellerProductApiError
           ? error.message
@@ -198,6 +201,9 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
                 </Badge>
                 {media.reviewReason && (
                   <p className="mt-2 text-xs text-destructive">{media.reviewReason}</p>
+                )}
+                {media.processingError && (
+                  <p className="mt-2 text-xs text-destructive">{media.processingError}</p>
                 )}
                 {!activated && media.status === "PENDING_UPLOAD" && (
                   <Button

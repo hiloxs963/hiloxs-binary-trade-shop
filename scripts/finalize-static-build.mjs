@@ -55,7 +55,11 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' https://api.hiloxs.co.ke",
-  "connect-src 'self' https://api.hiloxs.co.ke",
+  // The R2 bucket origin is required for the Phase 12 direct browser upload: the presigned
+  // PUT in src/lib/seller-product-api.ts is a cross-origin fetch straight to R2, so without
+  // this origin the upload is blocked by our own CSP with no visible error. It must stay in
+  // sync with MEDIA_S3_ENDPOINT in Railway — removing it breaks uploads silently.
+  "connect-src 'self' https://api.hiloxs.co.ke https://8e21c80244678cbc435f75750047fea7.r2.cloudflarestorage.com",
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
@@ -89,9 +93,13 @@ RewriteRule ^ https://hiloxs.co.ke%{REQUEST_URI} [R=308,L,NE]
 </IfModule>
 
 # Preserve client-side access to known private routes without exposing them in the sitemap.
+# shop/<slug> is included because only the static product list is prerendered: a seller product
+# activated after the build has no HTML file, so a direct load or refresh would otherwise hit the
+# catch-all 404 below. The client route resolves the slug against the API and renders its own
+# not-found for a bogus one, so this serves the shell rather than masking a genuine miss.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(?:login|register|forgot-password|reset-password|verify-email|checkout|my-orders|sell-with-us|staff|account/security)/?$ _shell.html [L]
+RewriteRule ^(?:login|register|forgot-password|reset-password|verify-email|checkout|my-orders|sell-with-us|staff|account/security|shop/[^/]+)/?$ _shell.html [L]
 
 # Existing prerendered routes and static assets are served directly. Everything else is a real 404.
 RewriteCond %{REQUEST_FILENAME} !-f
