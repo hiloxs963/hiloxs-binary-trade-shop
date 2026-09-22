@@ -952,6 +952,7 @@ async function createVerifiedSession(email: string): Promise<string> {
     email,
     phone: "0712345678",
     password: PASSWORD,
+    termsAccepted: true,
     callbackURL: `${ORIGIN}/verify-email`,
   });
   expect(registration.statusCode).toBe(200);

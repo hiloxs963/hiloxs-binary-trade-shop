@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { base32 } from "@better-auth/utils/base32";
-import { count, eq } from "drizzle-orm";
+import { asc, count, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
@@ -17,6 +17,8 @@ import {
 } from "../../src/config/env.js";
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
 import { session, twoFactor, user, verification } from "../../src/db/schema/auth.js";
+import { userConsents } from "../../src/db/schema/consent.js";
+import { PRIVACY_POLICY_VERSION, TERMS_OF_USE_VERSION } from "../../src/consent/model.js";
 import { EmailDeliveryError } from "../../src/lib/errors.js";
 
 const FRONTEND_ORIGIN = "http://localhost:8080";
@@ -86,6 +88,73 @@ describe("email and password authentication", () => {
       kind: "verification",
       recipient: "customer@example.com",
     });
+  });
+
+  it("records privacy policy and terms of use consent for the new account", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/sign-up/email",
+      headers: {
+        "content-type": "application/json",
+        origin: FRONTEND_ORIGIN,
+        "x-real-ip": "198.51.100.200",
+        "user-agent": "HiloxsTest/1.0",
+      },
+      payload: registrationBody("consent@example.com"),
+    });
+    const [owner] = await database.db.select({ id: user.id }).from(user);
+    const consents = await database.db
+      .select({
+        userId: userConsents.userId,
+        policy: userConsents.policy,
+        version: userConsents.version,
+        ipAddress: userConsents.ipAddress,
+        userAgent: userConsents.userAgent,
+      })
+      .from(userConsents)
+      .orderBy(asc(userConsents.policy));
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      consents.map((consent) => ({
+        userId: consent.userId,
+        policy: consent.policy,
+        version: consent.version,
+        userAgent: consent.userAgent,
+      })),
+    ).toEqual([
+      {
+        userId: owner?.id,
+        policy: "privacy-policy",
+        version: PRIVACY_POLICY_VERSION,
+        userAgent: "HiloxsTest/1.0",
+      },
+      {
+        userId: owner?.id,
+        policy: "terms-of-use",
+        version: TERMS_OF_USE_VERSION,
+        userAgent: "HiloxsTest/1.0",
+      },
+    ]);
+    // Fastify is not behind a trusted proxy here, so the recorded address is
+    // the socket address rather than the x-real-ip header above.
+    expect(consents.every((consent) => (consent.ipAddress ?? "").length > 0)).toBe(true);
+  });
+
+  it("rejects registration without consent before creating the account", async () => {
+    const { termsAccepted, ...withoutConsent } = registrationBody("unconsented@example.com");
+    expect(termsAccepted).toBe(true);
+
+    for (const payload of [withoutConsent, { ...withoutConsent, termsAccepted: false }]) {
+      const response = await post("/api/auth/sign-up/email", payload);
+      expect(response.statusCode).toBe(400);
+    }
+
+    const [users] = await database.db.select({ value: count() }).from(user);
+    const [consents] = await database.db.select({ value: count() }).from(userConsents);
+    expect(users?.value).toBe(0);
+    expect(consents?.value).toBe(0);
+    expect(emailSender.messages).toHaveLength(0);
   });
 
   it("builds verification links from the canonical frontend URL", async () => {
@@ -717,6 +786,7 @@ function registrationBody(email: string, phone = "0712345678") {
     email,
     phone,
     password: ORIGINAL_PASSWORD,
+    termsAccepted: true,
     callbackURL: VERIFICATION_PAGE,
   };
 }
