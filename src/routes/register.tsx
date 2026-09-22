@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AuthFormLayout, FormNotice, PasswordField } from "@/components/hiloxs/AuthForm";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { registerWithEmail } from "@/lib/auth-api";
@@ -27,6 +28,7 @@ function RegisterPage() {
     password?: string;
     confirm?: string;
   }>({});
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -74,6 +76,7 @@ function RegisterPage() {
               email: form.email,
               phone: form.phone,
               password: form.password,
+              termsAccepted,
             });
             setRegistered(true);
             setNotice("Check your email for the verification link before logging in.");
@@ -127,8 +130,33 @@ function RegisterPage() {
           error={errors.confirm}
           autoComplete="new-password"
         />
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="register-terms"
+            checked={termsAccepted}
+            onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+            className="mt-0.5"
+          />
+          {/* Plain anchors, not router Links: the policy routes are not published yet. */}
+          <Label htmlFor="register-terms" className="font-normal leading-5">
+            I agree to the{" "}
+            <a href="/privacy-policy" className="font-medium text-primary hover:underline">
+              Privacy Policy
+            </a>{" "}
+            and{" "}
+            <a href="/terms-of-use" className="font-medium text-primary hover:underline">
+              Terms of Use
+            </a>
+            .
+          </Label>
+        </div>
         {notice && <FormNotice>{notice}</FormNotice>}
-        <Button type="submit" variant="hero" className="w-full" disabled={submitting || registered}>
+        <Button
+          type="submit"
+          variant="hero"
+          className="w-full"
+          disabled={!termsAccepted || submitting || registered}
+        >
           {submitting ? "Creating account..." : registered ? "Verification email sent" : "Continue"}
         </Button>
       </form>
