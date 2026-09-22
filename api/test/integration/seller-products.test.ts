@@ -693,6 +693,7 @@ async function sellerAccount(email: string): Promise<{ cookie: string }> {
     email,
     phone: "0712345678",
     password: PASSWORD,
+    termsAccepted: true,
     callbackURL: `${FRONTEND_ORIGIN}/verify-email`,
   });
   expect(registration.statusCode).toBe(200);

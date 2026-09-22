@@ -75,6 +75,7 @@ export async function registerWithEmail(input: {
   email: string;
   phone: string;
   password: string;
+  termsAccepted: boolean;
 }): Promise<void> {
   const response = await request("/api/auth/sign-up/email", {
     method: "POST",

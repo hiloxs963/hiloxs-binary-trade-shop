@@ -71,6 +71,13 @@
       "when": 1788478804710,
       "tag": "0009_phase11_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790071380954,
+      "tag": "0010_wet_fenris",
+      "breakpoints": true
     }
   ]
 }

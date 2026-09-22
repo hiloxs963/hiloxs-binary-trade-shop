@@ -128,7 +128,13 @@ function normalizeAuthBody(
   trustedOrigins: readonly string[],
 ): unknown {
   const parsed = (() => {
-    if (path.endsWith("/sign-up/email")) return RegistrationSchema.parse(body);
+    if (path.endsWith("/sign-up/email")) {
+      // The acknowledgement is recorded against user_consents by the
+      // create-user hook, so Better Auth never needs to see it.
+      const registration: Record<string, unknown> = { ...RegistrationSchema.parse(body) };
+      delete registration["termsAccepted"];
+      return registration;
+    }
     if (path.endsWith("/sign-in/email")) return LoginSchema.parse(body);
     if (path.endsWith("/request-password-reset")) return PasswordResetRequestSchema.parse(body);
     if (path.endsWith("/reset-password")) return PasswordResetSchema.parse(body);

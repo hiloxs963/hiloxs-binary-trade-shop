@@ -2,6 +2,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as authSchema from "./schema/auth.js";
 import * as commerceSchema from "./schema/commerce.js";
+import * as consentSchema from "./schema/consent.js";
 import * as metadataSchema from "./schema/system-metadata.js";
 import * as mediaSchema from "./schema/media.js";
 import * as paymentSchema from "./schema/payments.js";
@@ -14,6 +15,7 @@ import { safeErrorForLog } from "../lib/redact.js";
 const schema = {
   ...authSchema,
   ...commerceSchema,
+  ...consentSchema,
   ...metadataSchema,
   ...mediaSchema,
   ...paymentSchema,

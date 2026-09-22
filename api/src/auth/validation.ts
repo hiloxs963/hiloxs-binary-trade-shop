@@ -11,20 +11,25 @@ const StrongPasswordSchema = z
   .regex(/[0-9]/, "Include a number.")
   .regex(/[^A-Za-z0-9]/, "Include a symbol.");
 
-export const RegistrationSchema = z.object({
-  name: z.string().trim().min(2).max(100),
-  email: z.email().transform(normalizeEmail),
-  phone: z.string().transform((value, context) => {
-    const normalized = normalizePhone(value);
-    if (!normalized) {
-      context.addIssue({ code: "custom", message: "Enter a valid phone number." });
-      return z.NEVER;
-    }
-    return normalized;
-  }),
-  password: StrongPasswordSchema,
-  callbackURL: z.url().optional(),
-});
+export const RegistrationSchema = z
+  .object({
+    name: z.string().trim().min(2).max(100),
+    email: z.email().transform(normalizeEmail),
+    phone: z.string().transform((value, context) => {
+      const normalized = normalizePhone(value);
+      if (!normalized) {
+        context.addIssue({ code: "custom", message: "Enter a valid phone number." });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
+    password: StrongPasswordSchema,
+    // Rejects false, undefined and a missing key alike, so an account is never
+    // created without a recorded acceptance.
+    termsAccepted: z.literal(true),
+    callbackURL: z.url().optional(),
+  })
+  .strict();
 
 export const LoginSchema = z.object({
   email: z.email().transform(normalizeEmail),

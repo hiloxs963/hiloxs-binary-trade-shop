@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { twoFactor as twoFactorPlugin } from "better-auth/plugins/two-factor";
+import { recordRegistrationConsent } from "../consent/service.js";
 import type { AuthRuntimeConfig } from "../config/env.js";
 import type { DatabaseClient } from "../db/client.js";
 import {
@@ -19,6 +20,7 @@ import { PASSWORD_MIN_LENGTH } from "./validation.js";
 import { EmailVerificationTokenStore } from "./verification-tokens.js";
 
 const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60;
+const SIGN_UP_PATH = "/sign-up/email";
 
 type CreateAuthOptions = {
   database: DatabaseClient;
@@ -111,6 +113,21 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
       enabled: false,
     },
     databaseHooks: {
+      user: {
+        create: {
+          // Sign-up is the only route that creates a user, and it cannot be
+          // reached without RegistrationSchema accepting termsAccepted: true,
+          // so reaching here means consent was given. A failure here fails the
+          // registration rather than leaving an unrecorded acceptance.
+          after: async (created, context) => {
+            if (context?.path !== SIGN_UP_PATH) return;
+            await recordRegistrationConsent(database.db, created.id, {
+              ipAddress: context.headers?.get("x-real-ip"),
+              userAgent: context.headers?.get("user-agent"),
+            });
+          },
+        },
+      },
       session: {
         create: {
           before: async (pendingSession) => {

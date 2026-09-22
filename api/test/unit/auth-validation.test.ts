@@ -26,6 +26,36 @@ describe("authentication input validation", () => {
     ).toThrow();
   });
 
+  it("requires an explicit registration consent acknowledgement", () => {
+    const registration = {
+      name: "Test User",
+      email: "test@example.com",
+      phone: "0712345678",
+      password: "StrongPassword!42",
+    };
+
+    expect(RegistrationSchema.parse({ ...registration, termsAccepted: true })).toMatchObject({
+      termsAccepted: true,
+    });
+    for (const termsAccepted of [undefined, false, "true", 1]) {
+      expect(() => RegistrationSchema.parse({ ...registration, termsAccepted })).toThrow();
+    }
+    expect(() => RegistrationSchema.parse(registration)).toThrow();
+  });
+
+  it("rejects unknown registration fields instead of stripping them", () => {
+    expect(() =>
+      RegistrationSchema.parse({
+        name: "Test User",
+        email: "test@example.com",
+        phone: "0712345678",
+        password: "StrongPassword!42",
+        termsAccepted: true,
+        status: "SUSPENDED",
+      }),
+    ).toThrow();
+  });
+
   it("accepts only absolute redirects on trusted origins", () => {
     const trusted = ["http://localhost:8080", "https://hiloxs.co.ke"];
     expect(validateTrustedRedirect("http://localhost:8080/reset-password", trusted)).toBe(true);
