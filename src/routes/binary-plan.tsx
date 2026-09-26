@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ELECTRONICS_PRODUCTS, PLAN, SUPPORT, dual, kes, usd, kesToUsd } from "@/lib/hiloxs";
+import { PLAN, SUPPORT, dual, kes, usd, kesToUsd } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { type Leg } from "@/lib/hiloxs-store";
 import { BinaryTree } from "@/components/hiloxs/BinaryTree";
@@ -167,24 +167,6 @@ function BinaryPlanPage() {
           </p>
           <div className="panel mt-3 overflow-x-auto p-5">
             <BinaryTree node={tree} />
-          </div>
-
-          <h3 className="mt-8 text-lg font-semibold">Electronics packages behind the plan</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The binary plan is backed by electronics only — laptops, screens, woofers and their
-            accessories. Nothing else qualifies for the entry package.
-          </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {ELECTRONICS_PRODUCTS.map((p) => (
-              <div key={p.id} className="panel p-4">
-                <span className="text-2xl" aria-hidden>
-                  {p.emoji}
-                </span>
-                <p className="mt-2 text-sm font-semibold leading-tight">{p.name}</p>
-                <p className="text-xs text-muted-foreground">{p.category}</p>
-                <p className="mt-1 text-sm font-bold text-primary">{kes(p.priceKes)}</p>
-              </div>
-            ))}
           </div>
 
           <h3 className="mt-8 text-lg font-semibold">My team</h3>

@@ -59,7 +59,8 @@ import { S3MediaStorage } from "../../src/media/s3-storage.js";
 import type { MediaStorage } from "../../src/media/storage.js";
 import { readStoredObject, sha256Hex } from "../../src/media/storage.js";
 import { processNextMedia } from "../../src/media/worker-service.js";
-import { restoreInitialCatalog } from "./helpers.js";
+import { restoreTestCatalog } from "./helpers.js";
+import { TEST_CATALOG } from "./catalog-fixture.js";
 
 const ORIGIN = "http://localhost:8080";
 const PASSWORD = "StrongPassword!42";
@@ -126,7 +127,7 @@ beforeEach(async () => {
     cascade
   `);
   await database.pool.query(`delete from "products" where "source" = 'SELLER'`);
-  await restoreInitialCatalog(database);
+  await restoreTestCatalog(database);
   emailSender.messages.length = 0;
 });
 
@@ -694,7 +695,7 @@ describe("controlled catalog activation", () => {
       }),
     ).rejects.toThrow("One or more products are unavailable");
     await expect(
-      priceCart(database.db, { items: [{ productId: "lp-01", quantity: 1 }] }),
+      priceCart(database.db, { items: [{ productId: TEST_CATALOG[0].catalogKey, quantity: 1 }] }),
     ).resolves.toMatchObject({ totalMinor: 7_850_000n });
     const sellerCart = { items: [{ productId: sellerProduct!.catalogKey, quantity: 1 }] };
     const quote = await app.inject({
@@ -721,7 +722,8 @@ describe("controlled catalog activation", () => {
 
     const publicList = await app.inject({ method: "GET", url: "/api/v1/products" });
     const body = publicList.json<{ products: Array<Record<string, unknown>> }>();
-    expect(body.products).toHaveLength(45);
+    // The fixture catalog plus the seller product activated by this test.
+    expect(body.products).toHaveLength(TEST_CATALOG.length + 1);
     const publicSeller = body.products.find((product) => product["slug"] === sellerProduct?.slug);
     expect(publicSeller).toMatchObject({ isPurchasable: false });
     expect(JSON.stringify(publicSeller)).not.toMatch(

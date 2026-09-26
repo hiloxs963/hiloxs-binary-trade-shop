@@ -11,7 +11,7 @@ import {
   getPublicCatalogProduct,
   type PublicCatalogProduct,
 } from "@/lib/catalog-api";
-import { PRODUCTS, kes, productImages } from "@/lib/hiloxs";
+import { kes } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { absoluteUrl, pageSeo } from "@/lib/seo";
 
@@ -36,11 +36,8 @@ export const Route = createFileRoute("/shop_/$slug")({
     const { product } = loaderData;
     const path = `/shop/${product.slug}`;
     const productUrl = absoluteUrl(path);
-    const legacy = legacyProduct(product);
     const mediaPath = product.media[0]?.variants.LARGE?.path;
-    const image =
-      (mediaPath && catalogMediaUrl(mediaPath)) ||
-      (legacy ? productImages(legacy)[0]?.src : undefined);
+    const image = mediaPath ? catalogMediaUrl(mediaPath) : undefined;
     const productData: Record<string, unknown> = {
       "@context": "https://schema.org",
       "@type": "Product",
@@ -87,7 +84,6 @@ export const Route = createFileRoute("/shop_/$slug")({
 function ProductDetailPage() {
   const { product } = Route.useLoaderData();
   const { addToCart } = useHiloxs();
-  const legacy = legacyProduct(product);
   const priceKes = catalogPriceKes(product);
 
   return (
@@ -112,7 +108,6 @@ function ProductDetailPage() {
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
         <CatalogProductMedia
           product={product}
-          {...(legacy ? { fallbackProduct: legacy } : {})}
           priority
           className="aspect-square rounded-lg border border-border"
         />
@@ -154,8 +149,4 @@ function ProductDetailPage() {
       </div>
     </div>
   );
-}
-
-function legacyProduct(product: PublicCatalogProduct) {
-  return PRODUCTS.find((candidate) => candidate.id === product.id);
 }

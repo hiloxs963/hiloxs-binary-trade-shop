@@ -9,8 +9,8 @@ import {
 
 describe("commerce request validation", () => {
   it("accepts identifiers and bounded integer quantities", () => {
-    expect(CartSchema.parse({ items: [{ productId: "lp-01", quantity: 2 }] })).toEqual({
-      items: [{ productId: "lp-01", quantity: 2 }],
+    expect(CartSchema.parse({ items: [{ productId: "test-product-a", quantity: 2 }] })).toEqual({
+      items: [{ productId: "test-product-a", quantity: 2 }],
     });
   });
 
@@ -23,7 +23,7 @@ describe("commerce request validation", () => {
       { userId: "another-user" },
     ]) {
       expect(() =>
-        CartSchema.parse({ items: [{ productId: "lp-01", quantity: 1 }], ...injected }),
+        CartSchema.parse({ items: [{ productId: "test-product-a", quantity: 1 }], ...injected }),
       ).toThrow();
     }
   });
@@ -33,15 +33,19 @@ describe("commerce request validation", () => {
     expect(() =>
       CartSchema.parse({
         items: [
-          { productId: "lp-01", quantity: 1 },
-          { productId: "lp-01", quantity: 1 },
+          { productId: "test-product-a", quantity: 1 },
+          { productId: "test-product-a", quantity: 1 },
         ],
       }),
     ).toThrow();
     expect(() =>
-      CartSchema.parse({ items: [{ productId: "lp-01", quantity: MAX_ITEM_QUANTITY + 1 }] }),
+      CartSchema.parse({
+        items: [{ productId: "test-product-a", quantity: MAX_ITEM_QUANTITY + 1 }],
+      }),
     ).toThrow();
-    expect(() => CartSchema.parse({ items: [{ productId: "lp-01", quantity: 1.5 }] })).toThrow();
+    expect(() =>
+      CartSchema.parse({ items: [{ productId: "test-product-a", quantity: 1.5 }] }),
+    ).toThrow();
     expect(() =>
       CartSchema.parse({
         items: Array.from({ length: MAX_CART_LINES + 1 }, (_, index) => ({
@@ -64,14 +68,14 @@ describe("commerce request validation", () => {
   it("fingerprints logical carts independently of line ordering", () => {
     const first = CartSchema.parse({
       items: [
-        { productId: "lp-01", quantity: 1 },
+        { productId: "test-product-a", quantity: 1 },
         { productId: "ac-01", quantity: 2 },
       ],
     });
     const reordered = CartSchema.parse({ items: [...first.items].reverse() });
     const changed = CartSchema.parse({
       items: [
-        { productId: "lp-01", quantity: 1 },
+        { productId: "test-product-a", quantity: 1 },
         { productId: "ac-01", quantity: 3 },
       ],
     });

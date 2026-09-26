@@ -5,11 +5,11 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { restoreInitialCatalog } from "./helpers.js";
+import { restoreTestCatalog } from "./helpers.js";
 import { buildApp } from "../../src/app.js";
 import { createAuthService } from "../../src/auth/auth.js";
 import { InMemoryAuthEmailSender } from "../../src/auth/email.js";
-import { INITIAL_CATALOG } from "../../src/catalog/initial-catalog.js";
+import { TEST_CATALOG } from "./catalog-fixture.js";
 import {
   assertSafeTestDatabaseUrl,
   parseEnv,
@@ -48,8 +48,8 @@ let app: FastifyInstance;
 let database: DatabaseClient;
 let requestCounter = 0;
 const emailSender = new InMemoryAuthEmailSender();
-const approvedLaptop = INITIAL_CATALOG[0];
-const secondApprovedLaptop = INITIAL_CATALOG[1];
+const approvedLaptop = TEST_CATALOG[0];
+const secondApprovedLaptop = TEST_CATALOG[1];
 
 beforeAll(async () => {
   database = createDatabaseClient(databaseUrl);
@@ -69,7 +69,7 @@ beforeEach(async () => {
   await database.pool.query(
     'truncate table "security_rate_limit_windows", "order_items", "orders", "verification", "session", "account", "user" cascade',
   );
-  await restoreInitialCatalog(database);
+  await restoreTestCatalog(database);
   await database.db
     .update(products)
     .set({
@@ -96,9 +96,9 @@ describe("server-authoritative commerce", () => {
     });
 
     expect(list.statusCode).toBe(200);
-    expect(body.products).toHaveLength(44);
+    expect(body.products).toHaveLength(TEST_CATALOG.length);
     expect(body.products.map((product) => product["id"])).toEqual(
-      INITIAL_CATALOG.map((product) => product.catalogKey),
+      TEST_CATALOG.map((product) => product.catalogKey),
     );
     expect(body.products[0]).toEqual({
       id: approvedLaptop.catalogKey,
@@ -136,7 +136,13 @@ describe("server-authoritative commerce", () => {
     });
 
     expect(filtered.statusCode).toBe(200);
-    expect(filtered.json<{ products: Array<{ id: string }> }>().products).toHaveLength(3);
+    const remainingLaptops = TEST_CATALOG.filter(
+      (product) =>
+        product.category === "Laptops" && product.catalogKey !== approvedLaptop.catalogKey,
+    ).length;
+    expect(filtered.json<{ products: Array<{ id: string }> }>().products).toHaveLength(
+      remainingLaptops,
+    );
     expect(filtered.body).not.toContain(approvedLaptop.catalogKey);
     expect(detail.statusCode).toBe(404);
   });

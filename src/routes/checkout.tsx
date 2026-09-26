@@ -39,7 +39,6 @@ import {
   type DeliveryAddress,
 } from "@/lib/commerce-api";
 import { KENYA_COUNTIES } from "@/lib/delivery";
-import { PRODUCTS } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { pageSeo } from "@/lib/seo";
 
@@ -134,11 +133,6 @@ function CheckoutPage() {
     );
   }
 
-  const changedPrices = quote?.items.filter((item) => {
-    const local = PRODUCTS.find((product) => product.id === item.productId);
-    return local ? BigInt(item.unitPriceMinor) !== BigInt(local.priceKes) * 100n : false;
-  });
-
   return (
     <section className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-3xl font-bold sm:text-4xl">Checkout</h1>
@@ -159,17 +153,6 @@ function CheckoutPage() {
         )}
         {quote && (
           <>
-            {changedPrices && changedPrices.length > 0 && (
-              <div className="mb-5 rounded-md border border-border bg-secondary/60 p-3 text-sm">
-                <p className="flex items-center gap-2 font-medium">
-                  <AlertTriangle className="size-4 text-primary" aria-hidden /> Price updated
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  The server price differs from the catalog display for {changedPrices.length} item
-                  {changedPrices.length === 1 ? "" : "s"}. The confirmed total is shown below.
-                </p>
-              </div>
-            )}
             <ul className="divide-y divide-border">
               {quote.items.map((item) => (
                 <li key={item.productId} className="flex gap-4 py-4 text-sm">
