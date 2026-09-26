@@ -1,5 +1,8 @@
+import type { ManualTillConfig } from "./manual-till";
 import type { PaymentConfig } from "./mpesa-availability";
 
+export { manualTillDetails, manualTillLabel, supportWhatsAppLink } from "./manual-till";
+export type { ManualTillConfig, ManualTillDetails } from "./manual-till";
 export { mpesaAvailabilityForOrder } from "./mpesa-availability";
 export type { MpesaOrderAvailability, PaymentConfig } from "./mpesa-availability";
 
@@ -158,6 +161,12 @@ export async function getPaymentConfig(): Promise<PaymentConfig> {
   const response = await request("/api/v1/payments/config", { method: "GET" });
   if (!response.ok) throw await toCommerceError(response, "Unable to load payment availability");
   return (await response.json()) as PaymentConfig;
+}
+
+export async function getManualTillConfig(): Promise<ManualTillConfig> {
+  const response = await request("/api/v1/payments/manual-till", { method: "GET" });
+  if (!response.ok) throw await toCommerceError(response, "Unable to load manual payment details");
+  return ((await response.json()) as { manualTill: ManualTillConfig }).manualTill;
 }
 
 export async function cancelOrder(orderId: string): Promise<CommerceOrder> {

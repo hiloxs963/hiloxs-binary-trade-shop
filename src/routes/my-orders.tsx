@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Loader2, Package, RefreshCw, Smartphone, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AuthRequired } from "@/components/hiloxs/AuthRequired";
+import { ManualTillPanel } from "@/components/hiloxs/ManualTillPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,13 +11,16 @@ import {
   cancelOrder,
   confirmOrderDelivery,
   formatMoneyMinor,
+  getManualTillConfig,
   getOrderPaymentStatus,
   getOrders,
   getPaymentConfig,
   initiateMpesaPayment,
+  manualTillDetails,
   mpesaAvailabilityForOrder,
   refreshMpesaPayment,
   type CommerceOrder,
+  type ManualTillConfig,
   type OrderPaymentStatus,
   type PaymentConfig,
 } from "@/lib/commerce-api";
@@ -50,6 +54,7 @@ function MyOrdersPage() {
   const [confirming, setConfirming] = useState("");
   const [paymentBlocking, setPaymentBlocking] = useState<Record<string, boolean>>({});
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>();
+  const [manualTill, setManualTill] = useState<ManualTillConfig | null>();
 
   useEffect(() => {
     if (auth.isLoading || !auth.isAuthenticated) return;
@@ -80,6 +85,13 @@ function MyOrdersPage() {
       })
       .catch(() => {
         if (active) setPaymentConfig(null);
+      });
+    void getManualTillConfig()
+      .then((config) => {
+        if (active) setManualTill(config);
+      })
+      .catch(() => {
+        if (active) setManualTill(null);
       });
     return () => {
       active = false;
@@ -253,6 +265,7 @@ function MyOrdersPage() {
                   order={order}
                   initialPhone={auth.currentUser?.phone ?? ""}
                   paymentConfig={paymentConfig}
+                  manualTill={manualTill}
                   onPayment={(payment) => {
                     setPaymentBlocking((current) => ({
                       ...current,
@@ -303,11 +316,13 @@ function OrderPaymentControls({
   order,
   initialPhone,
   paymentConfig,
+  manualTill,
   onPayment,
 }: {
   order: CommerceOrder;
   initialPhone: string;
   paymentConfig: PaymentConfig | null | undefined;
+  manualTill: ManualTillConfig | null | undefined;
   onPayment: (payment: OrderPaymentStatus) => void;
 }) {
   const [payment, setPayment] = useState<OrderPaymentStatus | null>(null);
@@ -359,6 +374,8 @@ function OrderPaymentControls({
     order.status === "PENDING_PAYMENT" &&
     (!payment || payment.paymentStatus === null || payment.paymentStatus === "FAILED");
   const availability = mpesaAvailabilityForOrder(paymentConfig, order.orderNumber);
+  const manualTillOption = manualTillDetails(manualTill);
+  const availabilityLoading = paymentConfig === undefined || manualTill === undefined;
 
   return (
     <div className="mt-5 border-t border-border pt-4">
@@ -410,13 +427,27 @@ function OrderPaymentControls({
         </div>
       )}
 
-      {paymentStateAllowsInitiation && !availability.canInitiate && (
+      {paymentStateAllowsInitiation && !availability.canInitiate && availabilityLoading && (
         <p className="text-sm text-muted-foreground" role="status">
-          {paymentConfig === undefined
-            ? "Checking M-Pesa availability..."
-            : "M-Pesa payments are not currently available."}
+          Checking M-Pesa availability...
         </p>
       )}
+
+      {paymentStateAllowsInitiation &&
+        !availability.canInitiate &&
+        !availabilityLoading &&
+        (manualTillOption ? (
+          <ManualTillPanel
+            details={manualTillOption}
+            orderNumber={order.orderNumber}
+            totalMinor={order.totalMinor}
+            currency={order.currency}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground" role="status">
+            M-Pesa payments are not currently available.
+          </p>
+        ))}
 
       {payment?.paymentStatus === "SUCCEEDED" && (
         <p className="text-sm font-medium text-success">
