@@ -1,6 +1,5 @@
 import { createContext, useContext } from "react";
 import type { HiloxsState, Leg, PayoutAccounts, TrainingLevel, Trade } from "./hiloxs-store";
-import type { Product } from "./hiloxs";
 
 export type HiloxsContextValue = {
   state: HiloxsState;
@@ -20,7 +19,6 @@ export type HiloxsContextValue = {
   withdrawTrading: (amountUsd: number, to: "paypal" | "minipay" | "mpesa") => string | null;
   addVideo: (input: { title: string; level: TrainingLevel; url: string }) => string | null;
   removeVideo: (id: string) => void;
-  allProducts: Product[];
 };
 
 export const HiloxsContext = createContext<HiloxsContextValue | null>(null);
