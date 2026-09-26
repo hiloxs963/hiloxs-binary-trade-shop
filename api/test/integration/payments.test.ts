@@ -14,6 +14,7 @@ import {
   parseEnv,
   requireDatabaseUrl,
   resolveAuthRuntimeConfig,
+  resolveManualTillConfig,
   type MpesaRuntimeConfig,
 } from "../../src/config/env.js";
 import { createDatabaseClient, type DatabaseClient } from "../../src/db/client.js";
@@ -180,6 +181,52 @@ describe("M-Pesa availability gate", () => {
       expect(response.body).not.toContain(mpesaConfig.consumerSecret);
       expect(response.body).not.toContain(mpesaConfig.passkey);
       expect(response.body).not.toContain(mpesaConfig.shortcode);
+    }
+  });
+});
+
+describe("manual till payment details", () => {
+  // Served by its own route, so the STK config response above keeps exposing no merchant
+  // identifier at all. Informational only: no order, attempt, or status is created here.
+  const url = "/api/v1/payments/manual-till";
+
+  it("exposes only the customer-facing till and only when the manual flag is enabled", async () => {
+    const disabled = await buildApp();
+    try {
+      const response = await disabled.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        manualTill: { enabled: false, kind: null, number: null },
+      });
+      expect(response.body).not.toContain("654321");
+    } finally {
+      await disabled.close();
+    }
+
+    const enabled = await buildApp({
+      manualTill: resolveManualTillConfig(
+        parseEnv({
+          MANUAL_TILL_ENABLED: "true",
+          MPESA_TRANSACTION_TYPE: "CustomerBuyGoodsOnline",
+          MPESA_SHORTCODE: "123456",
+          MPESA_PARTY_B: "654321",
+          MPESA_PASSKEY: "manual-till-passkey",
+          MPESA_CONSUMER_KEY: "manual-till-consumer-key",
+        }),
+      ),
+    });
+    try {
+      const response = await enabled.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ manualTill: { number: string; instructions: string } }>();
+      expect(body.manualTill).toMatchObject({ enabled: true, kind: "TILL", number: "654321" });
+      expect(body.manualTill.instructions.length).toBeGreaterThan(0);
+      // The buy-goods till is PartyB. The STK shortcode and every credential stay server-side.
+      expect(response.body).not.toContain("123456");
+      expect(response.body).not.toContain("manual-till-passkey");
+      expect(response.body).not.toContain("manual-till-consumer-key");
+    } finally {
+      await enabled.close();
     }
   });
 });

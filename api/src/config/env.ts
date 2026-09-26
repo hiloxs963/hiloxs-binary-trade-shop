@@ -40,6 +40,7 @@ const EnvironmentSchema = z.object({
   FRONTEND_URL: z.url().optional(),
   MPESA_ENV: z.enum(["sandbox", "production"]).optional(),
   MPESA_PUBLIC_ENABLED: BooleanEnvironmentSchema,
+  MANUAL_TILL_ENABLED: BooleanEnvironmentSchema,
   STAFF_REVIEW_ENABLED: FailSafeBooleanEnvironmentSchema,
   STAFF_BOOTSTRAP_USER_ID: z.string().trim().min(1).optional(),
   STAFF_BOOTSTRAP_PERMISSIONS: z.string().trim().min(1).optional(),
@@ -100,6 +101,18 @@ export type MpesaRuntimeConfig = {
   requestTimeoutMs: number;
 };
 
+/**
+ * Informational manual-payment details for the period while public STK push is gated off.
+ * It carries only the customer-facing numeric identifier a buyer already needs in order to pay,
+ * never a Daraja credential, and it never marks an order paid.
+ */
+export type ManualTillConfig = {
+  enabled: boolean;
+  kind: "TILL" | "PAYBILL" | null;
+  number: string | null;
+  instructions: string;
+};
+
 export type MediaRuntimeConfig = {
   uploadEnabled: boolean;
   catalogActivationEnabled: boolean;
@@ -123,6 +136,15 @@ const MPESA_BASE_URLS = {
   sandbox: "https://sandbox.safaricom.co.ke",
   production: "https://api.safaricom.co.ke",
 } as const;
+const MANUAL_TILL_INSTRUCTIONS =
+  "Pay the exact order total via M-Pesa, then send us your M-Pesa confirmation message on WhatsApp so we can confirm the payment and arrange delivery. Your order is not confirmed until our team replies.";
+
+export const MANUAL_TILL_DISABLED: ManualTillConfig = {
+  enabled: false,
+  kind: null,
+  number: null,
+  instructions: MANUAL_TILL_INSTRUCTIONS,
+};
 
 export function parseEnv(input: Record<string, string | undefined>): AppEnv {
   const result = EnvironmentSchema.safeParse(input);
@@ -248,6 +270,35 @@ export function resolveMpesaRuntimeConfig(env: AppEnv): MpesaRuntimeConfig | und
     callbackBaseURL: callbackBaseURL.origin,
     maxAmountKes: env.MPESA_MAX_AMOUNT_KES as bigint,
     requestTimeoutMs: env.MPESA_REQUEST_TIMEOUT_MS,
+  };
+}
+
+/**
+ * Selects the identifier a buyer actually keys into their own phone. For buy-goods tills that is
+ * `MPESA_PARTY_B`; for paybill it is the `MPESA_SHORTCODE`. The transaction type therefore decides
+ * both the number and its label, because displaying a paybill number as a till would send real
+ * customer money to the wrong destination.
+ */
+export function resolveManualTillConfig(env: AppEnv): ManualTillConfig {
+  const customerFacing =
+    env.MPESA_TRANSACTION_TYPE === "CustomerBuyGoodsOnline"
+      ? ({ kind: "TILL", number: env.MPESA_PARTY_B } as const)
+      : env.MPESA_TRANSACTION_TYPE === "CustomerPayBillOnline"
+        ? ({ kind: "PAYBILL", number: env.MPESA_SHORTCODE } as const)
+        : undefined;
+
+  if (!env.MANUAL_TILL_ENABLED) return MANUAL_TILL_DISABLED;
+  if (!customerFacing?.number) {
+    throw new ConfigurationError(
+      "MANUAL_TILL_ENABLED is true but MPESA_TRANSACTION_TYPE and its matching customer-facing number (MPESA_PARTY_B for a till, MPESA_SHORTCODE for a paybill) are not set",
+    );
+  }
+
+  return {
+    enabled: true,
+    kind: customerFacing.kind,
+    number: customerFacing.number,
+    instructions: MANUAL_TILL_INSTRUCTIONS,
   };
 }
 
