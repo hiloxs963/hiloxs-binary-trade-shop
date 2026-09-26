@@ -5,6 +5,7 @@ import {
   requireDatabaseUrl,
   requireRateLimitHmacKey,
   resolveAuthRuntimeConfig,
+  resolveManualTillConfig,
   resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
   resolveProductionEmailConfig,
@@ -22,6 +23,7 @@ describe("environment configuration", () => {
       PG_IDLE_IN_TRANSACTION_TIMEOUT_MS: 60_000,
       LOG_LEVEL: "info",
       MPESA_PUBLIC_ENABLED: false,
+      MANUAL_TILL_ENABLED: false,
       MPESA_REQUEST_TIMEOUT_MS: 10_000,
       STAFF_REVIEW_ENABLED: false,
       MEDIA_UPLOAD_ENABLED: false,
@@ -289,6 +291,46 @@ describe("environment configuration", () => {
         }),
       ),
     ).toThrow("cannot include credentials");
+  });
+
+  it("exposes only the customer-facing manual till number and defaults the flag off", () => {
+    expect(parseEnv({}).MANUAL_TILL_ENABLED).toBe(false);
+    expect(() => parseEnv({ MANUAL_TILL_ENABLED: "1" })).toThrow(ConfigurationError);
+    expect(resolveManualTillConfig(parseEnv({}))).toMatchObject({
+      enabled: false,
+      kind: null,
+      number: null,
+    });
+
+    const numbers = {
+      MPESA_TRANSACTION_TYPE: "CustomerBuyGoodsOnline",
+      MPESA_SHORTCODE: "123456",
+      MPESA_PARTY_B: "654321",
+    };
+    expect(resolveManualTillConfig(parseEnv(numbers))).toMatchObject({
+      enabled: false,
+      number: null,
+    });
+
+    // Buy-goods buyers key in the till (PartyB); paybill buyers key in the shortcode. Showing the
+    // wrong one would route real money to the wrong destination.
+    expect(
+      resolveManualTillConfig(parseEnv({ ...numbers, MANUAL_TILL_ENABLED: "true" })),
+    ).toMatchObject({ enabled: true, kind: "TILL", number: "654321" });
+    expect(
+      resolveManualTillConfig(
+        parseEnv({
+          ...numbers,
+          MANUAL_TILL_ENABLED: "true",
+          MPESA_TRANSACTION_TYPE: "CustomerPayBillOnline",
+        }),
+      ),
+    ).toMatchObject({ enabled: true, kind: "PAYBILL", number: "123456" });
+
+    // An enabled flag with no resolvable number fails loudly instead of showing an empty till.
+    expect(() => resolveManualTillConfig(parseEnv({ MANUAL_TILL_ENABLED: "true" }))).toThrow(
+      "MANUAL_TILL_ENABLED is true but",
+    );
   });
 
   it("requires HTTPS for the production M-Pesa callback", () => {

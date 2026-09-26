@@ -6,6 +6,7 @@ import {
   requireDatabaseUrl,
   requireRateLimitHmacKey,
   resolveAuthRuntimeConfig,
+  resolveManualTillConfig,
   resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
 } from "./config/env.js";
@@ -31,6 +32,7 @@ async function start(): Promise<void> {
   await runStaffBootstrapGrants(database, env);
   const authRuntime = resolveAuthRuntimeConfig(env);
   const mpesaConfig = resolveMpesaRuntimeConfig(env);
+  const manualTill = resolveManualTillConfig(env);
   const mediaRuntime = resolveMediaRuntimeConfig(env);
   const mediaStorage = mediaRuntime.storage ? new S3MediaStorage(mediaRuntime.storage) : undefined;
   const auth = createAuthService({
@@ -45,6 +47,7 @@ async function start(): Promise<void> {
     allowedOrigins: authRuntime.trustedOrigins,
     logger: createLoggerOptions(env.LOG_LEVEL),
     rateLimitHmacKey: requireRateLimitHmacKey(env),
+    manualTill,
     staffReviewEnabled: env.STAFF_REVIEW_ENABLED,
     sellerCommerceEnabled: env.SELLER_COMMERCE_ENABLED,
     sellerOrderActionsEnabled: env.SELLER_ORDER_ACTIONS_ENABLED,

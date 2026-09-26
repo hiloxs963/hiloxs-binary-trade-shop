@@ -8,6 +8,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ManualTillPanel } from "@/components/hiloxs/ManualTillPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,13 +24,16 @@ import {
   createOrder,
   formatMoneyMinor,
   getCheckoutQuote,
+  getManualTillConfig,
   getOrderPaymentStatus,
   getPaymentConfig,
   initiateMpesaPayment,
+  manualTillDetails,
   mpesaAvailabilityForOrder,
   refreshMpesaPayment,
   type CommerceOrder,
   type CheckoutQuote,
+  type ManualTillConfig,
   type OrderPaymentStatus,
   type PaymentConfig,
   type DeliveryAddress,
@@ -384,6 +388,7 @@ function CreatedOrderPayment({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>();
+  const [manualTill, setManualTill] = useState<ManualTillConfig | null>();
   const paymentKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -394,6 +399,13 @@ function CreatedOrderPayment({
       })
       .catch(() => {
         if (active) setPaymentConfig(null);
+      });
+    void getManualTillConfig()
+      .then((config) => {
+        if (active) setManualTill(config);
+      })
+      .catch(() => {
+        if (active) setManualTill(null);
       });
     return () => {
       active = false;
@@ -413,6 +425,8 @@ function CreatedOrderPayment({
   const paymentStateAllowsInitiation =
     !payment || payment.paymentStatus === null || payment.paymentStatus === "FAILED";
   const availability = mpesaAvailabilityForOrder(paymentConfig, order.orderNumber);
+  const manualTillOption = manualTillDetails(manualTill);
+  const availabilityLoading = paymentConfig === undefined || manualTill === undefined;
   return (
     <section className="mx-auto max-w-2xl px-4 py-10">
       <CheckCircle2 className="size-9 text-success" aria-hidden />
@@ -481,11 +495,22 @@ function CreatedOrderPayment({
                   : "Send M-Pesa prompt"}
             </Button>
           </div>
+        ) : paymentStateAllowsInitiation && availabilityLoading ? (
+          <p className="mt-4 text-sm text-muted-foreground" role="status">
+            Checking M-Pesa availability...
+          </p>
+        ) : paymentStateAllowsInitiation && manualTillOption ? (
+          <div className="mt-4">
+            <ManualTillPanel
+              details={manualTillOption}
+              orderNumber={order.orderNumber}
+              totalMinor={order.totalMinor}
+              currency={order.currency}
+            />
+          </div>
         ) : paymentStateAllowsInitiation ? (
           <p className="mt-4 text-sm text-muted-foreground" role="status">
-            {paymentConfig === undefined
-              ? "Checking M-Pesa availability..."
-              : "M-Pesa payments are not currently available."}
+            M-Pesa payments are not currently available.
           </p>
         ) : (
           <PaymentMessage payment={payment} />

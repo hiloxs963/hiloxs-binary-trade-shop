@@ -4,7 +4,7 @@ import { ZodError } from "zod";
 import type { AuthService } from "./auth/auth.js";
 import { registerAuthRoutes } from "./auth/fastify.js";
 import { PostgresRateLimiter } from "./commerce/rate-limit.js";
-import type { AuthRuntimeConfig, MpesaRuntimeConfig } from "./config/env.js";
+import type { AuthRuntimeConfig, ManualTillConfig, MpesaRuntimeConfig } from "./config/env.js";
 import type { DatabaseClient } from "./db/client.js";
 import {
   NotFoundError,
@@ -25,6 +25,7 @@ import { registerCurrentUserRoute } from "./routes/current-user.js";
 import { registerReadyRoute } from "./routes/ready.js";
 import { registerEmailVerificationRoute } from "./routes/verify-email.js";
 import { registerCheckoutRoute } from "./routes/checkout.js";
+import { registerManualTillRoute } from "./routes/manual-till.js";
 import { registerOrderRoutes } from "./routes/orders.js";
 import { registerProductRoutes } from "./routes/products.js";
 import { registerSellerRoutes } from "./sellers/routes.js";
@@ -42,6 +43,7 @@ export type BuildAppOptions = {
   allowedOrigins?: readonly string[];
   logger?: FastifyServerOptions["logger"];
   mpesa?: { provider: MpesaProvider; config: MpesaRuntimeConfig };
+  manualTill?: ManualTillConfig;
   staffReviewEnabled?: boolean;
   sellerCommerceEnabled?: boolean;
   sellerOrderActionsEnabled?: boolean;
@@ -111,6 +113,9 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await securityPlugin(app, options.allowedOrigins ?? ["http://localhost:8080"]);
   registerHealthRoute(app);
   registerReadyRoute(app, options.database);
+  // Informational only, and intentionally independent of the Daraja provider: the manual till is
+  // what buyers see precisely when STK initiation is unavailable.
+  registerManualTillRoute(app, { ...(options.manualTill ? { config: options.manualTill } : {}) });
 
   const rateLimiter = options.database
     ? new PostgresRateLimiter(
