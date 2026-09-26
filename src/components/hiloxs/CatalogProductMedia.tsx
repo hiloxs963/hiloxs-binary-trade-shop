@@ -11,12 +11,15 @@ export function CatalogProductMedia({
   className,
   imageClassName,
   priority = false,
+  compact = false,
 }: {
   product: PublicCatalogProduct;
   fallbackProduct?: Product;
   className?: string;
   imageClassName?: string;
   priority?: boolean;
+  /** Thumbnail sizing: shrinks the placeholder and drops its caption. */
+  compact?: boolean;
 }) {
   const media = product.media[0];
   const medium = media?.variants.MEDIUM ? catalogMediaUrl(media.variants.MEDIUM.path) : null;
@@ -67,21 +70,26 @@ export function CatalogProductMedia({
   return (
     <div
       className={cn(
-        "grid place-items-center bg-[image:var(--gradient-night)] px-4 text-center",
+        "grid place-items-center overflow-hidden bg-[image:var(--gradient-night)] text-center",
+        compact ? "px-1" : "px-4",
         className,
       )}
       role="img"
       aria-label={`Licensed product photo not yet available for ${product.name}`}
     >
       <div>
-        {emoji && (
-          <span className="text-5xl" aria-hidden>
+        {emoji ? (
+          <span className={compact ? "text-xl" : "text-5xl"} aria-hidden>
             {emoji}
           </span>
+        ) : (
+          compact && <ImageIcon className="size-4 text-muted-foreground" aria-hidden />
         )}
-        <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <ImageIcon className="size-3.5" aria-hidden /> Licensed photo pending
-        </p>
+        {!compact && (
+          <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ImageIcon className="size-3.5" aria-hidden /> Licensed photo pending
+          </p>
+        )}
       </div>
     </div>
   );

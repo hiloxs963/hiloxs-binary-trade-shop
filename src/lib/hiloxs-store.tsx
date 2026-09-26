@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  DEMO_TRADING_PAYOUT_RATE,
-  PLAN,
-  PRODUCTS,
-  type Product,
-  type ShopCategory,
-} from "./hiloxs";
+import { DEMO_TRADING_PAYOUT_RATE, PLAN } from "./hiloxs";
 import { HiloxsContext, type HiloxsContextValue } from "./hiloxs-context";
 
 export type Leg = "L" | "R";
@@ -365,8 +359,6 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, videos: prev.videos.filter((v) => v.id !== id) }));
   }, []);
 
-  const allProducts = PRODUCTS;
-
   const value: Ctx = {
     state,
     hydrated,
@@ -385,7 +377,6 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     withdrawTrading,
     addVideo,
     removeVideo,
-    allProducts,
   };
 
   return <HiloxsContext.Provider value={value}>{children}</HiloxsContext.Provider>;

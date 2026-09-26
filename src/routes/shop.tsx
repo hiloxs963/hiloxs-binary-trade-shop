@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -46,7 +46,7 @@ type CatalogViewProduct = {
 };
 
 function ShopPage() {
-  const { state, hydrated, addToCart, setCartQty, clearCart, allProducts } = useHiloxs();
+  const { state, hydrated, addToCart, setCartQty, clearCart } = useHiloxs();
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("All");
   const [query, setQuery] = useState("");
   const [catalog, setCatalog] = useState<PublicCatalogProduct[]>([]);
@@ -89,12 +89,42 @@ function ShopPage() {
       ),
     [viewProducts, category, query],
   );
-  const cartLines = hydrated
-    ? Object.entries(state.cart)
-        .map(([id, qty]) => ({ product: allProducts.find((p) => p.id === id)!, qty }))
-        .filter((line) => Boolean(line.product))
-    : [];
-  const total = cartLines.reduce((sum, line) => sum + line.product.priceKes * line.qty, 0);
+  /**
+   * Cart ids are catalog keys from the API - "lp-01" for platform products and
+   * "seller-<uuid>" for activated seller products. Only the live catalog holds
+   * both, so every cart line resolves against it, never the static list.
+   */
+  const catalogById = useMemo(
+    () => new Map(viewProducts.map((item) => [item.product.id, item])),
+    [viewProducts],
+  );
+  const cartStored = hydrated ? Object.keys(state.cart).length : 0;
+  const cartReady = hydrated && catalogState === "ready";
+  const cartLines = useMemo(
+    () =>
+      cartReady
+        ? Object.entries(state.cart).flatMap(([id, qty]) => {
+            const item = catalogById.get(id);
+            return item ? [{ item, qty }] : [];
+          })
+        : [],
+    [cartReady, catalogById, state.cart],
+  );
+  const unresolvedCartCount = cartReady
+    ? Object.keys(state.cart).filter((id) => !catalogById.has(id)).length
+    : 0;
+  const total = cartLines.reduce((sum, line) => sum + line.item.priceKes * line.qty, 0);
+  const handleAddToCart = useCallback(
+    (product: PublicCatalogProduct) => {
+      if (!catalogById.has(product.id)) {
+        toast.error(`${product.name} could not be added to the cart. Please reload and try again.`);
+        return;
+      }
+      addToCart(product.id);
+      toast.success(`${product.name} added to cart`);
+    },
+    [addToCart, catalogById],
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -173,10 +203,7 @@ function ShopPage() {
               <ProductCard
                 key={item.product.id}
                 item={item}
-                onAdd={() => {
-                  addToCart(item.product.id);
-                  toast.success(`${item.product.name} added to cart`);
-                }}
+                onAdd={() => handleAddToCart(item.product)}
               />
             ))}
           {catalogState === "ready" && products.length === 0 && (
@@ -199,27 +226,46 @@ function ShopPage() {
 
         <aside id="cart" className="panel h-fit p-5 lg:sticky lg:top-20">
           <h2 className="text-lg font-semibold">Your cart</h2>
-          {cartLines.length === 0 ? (
+          {unresolvedCartCount > 0 && (
+            <p className="mt-3 text-xs text-destructive" role="alert">
+              {unresolvedCartCount} saved item{unresolvedCartCount === 1 ? " is" : "s are"} no
+              longer in the catalog and {unresolvedCartCount === 1 ? "is" : "are"} not shown below.
+            </p>
+          )}
+          {cartStored > 0 && catalogState === "loading" ? (
+            <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground" role="status">
+              <Loader2 className="size-4 animate-spin" aria-hidden /> Loading your cart...
+            </p>
+          ) : cartStored > 0 && catalogState === "error" ? (
+            <p className="mt-3 text-sm text-destructive" role="alert">
+              Your cart could not be loaded because the catalog is unavailable. Your saved items are
+              safe - please try again shortly.
+            </p>
+          ) : cartLines.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
               Nothing here yet. Add a laptop, screen or woofer to get started.
             </p>
           ) : (
             <>
               <ul className="mt-4 space-y-3">
-                {cartLines.map(({ product, qty }) => (
-                  <li key={product.id} className="flex items-start gap-3 text-sm">
-                    <span className="text-xl" aria-hidden>
-                      {product.emoji}
-                    </span>
+                {cartLines.map(({ item, qty }) => (
+                  <li key={item.product.id} className="flex items-start gap-3 text-sm">
+                    <CatalogProductMedia
+                      product={item.product}
+                      {...(item.legacy ? { fallbackProduct: item.legacy } : {})}
+                      className="size-12 shrink-0 rounded-md"
+                      imageClassName="object-contain p-1"
+                      compact
+                    />
                     <div className="flex-1">
-                      <p className="font-medium leading-tight">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">{kes(product.priceKes)} each</p>
+                      <p className="font-medium leading-tight">{item.product.name}</p>
+                      <p className="text-xs text-muted-foreground">{kes(item.priceKes)} each</p>
                       <div className="mt-1 flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          aria-label={`Decrease quantity of ${product.name}`}
-                          onClick={() => setCartQty(product.id, qty - 1)}
+                          aria-label={`Decrease quantity of ${item.product.name}`}
+                          onClick={() => setCartQty(item.product.id, qty - 1)}
                         >
                           -
                         </Button>
@@ -227,16 +273,16 @@ function ShopPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          aria-label={`Increase quantity of ${product.name}`}
-                          onClick={() => setCartQty(product.id, qty + 1)}
+                          aria-label={`Increase quantity of ${item.product.name}`}
+                          onClick={() => setCartQty(item.product.id, qty + 1)}
                         >
                           +
                         </Button>
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label={`Remove ${product.name} from cart`}
-                          onClick={() => setCartQty(product.id, 0)}
+                          aria-label={`Remove ${item.product.name} from cart`}
+                          onClick={() => setCartQty(item.product.id, 0)}
                         >
                           <Trash2 />
                         </Button>
