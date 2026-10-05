@@ -47,6 +47,10 @@ pause new commerce.
 8. Deploy the validated static frontend artifact.
 9. Monitor errors, latency, workers, payments, and fulfillment queues.
 
+When `0011` and `0012` ship together, follow the combined rollout in
+[`backup-restore-migrations.md`](./backup-restore-migrations.md): that release migrates **before** deploying
+the API, because the new API requires `session.mfa_method`.
+
 If migration fails, halt and investigate. Do not run destructive down migrations or improvise direct
 production SQL. Application startup never runs migrations.
 
@@ -73,8 +77,9 @@ Before enabling the flag, confirm Resend delivery for `auth@mail.hiloxs.co.ke` t
 Yahoo (see the launch blockers), because a code that never arrives only has TOTP as a fallback. Review
 `auth_security_events` (`EMAIL_OTP_SEND_FAILED`, `EMAIL_OTP_LOCKED`) after enabling.
 
-Per-IP send caps use the client IP the API sees. Verify that this is the real client address, not the
-proxy, in the target environment before relying on them (the API sets no `trustProxy`).
+Per-IP send caps use the client IP the API sees. `EMAIL_OTP_ENABLED` must stay `false` until the client-IP
+fix (`trustProxy` limited to Railway's proxy range) is deployed and its production check has passed;
+without it every user shares one address and one per-IP cap.
 
 ## Rate-limit key operations
 
