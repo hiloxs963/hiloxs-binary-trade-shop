@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AuthFormLayout, FormNotice, PasswordField } from "@/components/hiloxs/AuthForm";
+import { SecondFactorStep } from "@/components/hiloxs/SecondFactorStep";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthApiError } from "@/lib/auth-api";
 import { useAuth } from "@/lib/auth-context";
 import { parseAuthReturnPath, type AuthReturnPath } from "@/lib/auth-return";
+import type { SecondFactorMethod } from "@/lib/second-factor";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/login")({
@@ -42,19 +44,44 @@ function LoginPage() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [awaitingTwoFactor, setAwaitingTwoFactor] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [methods, setMethods] = useState<SecondFactorMethod[]>(["totp", "backup-code"]);
+
+  if (awaitingTwoFactor) {
+    return (
+      <AuthFormLayout
+        title="Verify it's you"
+        description="Choose how you want to confirm this sign-in."
+        footer={
+          <button
+            type="button"
+            className="font-medium text-primary hover:underline"
+            onClick={() => setAwaitingTwoFactor(false)}
+          >
+            Start over
+          </button>
+        }
+      >
+        <SecondFactorStep
+          methods={methods}
+          onVerified={async () => {
+            await navigate({ to: search.returnTo ?? "/" });
+          }}
+        />
+      </AuthFormLayout>
+    );
+  }
 
   return (
     <AuthFormLayout
       title="Log in"
       description="Access your HILOXS account with a verified email address."
       footer={
-        <>
+        <div className="space-y-4">
           New to HILOXS?{" "}
           <Link to="/register" className="font-medium text-primary hover:underline">
             Create an account
           </Link>
-        </>
+        </div>
       }
     >
       <form
@@ -62,25 +89,6 @@ function LoginPage() {
         className="space-y-4"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (awaitingTwoFactor) {
-            if (!/^\d{6}$/.test(twoFactorCode)) {
-              setNotice("Enter the six-digit code from your authenticator app.");
-              return;
-            }
-            setSubmitting(true);
-            setNotice("");
-            try {
-              await auth.completeTwoFactor(twoFactorCode);
-              setTwoFactorCode("");
-              await navigate({ to: search.returnTo ?? "/" });
-            } catch {
-              setNotice("The authentication code could not be verified.");
-            } finally {
-              setSubmitting(false);
-            }
-            return;
-          }
-
           const nextErrors: typeof errors = {};
           if (!/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Enter a valid email address.";
           if (!password) nextErrors.password = "Enter your password.";
@@ -93,6 +101,7 @@ function LoginPage() {
             const result = await auth.login(email, password);
             if (result.requiresTwoFactor) {
               setPassword("");
+              setMethods(result.methods);
               setAwaitingTwoFactor(true);
             } else {
               await navigate({ to: search.returnTo ?? "/" });
@@ -108,59 +117,41 @@ function LoginPage() {
           }
         }}
       >
-        {awaitingTwoFactor ? (
+        <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="login-totp">Authenticator code</Label>
+            <Label htmlFor="login-email">Email address</Label>
             <Input
-              id="login-totp"
-              type="text"
-              value={twoFactorCode}
-              onChange={(event) =>
-                setTwoFactorCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              maxLength={6}
-              autoFocus
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              inputMode="email"
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "login-email-error" : undefined}
             />
+            {errors.email && (
+              <p id="login-email-error" className="text-xs text-destructive">
+                {errors.email}
+              </p>
+            )}
           </div>
-        ) : (
-          <>
-            <div className="space-y-1.5">
-              <Label htmlFor="login-email">Email address</Label>
-              <Input
-                id="login-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                inputMode="email"
-                aria-invalid={Boolean(errors.email)}
-                aria-describedby={errors.email ? "login-email-error" : undefined}
-              />
-              {errors.email && (
-                <p id="login-email-error" className="text-xs text-destructive">
-                  {errors.email}
-                </p>
-              )}
-            </div>
-            <PasswordField
-              id="login-password"
-              value={password}
-              onChange={setPassword}
-              error={errors.password}
-              autoComplete="current-password"
-            />
-            <div className="text-right">
-              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-          </>
-        )}
+          <PasswordField
+            id="login-password"
+            value={password}
+            onChange={setPassword}
+            error={errors.password}
+            autoComplete="current-password"
+          />
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+        </div>
         {notice && <FormNotice>{notice}</FormNotice>}
         <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
-          {submitting ? "Verifying..." : awaitingTwoFactor ? "Verify code" : "Continue"}
+          {submitting ? "Verifying..." : "Continue"}
         </Button>
       </form>
     </AuthFormLayout>

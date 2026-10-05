@@ -7,6 +7,7 @@ import {
   type AuthUser,
 } from "./auth-api";
 import { AuthContext } from "./auth-context";
+import type { SecondFactorMethod } from "./second-factor";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -36,8 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const completeTwoFactor = useCallback(
-    async (code: string) => {
-      await verifyTwoFactorCode(code);
+    async (code: string, method: SecondFactorMethod = "totp") => {
+      await verifyTwoFactorCode(code, method);
       await refresh();
     },
     [refresh],

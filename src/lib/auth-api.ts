@@ -1,3 +1,5 @@
+import { availableSecondFactorMethods, type SecondFactorMethod } from "./second-factor";
+
 export type AuthUser = {
   id: string;
   name: string;
@@ -40,22 +42,64 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 export async function loginWithEmail(
   email: string,
   password: string,
-): Promise<{ requiresTwoFactor: boolean }> {
+): Promise<{ requiresTwoFactor: boolean; methods: SecondFactorMethod[] }> {
   const response = await request("/api/auth/sign-in/email", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
   if (!response.ok) throw await toAuthError(response, "Unable to log in");
-  const body = (await response.json()) as { twoFactorRedirect?: boolean };
-  return { requiresTwoFactor: body.twoFactorRedirect === true };
+  const body = (await response.json()) as {
+    twoFactorRedirect?: boolean;
+    twoFactorMethods?: unknown;
+  };
+  return {
+    requiresTwoFactor: body.twoFactorRedirect === true,
+    methods: availableSecondFactorMethods(body.twoFactorMethods),
+  };
 }
 
-export async function verifyTwoFactorCode(code: string): Promise<void> {
-  const response = await request("/api/auth/two-factor/verify-totp", {
+const SECOND_FACTOR_PATHS: Record<SecondFactorMethod, string> = {
+  totp: "/api/auth/two-factor/verify-totp",
+  "email-otp": "/api/auth/email-otp/verify",
+  "backup-code": "/api/auth/two-factor/verify-backup-code",
+};
+
+export async function verifyTwoFactorCode(
+  code: string,
+  method: SecondFactorMethod = "totp",
+): Promise<void> {
+  const response = await request(SECOND_FACTOR_PATHS[method], {
     method: "POST",
     body: JSON.stringify({ code }),
   });
   if (!response.ok) throw await toAuthError(response, "Unable to verify the authentication code");
+}
+
+export async function sendEmailOtp(): Promise<{ resendAvailableAt: string }> {
+  const response = await request("/api/auth/email-otp/send", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw await toAuthError(response, "Unable to send the code");
+  return (await response.json()) as { resendAvailableAt: string };
+}
+
+export type EmailOtpStatus = { enrolled: boolean; eligible: boolean };
+
+/** Null when the feature is off (the API answers 404) or there is no session. */
+export async function getEmailOtpStatus(): Promise<EmailOtpStatus | null> {
+  const response = await request("/api/auth/email-otp/status", { method: "GET" });
+  if (response.status === 404 || response.status === 401) return null;
+  if (!response.ok) throw await toAuthError(response, "Unable to check email sign-in codes");
+  return (await response.json()) as EmailOtpStatus;
+}
+
+export async function changeEmailOtp(action: "enroll" | "disable", code: string): Promise<void> {
+  const response = await request(`/api/auth/email-otp/${action}`, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) throw await toAuthError(response, "Unable to update email sign-in codes");
 }
 
 export async function enableTwoFactor(password: string): Promise<{
