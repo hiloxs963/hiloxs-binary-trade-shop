@@ -22,6 +22,7 @@ describe("environment configuration", () => {
       PG_LOCK_TIMEOUT_MS: 10_000,
       PG_IDLE_IN_TRANSACTION_TIMEOUT_MS: 60_000,
       LOG_LEVEL: "info",
+      CLIENT_IP_DIAGNOSTIC: false,
       MPESA_PUBLIC_ENABLED: false,
       MANUAL_TILL_ENABLED: false,
       MPESA_REQUEST_TIMEOUT_MS: 10_000,
