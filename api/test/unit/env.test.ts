@@ -26,6 +26,7 @@ describe("environment configuration", () => {
       MPESA_PUBLIC_ENABLED: false,
       MANUAL_TILL_ENABLED: false,
       MPESA_REQUEST_TIMEOUT_MS: 10_000,
+      EMAIL_OTP_ENABLED: false,
       STAFF_REVIEW_ENABLED: false,
       MEDIA_UPLOAD_ENABLED: false,
       CATALOG_ACTIVATION_ENABLED: false,

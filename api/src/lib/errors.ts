@@ -3,6 +3,9 @@ export type ErrorCode =
   | "CONFIGURATION_ERROR"
   | "DATABASE_UNAVAILABLE"
   | "EMAIL_DELIVERY_FAILED"
+  | "EMAIL_OTP_UNAVAILABLE"
+  | "EMAIL_OTP_SEND_FAILED"
+  | "INVALID_SECOND_FACTOR_CODE"
   | "UNAUTHENTICATED"
   | "SELLER_NOT_APPROVED"
   | "STAFF_PERMISSION_REQUIRED"
@@ -300,6 +303,39 @@ export class RateLimitError extends AppError {
     super("Too many requests", {
       code: "RATE_LIMITED",
       statusCode: 429,
+      expose: true,
+    });
+  }
+}
+
+/** Email OTP cannot be used for this account or login right now; TOTP still works. */
+export class EmailOtpUnavailableError extends AppError {
+  constructor() {
+    super("Email codes are not available for this sign-in. Use your authenticator app.", {
+      code: "EMAIL_OTP_UNAVAILABLE",
+      statusCode: 403,
+      expose: true,
+    });
+  }
+}
+
+export class EmailOtpSendFailedError extends AppError {
+  constructor(cause?: unknown) {
+    super("We could not send the code. Use your authenticator app, or try again shortly.", {
+      code: "EMAIL_OTP_SEND_FAILED",
+      statusCode: 503,
+      expose: true,
+      ...(cause === undefined ? {} : { cause }),
+    });
+  }
+}
+
+/** One message for wrong, expired, used, and exhausted codes so none of them is an oracle. */
+export class InvalidSecondFactorCodeError extends AppError {
+  constructor() {
+    super("The code is incorrect or has expired", {
+      code: "INVALID_SECOND_FACTOR_CODE",
+      statusCode: 401,
       expose: true,
     });
   }

@@ -1,4 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { disableEmailOtpForStaffMember } from "../auth/email-otp/service.js";
 import type { DatabaseClient } from "../db/client.js";
 import { session, twoFactor, user } from "../db/schema/auth.js";
 import {
@@ -56,6 +57,8 @@ export async function bootstrapStaffMembership(
     if (existing) throw new ConflictError("A staff membership already exists");
 
     await transaction.insert(staffMemberships).values({ userId: input.userId, role: input.role });
+    // Staff are TOTP-only (ADR 0010): drop any email-OTP enrollment in the same transaction.
+    await disableEmailOtpForStaffMember(transaction, input.userId);
     await transaction.insert(staffAuditEvents).values({
       actorType: "SYSTEM_BOOTSTRAP",
       actorRole: input.role,

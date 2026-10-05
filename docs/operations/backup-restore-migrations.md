@@ -66,6 +66,48 @@ Rollback is forward-only: re-insert the 44 products from the `INSERT INTO "produ
 `0002_chubby_scarlet_spider.sql` through a reviewed migration, or restore the backup into an isolated
 target and copy the rows across.
 
+### Combined rollout: migrations `0011` + `0012` (demo-product removal and email OTP)
+
+Use this when both migrations are pending in one release. `0011` deletes rows; `0012` is additive
+(three new tables and `session.mfa_method text not null default 'none'`). The currently deployed API
+(before email OTP) was run against a database already at `0012` in the integration suite (55 auth and
+staff tests pass), so the schema can be migrated **before** the new API is deployed. The reverse is not
+safe: the new API reads and writes `session.mfa_method`, so it must never serve traffic before `0012`.
+
+1. **Prerequisites.** The client-IP fix is merged and its production check passed (see
+   `production-readiness.md`, "Client address resolution"). Frontend and API CI are green. Railway
+   Auto Deploy stays disabled. `EMAIL_OTP_ENABLED` is unset or `false` and stays that way until step 10.
+2. **One verified backup** taken immediately before step 4, covering both migrations (the rollback for
+   `0011` is a restore or a reviewed forward re-insert, so do not rely on an older backup). Record the
+   object name, checksum, size, and date only.
+3. **Refcheck.** Run [`refcheck-demo-products.sql`](./refcheck-demo-products.sql) in the Railway query
+   tab. Expect `products_matched = 44` and `0` in every other row. If anything else is non-zero, stop:
+   do not apply either migration, and prepare a reviewed forward fix as described under `0011` above.
+4. **Migrate once, in order, from the final image.** Build the production image that contains `0012` and
+   the new API, and run `npm run db:migrate:prod` from that image against production. Drizzle applies
+   `0011` then `0012` in journal order; it stops at the first failure. Do not run it twice or from a
+   different image.
+5. **Verify the schema.** Journal has 13 entries (`0000`–`0012`); re-run the refcheck and expect
+   `products_matched = 0`; confirm `session.mfa_method`, `email_otp_enrollments`,
+   `email_otp_challenges`, and `auth_security_events` exist. The still-running old API must keep
+   answering `/health`, `/ready`, and sign-in. If it does not, stop and investigate before deploying.
+6. **Deploy the API** from the same image with `EMAIL_OTP_ENABLED=false` (and no `EMAIL_OTP_HMAC_KEY`
+   required yet). Verify `/health`, `/ready`, an existing user's password + TOTP sign-in, and a staff
+   permission check. Email OTP endpoints must answer 404 and sign-in responses must list only `totp`.
+7. **Deploy the static frontend** artifact from the matching commit (it handles the removed products in
+   existing carts and the new second-factor step). The email option stays hidden while the flag is off.
+8. **Monitor** errors, latency, sign-in success, and the audit table for `BACKUP_CODE_LOGIN_*` events.
+9. **Delivery check** for `auth@mail.hiloxs.co.ke` to Gmail, Outlook, and Yahoo (SPF/DKIM/DMARC alignment
+   and a real inbox test), then generate `EMAIL_OTP_HMAC_KEY` (32+ chars, independent of the other
+   secrets) in the secret manager.
+10. **Enable** `EMAIL_OTP_ENABLED=true` only after step 9 and the client-IP check. Run the manual checklist
+    in the UI pull request with a non-staff TOTP-enrolled test account and confirm a staff account never sees
+    the email option. Turning the flag off again is the rollback; it needs no data change.
+
+Rollback: forward-only for the schema. Code can be rolled back to the previous API image at any point
+after step 4 because `0012` is additive; do not drop the new tables or column. `0011` follows its own
+rollback note above.
+
 ## Backup disposal
 
 Destroy temporary plaintext dumps, test restore volumes, and short-lived credentials after the drill.

@@ -62,6 +62,7 @@ Never commit `.env`.
 | `STAFF_REVIEW_ENABLED` | `false`                                     | Exact `true` enables authorized staff review mutations                                                               |
 | `TRUSTED_PROXY_CIDRS`  | production: `100.64.0.0/10`; otherwise none | Proxies whose `X-Forwarded-For` is believed; empty disables; catch-all ranges are rejected (see ADR 0002)            |
 | `CLIENT_IP_DIAGNOSTIC` | `false`                                     | Exact `true` logs keyed digests of the resolved client address for `/health` checks that send `x-hiloxs-ip-check: 1` |
+| `EMAIL_OTP_ENABLED`    | `false`                                     | Exact `true` enables emailed sign-in codes (needs `EMAIL_OTP_HMAC_KEY`, 32+ chars; see ADR 0010)                     |
 
 Production starts only with the canonical API origin, a supplied authentication secret, secure
 cookies, the canonical frontend origin, and complete Resend configuration. Missing production email
