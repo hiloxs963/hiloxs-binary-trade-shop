@@ -9,6 +9,7 @@ import {
   resolveManualTillConfig,
   resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
+  resolveTrustedProxies,
 } from "./config/env.js";
 import { createDatabaseClient } from "./db/client.js";
 import { createLoggerOptions, writeFatalLog } from "./lib/logger.js";
@@ -47,6 +48,8 @@ async function start(): Promise<void> {
     allowedOrigins: authRuntime.trustedOrigins,
     logger: createLoggerOptions(env.LOG_LEVEL),
     rateLimitHmacKey: requireRateLimitHmacKey(env),
+    trustedProxies: resolveTrustedProxies(env),
+    clientIpDiagnostic: env.CLIENT_IP_DIAGNOSTIC,
     manualTill,
     staffReviewEnabled: env.STAFF_REVIEW_ENABLED,
     sellerCommerceEnabled: env.SELLER_COMMERCE_ENABLED,

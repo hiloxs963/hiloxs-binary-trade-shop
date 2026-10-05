@@ -12,6 +12,7 @@ import {
   serializeError,
   ValidationError,
 } from "./lib/errors.js";
+import { registerClientIpDiagnostic } from "./lib/client-ip.js";
 import { safeErrorForLog } from "./lib/redact.js";
 import { requestContextPlugin } from "./plugins/request-context.js";
 import { securityPlugin } from "./plugins/security.js";
@@ -53,6 +54,10 @@ export type BuildAppOptions = {
     catalogActivationEnabled: boolean;
   };
   rateLimitHmacKey?: string;
+  /** Proxy addresses/CIDRs whose X-Forwarded-For entries are trusted. Empty trusts nothing. */
+  trustedProxies?: readonly string[];
+  /** Logs keyed digests of the resolved client address for /health checks (never raw IPs). */
+  clientIpDiagnostic?: boolean;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -64,6 +69,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
     connectionTimeout: 10_000,
     keepAliveTimeout: 5_000,
     forceCloseConnections: "idle",
+    // Only the listed proxies may speak for a client: the address is the right-most
+    // X-Forwarded-For entry that is not itself a trusted proxy, so client-supplied entries to
+    // its left can never change it. With nothing listed the socket address is used.
+    trustProxy: options.trustedProxies?.length ? [...options.trustedProxies] : false,
   });
 
   app.addHook("onRoute", (route) => {
@@ -93,6 +102,12 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   requestContextPlugin(app);
+  if (options.clientIpDiagnostic) {
+    registerClientIpDiagnostic(
+      app,
+      options.rateLimitHmacKey ?? "development-only-rate-limit-hmac-key-change-me",
+    );
+  }
   app.addHook("onResponse", (request, reply, done) => {
     const route = request.routeOptions.url ?? "unmatched";
     const event = operationalFailureEvent(route, request.method, reply.statusCode);
