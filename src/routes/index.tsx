@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Activity,
   GraduationCap,
@@ -12,7 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import heroImage from "@/assets/hiloxs-brand-hero.jpg";
-import { PLAN, PRODUCTS, dual, kes, productSlug } from "@/lib/hiloxs";
+import { CatalogProductMedia } from "@/components/hiloxs/CatalogProductMedia";
+import { catalogPriceKes, getPublicCatalog, type PublicCatalogProduct } from "@/lib/catalog-api";
+import { PLAN, dual, kes } from "@/lib/hiloxs";
 import { absoluteUrl, pageSeo, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
@@ -81,7 +84,23 @@ const PILLARS = [
 ];
 
 function Index() {
-  const featured = PRODUCTS.slice(0, 4);
+  // The catalog is seller-sourced and lives behind the API, so the featured strip is
+  // fetched on hydration rather than sliced from a build-time list.
+  const [featured, setFeatured] = useState<PublicCatalogProduct[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void getPublicCatalog()
+      .then((products) => {
+        if (active) setFeatured(products.slice(0, 4));
+      })
+      .catch(() => {
+        if (active) setFeatured([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div>
@@ -186,23 +205,29 @@ function Index() {
               <Link to="/binary-plan">Open the prototype dashboard</Link>
             </Button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {featured.map((p) => (
-              <Link
-                key={p.id}
-                to="/shop/$slug"
-                params={{ slug: productSlug(p) }}
-                className="rounded-xl border border-border bg-background/40 p-4 transition-colors hover:border-primary"
-                aria-label={`View ${p.name}`}
-              >
-                <span className="text-3xl" aria-hidden>
-                  {p.emoji}
-                </span>
-                <p className="mt-2 text-sm font-semibold leading-tight">{p.name}</p>
-                <p className="mt-1 text-sm font-bold text-primary">{kes(p.priceKes)}</p>
-              </Link>
-            ))}
-          </div>
+          {featured.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {featured.map((product) => (
+                <Link
+                  key={product.id}
+                  to="/shop/$slug"
+                  params={{ slug: product.slug }}
+                  className="rounded-xl border border-border bg-background/40 p-4 transition-colors hover:border-primary"
+                  aria-label={`View ${product.name}`}
+                >
+                  <CatalogProductMedia
+                    product={product}
+                    className="aspect-[4/3] rounded-lg"
+                    imageClassName="object-contain p-2"
+                  />
+                  <p className="mt-2 text-sm font-semibold leading-tight">{product.name}</p>
+                  <p className="mt-1 text-sm font-bold text-primary">
+                    {kes(catalogPriceKes(product))}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

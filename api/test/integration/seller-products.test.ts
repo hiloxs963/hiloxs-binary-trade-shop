@@ -4,11 +4,11 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { restoreInitialCatalog } from "./helpers.js";
+import { restoreTestCatalog } from "./helpers.js";
 import { buildApp } from "../../src/app.js";
 import { createAuthService } from "../../src/auth/auth.js";
 import { InMemoryAuthEmailSender } from "../../src/auth/email.js";
-import { INITIAL_CATALOG } from "../../src/catalog/initial-catalog.js";
+import { TEST_CATALOG } from "./catalog-fixture.js";
 import {
   assertSafeTestDatabaseUrl,
   parseEnv,
@@ -63,7 +63,7 @@ beforeEach(async () => {
   await database.pool.query(
     'truncate table "security_rate_limit_windows", "seller_product_submissions", "seller_applications", "verification", "session", "account", "user" cascade',
   );
-  await restoreInitialCatalog(database);
+  await restoreTestCatalog(database);
   emailSender.messages.length = 0;
 });
 
@@ -550,8 +550,8 @@ describe("public catalog isolation", () => {
     );
 
     expect(after.json<{ products: unknown[] }>().products).toEqual(beforeProducts);
-    expect(beforeProducts).toHaveLength(INITIAL_CATALOG.length);
-    expect(publicRows[0]?.value).toBe(INITIAL_CATALOG.length);
+    expect(beforeProducts).toHaveLength(TEST_CATALOG.length);
+    expect(publicRows[0]?.value).toBe(TEST_CATALOG.length);
     expect(quote.statusCode).toBe(400);
     expect(order.statusCode).toBe(400);
   });

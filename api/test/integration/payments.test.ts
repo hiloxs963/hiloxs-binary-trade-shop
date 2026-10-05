@@ -4,11 +4,11 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { restoreInitialCatalog } from "./helpers.js";
+import { restoreTestCatalog } from "./helpers.js";
 import { buildApp } from "../../src/app.js";
 import { createAuthService } from "../../src/auth/auth.js";
 import { InMemoryAuthEmailSender } from "../../src/auth/email.js";
-import { INITIAL_CATALOG } from "../../src/catalog/initial-catalog.js";
+import { TEST_CATALOG } from "./catalog-fixture.js";
 import {
   assertSafeTestDatabaseUrl,
   parseEnv,
@@ -42,7 +42,7 @@ let database: DatabaseClient;
 let provider: FakeMpesaProvider;
 let requestCounter = 0;
 const emailSender = new InMemoryAuthEmailSender();
-const approvedProduct = INITIAL_CATALOG[0];
+const approvedProduct = TEST_CATALOG[0];
 const mpesaConfig: MpesaRuntimeConfig = {
   environment: "production",
   publicEnabled: true,
@@ -77,7 +77,7 @@ beforeEach(async () => {
   await database.pool.query(
     'truncate table "security_rate_limit_windows", "payment_events", "payment_attempts", "order_items", "orders", "verification", "session", "account", "user" cascade',
   );
-  await restoreInitialCatalog(database);
+  await restoreTestCatalog(database);
   await database.db
     .update(products)
     .set({ priceMinor: approvedProduct.priceMinor, isActive: true, updatedAt: new Date() })

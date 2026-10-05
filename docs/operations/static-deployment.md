@@ -32,8 +32,9 @@ is not in this repository, verification of this staging/switch/rollback behavior
 
 ## Release verification
 
-Run `npm run verify:production` against `dist/client`. Confirm 49 public pages (home, shop, three
-public informational routes, and 44 products), no private sitemap entries, correct canonical product
+Run `npm run verify:production` against `dist/client`. Confirm 5 public pages (home, shop, and three
+public informational routes) and 0 product pages, since products are served from the live API and
+are not prerendered, no private sitemap entries, correct canonical product
 metadata/JSON-LD, all inline scripts covered by CSP hashes, local fonts only, a private SPA shell,
 `404.html`, headers/redirect rules, and manifest checksums. After an authorized deployment, test one
 known route, one product, one authenticated deep link, one unknown path, HTTP redirect, `www`

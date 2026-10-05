@@ -10,23 +10,16 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CartRemovedNotice } from "@/components/hiloxs/CartRemovedNotice";
 import { CatalogProductMedia } from "@/components/hiloxs/CatalogProductMedia";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { catalogPriceKes, getPublicCatalog, type PublicCatalogProduct } from "@/lib/catalog-api";
-import {
-  CATEGORIES,
-  CATEGORY_EMOJI,
-  PRODUCTS,
-  SHOP_CATEGORIES,
-  SUPPORT,
-  dual,
-  kes,
-  type Product,
-} from "@/lib/hiloxs";
+import { CATEGORIES, CATEGORY_EMOJI, SHOP_CATEGORIES, SUPPORT, dual, kes } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { pageSeo } from "@/lib/seo";
+import { useCartReconciliation } from "@/lib/use-cart-reconciliation";
 
 export const Route = createFileRoute("/shop")({
   head: () =>
@@ -41,7 +34,6 @@ export const Route = createFileRoute("/shop")({
 
 type CatalogViewProduct = {
   product: PublicCatalogProduct;
-  legacy?: Product;
   priceKes: number;
 };
 
@@ -69,15 +61,7 @@ function ShopPage() {
   }, []);
 
   const viewProducts = useMemo(
-    () =>
-      catalog.map((product) => {
-        const legacy = PRODUCTS.find((candidate) => candidate.id === product.id);
-        return {
-          product,
-          ...(legacy ? { legacy } : {}),
-          priceKes: catalogPriceKes(product),
-        };
-      }),
+    () => catalog.map((product) => ({ product, priceKes: catalogPriceKes(product) })),
     [catalog],
   );
   const products = useMemo(
@@ -90,15 +74,19 @@ function ShopPage() {
     [viewProducts, category, query],
   );
   /**
-   * Cart ids are catalog keys from the API - "lp-01" for platform products and
-   * "seller-<uuid>" for activated seller products. Only the live catalog holds
-   * both, so every cart line resolves against it, never the static list.
+   * Cart ids are catalog keys from the API, and every product now comes from a seller,
+   * so lines resolve against the live catalog this page already fetched.
    */
   const catalogById = useMemo(
     () => new Map(viewProducts.map((item) => [item.product.id, item])),
     [viewProducts],
   );
   const cartStored = hydrated ? Object.keys(state.cart).length : 0;
+  const availableIds = useMemo(
+    () => (catalogState === "ready" ? new Set(catalogById.keys()) : null),
+    [catalogState, catalogById],
+  );
+  const removedFromCart = useCartReconciliation(availableIds);
   const cartReady = hydrated && catalogState === "ready";
   const cartLines = useMemo(
     () =>
@@ -110,9 +98,6 @@ function ShopPage() {
         : [],
     [cartReady, catalogById, state.cart],
   );
-  const unresolvedCartCount = cartReady
-    ? Object.keys(state.cart).filter((id) => !catalogById.has(id)).length
-    : 0;
   const total = cartLines.reduce((sum, line) => sum + line.item.priceKes * line.qty, 0);
   const handleAddToCart = useCallback(
     (product: PublicCatalogProduct) => {
@@ -226,12 +211,7 @@ function ShopPage() {
 
         <aside id="cart" className="panel h-fit p-5 lg:sticky lg:top-20">
           <h2 className="text-lg font-semibold">Your cart</h2>
-          {unresolvedCartCount > 0 && (
-            <p className="mt-3 text-xs text-destructive" role="alert">
-              {unresolvedCartCount} saved item{unresolvedCartCount === 1 ? " is" : "s are"} no
-              longer in the catalog and {unresolvedCartCount === 1 ? "is" : "are"} not shown below.
-            </p>
-          )}
+          <CartRemovedNotice count={removedFromCart} />
           {cartStored > 0 && catalogState === "loading" ? (
             <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground" role="status">
               <Loader2 className="size-4 animate-spin" aria-hidden /> Loading your cart...
@@ -243,7 +223,7 @@ function ShopPage() {
             </p>
           ) : cartLines.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
-              Nothing here yet. Add a laptop, screen or woofer to get started.
+              Nothing here yet. Browse the catalog to get started.
             </p>
           ) : (
             <>
@@ -252,7 +232,6 @@ function ShopPage() {
                   <li key={item.product.id} className="flex items-start gap-3 text-sm">
                     <CatalogProductMedia
                       product={item.product}
-                      {...(item.legacy ? { fallbackProduct: item.legacy } : {})}
                       className="size-12 shrink-0 rounded-md"
                       imageClassName="object-contain p-1"
                       compact
@@ -332,13 +311,12 @@ function ShopPage() {
 }
 
 function ProductCard({ item, onAdd }: { item: CatalogViewProduct; onAdd: () => void }) {
-  const { product, legacy, priceKes } = item;
+  const { product, priceKes } = item;
   return (
     <article className="panel flex flex-col overflow-hidden">
       <div className="relative">
         <CatalogProductMedia
           product={product}
-          {...(legacy ? { fallbackProduct: legacy } : {})}
           className="aspect-[4/3]"
           imageClassName="object-contain p-3"
         />

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CATALOG_CATEGORIES } from "../catalog/initial-catalog.js";
+import { PRODUCT_CATEGORIES } from "../catalog/categories.js";
 
 export const MAX_CART_LINES = 20;
 export const MAX_ITEM_QUANTITY = 20;
@@ -46,7 +46,7 @@ export const EmptyBodySchema = z.object({}).strict();
 
 export const ProductListQuerySchema = z
   .object({
-    category: z.enum(CATALOG_CATEGORIES).optional(),
+    category: z.enum(PRODUCT_CATEGORIES).optional(),
   })
   .strict();
 

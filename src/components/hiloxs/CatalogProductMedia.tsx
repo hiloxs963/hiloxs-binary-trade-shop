@@ -1,20 +1,16 @@
 import { ImageIcon } from "lucide-react";
-import type { Product } from "@/lib/hiloxs";
 import { CATEGORY_EMOJI } from "@/lib/hiloxs";
 import { catalogMediaUrl, type PublicCatalogProduct } from "@/lib/catalog-api";
 import { cn } from "@/lib/utils";
-import { ProductMedia } from "./ProductMedia";
 
 export function CatalogProductMedia({
   product,
-  fallbackProduct,
   className,
   imageClassName,
   priority = false,
   compact = false,
 }: {
   product: PublicCatalogProduct;
-  fallbackProduct?: Product;
   className?: string;
   imageClassName?: string;
   priority?: boolean;
@@ -52,17 +48,6 @@ export function CatalogProductMedia({
           decoding="async"
         />
       </div>
-    );
-  }
-
-  if (fallbackProduct) {
-    return (
-      <ProductMedia
-        product={fallbackProduct}
-        {...(className ? { className } : {})}
-        {...(imageClassName ? { imageClassName } : {})}
-        priority={priority}
-      />
     );
   }
 

@@ -19,7 +19,7 @@ const sitemapXml = await readFile(path.join(CLIENT_DIR, "sitemap.xml"), "utf8");
 const urls = parseSitemap(sitemapXml);
 assert(
   urls.length === EXPECTED_PUBLIC_PAGE_COUNT,
-  `Expected 49 sitemap URLs, found ${urls.length}`,
+  `Expected ${EXPECTED_PUBLIC_PAGE_COUNT} sitemap URLs, found ${urls.length}`,
 );
 assert(new Set(urls).size === urls.length, "Sitemap contains duplicate URLs");
 
@@ -54,7 +54,7 @@ for (const rawUrl of urls) {
 const productUrls = urls.filter((rawUrl) => new URL(rawUrl).pathname.startsWith("/shop/"));
 assert(
   productUrls.length === EXPECTED_PLATFORM_PRODUCT_COUNT,
-  `Expected 44 product URLs, found ${productUrls.length}`,
+  `Expected ${EXPECTED_PLATFORM_PRODUCT_COUNT} product URLs, found ${productUrls.length}`,
 );
 
 const htmlFiles = await readHtmlFiles();
@@ -189,7 +189,8 @@ async function smokeTestStaticRoutes(productUrl) {
     const checks = [
       ["/", 200],
       ["/shop", 200],
-      [new URL(productUrl).pathname, 200],
+      // Product pages are served from the live catalog, so there may be none prerendered.
+      ...(productUrl ? [[new URL(productUrl).pathname, 200]] : []),
       ["/login", 200],
       ["/definitely-not-a-hiloxs-route", 404],
     ];

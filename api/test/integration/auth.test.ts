@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { FastifyInstance } from "fastify";
 import type { Response as InjectResponse } from "light-my-request";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { restoreInitialCatalog } from "./helpers.js";
+import { restoreTestCatalog } from "./helpers.js";
 import { buildApp } from "../../src/app.js";
 import { createAuthService, type AuthService } from "../../src/auth/auth.js";
 import { InMemoryAuthEmailSender, type AuthEmailSender } from "../../src/auth/email.js";
@@ -55,7 +55,7 @@ beforeEach(async () => {
   await database.pool.query(
     'truncate table "security_rate_limit_windows", "verification", "session", "account", "user" cascade',
   );
-  await restoreInitialCatalog(database);
+  await restoreTestCatalog(database);
   emailSender.messages.length = 0;
 });
 

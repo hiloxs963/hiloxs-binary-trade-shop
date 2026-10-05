@@ -4,8 +4,9 @@ import path from "node:path";
 
 export const CLIENT_DIR = path.resolve("dist/client");
 export const SITE_ORIGIN = "https://hiloxs.co.ke";
-export const EXPECTED_PUBLIC_PAGE_COUNT = 49;
-export const EXPECTED_PLATFORM_PRODUCT_COUNT = 44;
+export const EXPECTED_PUBLIC_PAGE_COUNT = 5;
+// The catalog is seller-sourced and served at runtime; no product pages are prerendered.
+export const EXPECTED_PLATFORM_PRODUCT_COUNT = 0;
 
 export async function listFiles(root = CLIENT_DIR) {
   const files = [];
