@@ -13,6 +13,7 @@ export type HiloxsContextValue = {
   withdraw: (amountKes: number, to: "paypal" | "minipay" | "mpesa") => string | null;
   addToCart: (productId: string, qty?: number) => void;
   setCartQty: (productId: string, qty: number) => void;
+  removeCartItems: (productIds: readonly string[]) => void;
   clearCart: () => void;
   recordTrade: (trade: Trade) => void;
   settleTrade: (id: string, exit: number) => void;

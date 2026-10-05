@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { omitCartItems } from "./cart-reconcile";
 import { DEMO_TRADING_PAYOUT_RATE, PLAN } from "./hiloxs";
 import { HiloxsContext, type HiloxsContextValue } from "./hiloxs-context";
 
@@ -274,6 +275,11 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const removeCartItems = useCallback((productIds: readonly string[]) => {
+    if (productIds.length === 0) return;
+    setState((prev) => ({ ...prev, cart: omitCartItems(prev.cart, productIds) }));
+  }, []);
+
   const clearCart = useCallback(() => setState((prev) => ({ ...prev, cart: {} })), []);
 
   const recordTrade = useCallback((trade: Trade) => {
@@ -371,6 +377,7 @@ export function HiloxsProvider({ children }: { children: ReactNode }) {
     withdraw,
     addToCart,
     setCartQty,
+    removeCartItems,
     clearCart,
     recordTrade,
     settleTrade,

@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CartRemovedNotice } from "@/components/hiloxs/CartRemovedNotice";
 import { CatalogProductMedia } from "@/components/hiloxs/CatalogProductMedia";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { catalogPriceKes, getPublicCatalog, type PublicCatalogProduct } from "@/
 import { CATEGORIES, CATEGORY_EMOJI, SHOP_CATEGORIES, SUPPORT, dual, kes } from "@/lib/hiloxs";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { pageSeo } from "@/lib/seo";
+import { useCartReconciliation } from "@/lib/use-cart-reconciliation";
 
 export const Route = createFileRoute("/shop")({
   head: () =>
@@ -80,6 +82,11 @@ function ShopPage() {
     [viewProducts],
   );
   const cartStored = hydrated ? Object.keys(state.cart).length : 0;
+  const availableIds = useMemo(
+    () => (catalogState === "ready" ? new Set(catalogById.keys()) : null),
+    [catalogState, catalogById],
+  );
+  const removedFromCart = useCartReconciliation(availableIds);
   const cartReady = hydrated && catalogState === "ready";
   const cartLines = useMemo(
     () =>
@@ -91,9 +98,6 @@ function ShopPage() {
         : [],
     [cartReady, catalogById, state.cart],
   );
-  const unresolvedCartCount = cartReady
-    ? Object.keys(state.cart).filter((id) => !catalogById.has(id)).length
-    : 0;
   const total = cartLines.reduce((sum, line) => sum + line.item.priceKes * line.qty, 0);
   const handleAddToCart = useCallback(
     (product: PublicCatalogProduct) => {
@@ -207,12 +211,7 @@ function ShopPage() {
 
         <aside id="cart" className="panel h-fit p-5 lg:sticky lg:top-20">
           <h2 className="text-lg font-semibold">Your cart</h2>
-          {unresolvedCartCount > 0 && (
-            <p className="mt-3 text-xs text-destructive" role="alert">
-              {unresolvedCartCount} saved item{unresolvedCartCount === 1 ? " is" : "s are"} no
-              longer in the catalog and {unresolvedCartCount === 1 ? "is" : "are"} not shown below.
-            </p>
-          )}
+          <CartRemovedNotice count={removedFromCart} />
           {cartStored > 0 && catalogState === "loading" ? (
             <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground" role="status">
               <Loader2 className="size-4 animate-spin" aria-hidden /> Loading your cart...

@@ -8,6 +8,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CartRemovedNotice } from "@/components/hiloxs/CartRemovedNotice";
 import { ManualTillPanel } from "@/components/hiloxs/ManualTillPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,8 +40,11 @@ import {
   type DeliveryAddress,
 } from "@/lib/commerce-api";
 import { KENYA_COUNTIES } from "@/lib/delivery";
+import { reconcileCart } from "@/lib/cart-reconcile";
+import { getPublicCatalog } from "@/lib/catalog-api";
 import { useHiloxs } from "@/lib/hiloxs-context";
 import { pageSeo } from "@/lib/seo";
+import { useCartReconciliation } from "@/lib/use-cart-reconciliation";
 
 export const Route = createFileRoute("/checkout")({
   head: () =>
@@ -72,6 +76,15 @@ function CheckoutPage() {
     landmark: "",
   });
   const idempotencyKey = useRef<string | null>(null);
+  // The live catalog decides which saved cart lines still exist. A failed fetch leaves ids null, so
+  // nothing is pruned and the quote path below reports the problem as before.
+  const [catalogCheck, setCatalogCheck] = useState<{
+    checked: boolean;
+    ids: ReadonlySet<string> | null;
+  }>({ checked: false, ids: null });
+  const removedFromCart = useCartReconciliation(catalogCheck.ids);
+  const hasStaleLines =
+    catalogCheck.ids !== null && reconcileCart(state.cart, catalogCheck.ids).removed.length > 0;
   const items = useMemo(
     () => Object.entries(state.cart).map(([productId, quantity]) => ({ productId, quantity })),
     [state.cart],
@@ -84,11 +97,35 @@ function CheckoutPage() {
   }, [auth.isAuthenticated, auth.isLoading, navigate]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    let active = true;
+    void getPublicCatalog()
+      .then((products) => {
+        if (active) setCatalogCheck({ checked: true, ids: new Set(products.map((p) => p.id)) });
+      })
+      .catch(() => {
+        if (active) setCatalogCheck({ checked: true, ids: null });
+      });
+    return () => {
+      active = false;
+    };
+  }, [hydrated]);
+
+  useEffect(() => {
     idempotencyKey.current = null;
   }, [items]);
 
   useEffect(() => {
-    if (!hydrated || auth.isLoading || !auth.isAuthenticated || items.length === 0) return;
+    if (
+      !hydrated ||
+      !catalogCheck.checked ||
+      hasStaleLines ||
+      auth.isLoading ||
+      !auth.isAuthenticated ||
+      items.length === 0
+    ) {
+      return;
+    }
     let active = true;
     setQuoteLoading(true);
     setQuoteError("");
@@ -108,9 +145,9 @@ function CheckoutPage() {
     return () => {
       active = false;
     };
-  }, [auth.isAuthenticated, auth.isLoading, hydrated, items]);
+  }, [auth.isAuthenticated, auth.isLoading, catalogCheck.checked, hasStaleLines, hydrated, items]);
 
-  if (auth.isLoading || !hydrated) {
+  if (auth.isLoading || !hydrated || !catalogCheck.checked || hasStaleLines) {
     return <PageStatus>Checking account and cart...</PageStatus>;
   }
   if (!auth.isAuthenticated) {
@@ -126,6 +163,7 @@ function CheckoutPage() {
       <section className="mx-auto max-w-xl px-4 py-16 text-center">
         <ShoppingCart className="mx-auto size-10 text-muted-foreground" aria-hidden />
         <h1 className="mt-4 text-3xl font-bold">Your cart is empty</h1>
+        <CartRemovedNotice count={removedFromCart} />
         <Button asChild variant="hero" className="mt-6">
           <Link to="/shop">Browse products</Link>
         </Button>
@@ -136,6 +174,7 @@ function CheckoutPage() {
   return (
     <section className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-3xl font-bold sm:text-4xl">Checkout</h1>
+      <CartRemovedNotice count={removedFromCart} />
       <p className="mt-2 text-muted-foreground">
         Prices below are confirmed by the HILOXS server before an M-Pesa prompt can be sent.
       </p>
