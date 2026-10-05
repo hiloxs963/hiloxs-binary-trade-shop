@@ -6,6 +6,7 @@ import {
   requireDatabaseUrl,
   requireRateLimitHmacKey,
   resolveAuthRuntimeConfig,
+  resolveEmailOtpConfig,
   resolveManualTillConfig,
   resolveMediaRuntimeConfig,
   resolveMpesaRuntimeConfig,
@@ -39,6 +40,7 @@ async function start(): Promise<void> {
     database,
     emailSender: createRuntimeEmailSender(env),
     runtime: authRuntime,
+    emailOtp: resolveEmailOtpConfig(env),
   });
   const app = await buildApp({
     database,

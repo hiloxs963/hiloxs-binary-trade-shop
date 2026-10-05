@@ -25,6 +25,7 @@ All booleans default to false. Changing repository defaults does not change prod
 | Flag                           | Blocks when false                                              | Intentionally does not block                                                                                 |
 | ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `STAFF_REVIEW_ENABLED`         | Staff seller/product review mutations                          | Authenticated, permission-checked staff reads                                                                |
+| `EMAIL_OTP_ENABLED`            | Offering, sending, and verifying emailed sign-in codes         | Password, TOTP, and backup-code sign-in; existing enrollments stay dormant (ADR 0010)                        |
 | `MEDIA_UPLOAD_ENABLED`         | New seller media upload preparation/finalization               | Existing media reads and safe processing/reconciliation                                                      |
 | `CATALOG_ACTIVATION_ENABLED`   | New staff catalog activation mutations                         | Existing public product reads                                                                                |
 | `SELLER_COMMERCE_ENABLED`      | New seller-commerce enablement and new seller-product commerce | Settlement, reservation expiry/release, cancellation, and fulfillment safety for existing orders             |
@@ -60,6 +61,20 @@ The API and workers handle `SIGTERM`/`SIGINT`, stop accepting new work, finish o
 work, close PostgreSQL, and enforce a 25-second upper bound. A second signal exits immediately.
 Runtime filesystem writes are not required outside platform-provided temporary space; validate a
 read-only root filesystem separately before enabling it.
+
+## Email OTP key and rollout
+
+`EMAIL_OTP_HMAC_KEY` is a manually generated production secret of at least 32 characters, independent
+of `BETTER_AUTH_SECRET` and `RATE_LIMIT_HMAC_KEY`. It keys the stored code hashes and pending-login
+digests. Enabling `EMAIL_OTP_ENABLED` without it fails startup.
+
+Rotating it invalidates every outstanding code (they live at most 10 minutes) and nothing else.
+Before enabling the flag, confirm Resend delivery for `auth@mail.hiloxs.co.ke` to Gmail, Outlook, and
+Yahoo (see the launch blockers), because a code that never arrives only has TOTP as a fallback. Review
+`auth_security_events` (`EMAIL_OTP_SEND_FAILED`, `EMAIL_OTP_LOCKED`) after enabling.
+
+Per-IP send caps use the client IP the API sees. Verify that this is the real client address, not the
+proxy, in the target environment before relying on them (the API sets no `trustProxy`).
 
 ## Rate-limit key operations
 

@@ -1,7 +1,7 @@
 import { AppError } from "./errors.js";
 
 const SENSITIVE_KEY =
-  /authorization|cookie|password|passphrase|passkey|token|secret|hmac|databaseurl|apikey|accesskey|credential|signature|krapin|registrationnumber|totp|backupcode|twofactor|recipientname|deliveryphone|deliveryaddress|addressline|landmark|trackingreference|mpesareceipt|providerevidence|providerresultdescription|responsebody/i;
+  /authorization|cookie|password|passphrase|passkey|token|secret|hmac|databaseurl|apikey|accesskey|credential|signature|krapin|registrationnumber|totp|backupcode|twofactor|emailotp|otpcode|recipientname|deliveryphone|deliveryaddress|addressline|landmark|trackingreference|mpesareceipt|providerevidence|providerresultdescription|responsebody/i;
 
 const SENSITIVE_EXACT_KEYS = new Set(["policy"]);
 
@@ -50,6 +50,8 @@ export const LOG_REDACT_PATHS = [
   "totpURI",
   "totpCode",
   "twoFactorCode",
+  "emailOtpCode",
+  "otpCode",
   "twoFactorChallenge",
   "backupCodes",
   "recipientName",

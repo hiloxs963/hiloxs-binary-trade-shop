@@ -13,6 +13,9 @@ import {
 export const ACCOUNT_STATUSES = ["ACTIVE", "SUSPENDED", "DISABLED"] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
+export const SESSION_MFA_METHODS = ["none", "totp", "backup-code", "email-otp"] as const;
+export type SessionMfaMethod = (typeof SESSION_MFA_METHODS)[number];
+
 export const user = pgTable(
   "user",
   {
@@ -61,11 +64,19 @@ export const session = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
+    // How the second factor was satisfied. Staff authorization rejects "email-otp".
+    mfaMethod: text("mfa_method").$type<SessionMfaMethod>().notNull().default("none"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
   },
-  (table) => [index("session_user_id_idx").on(table.userId)],
+  (table) => [
+    index("session_user_id_idx").on(table.userId),
+    check(
+      "session_mfa_method_check",
+      sql`${table.mfaMethod} in ('none', 'totp', 'backup-code', 'email-otp')`,
+    ),
+  ],
 );
 
 export const account = pgTable(

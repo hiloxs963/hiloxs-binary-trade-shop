@@ -92,3 +92,59 @@ describe("auth rate limiting", () => {
     });
   });
 });
+
+describe("second-factor rate limiting", () => {
+  const pendingCookie = "hiloxs.two_factor=signed-pending-value.sig; other=1";
+
+  it("limits email OTP sends and verifies per IP and per pending login", async () => {
+    for (const [path, scope, policy] of [
+      ["/api/auth/email-otp/send", "auth-email-otp-send", RATE_LIMITS.emailOtpSend],
+      ["/api/auth/email-otp/verify", "auth-email-otp-verify", RATE_LIMITS.secondFactorAttempt],
+    ] as const) {
+      const { limiter, calls } = makeLimiter();
+      await applyAuthRateLimit(limiter, fakeAuth, path, {}, "1.2.3.4", { cookie: pendingCookie });
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toMatchObject({
+        scope: "auth-second-factor-pending",
+        key: "signed-pending-value.sig",
+        limit: RATE_LIMITS.secondFactorAttempt.limit,
+      });
+      expect(calls[1]).toMatchObject({
+        scope,
+        key: "1.2.3.4",
+        limit: policy.limit,
+        windowMs: policy.windowMs,
+      });
+    }
+  });
+
+  it("adds the per-pending-login ceiling to backup-code and TOTP attempts", async () => {
+    for (const path of [
+      "/api/auth/two-factor/verify-backup-code",
+      "/api/auth/two-factor/verify-totp",
+    ]) {
+      const { limiter, calls } = makeLimiter();
+      await applyAuthRateLimit(limiter, fakeAuth, path, {}, "1.2.3.4", { cookie: pendingCookie });
+
+      expect(calls.map((call) => call.scope)).toEqual([
+        "auth-second-factor-pending",
+        "auth-two-factor",
+      ]);
+    }
+  });
+
+  it("does not add a pending-login limit when there is no pending cookie", async () => {
+    const { limiter, calls } = makeLimiter();
+    await applyAuthRateLimit(
+      limiter,
+      fakeAuth,
+      "/api/auth/two-factor/verify-backup-code",
+      {},
+      "1.2.3.4",
+      {},
+    );
+
+    expect(calls.map((call) => call.scope)).toEqual(["auth-two-factor"]);
+  });
+});

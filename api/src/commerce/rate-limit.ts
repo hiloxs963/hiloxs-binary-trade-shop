@@ -87,6 +87,10 @@ export const RATE_LIMITS = {
   passwordResetRequest: { limit: 3, windowMs: 15 * 60_000 },
   verificationResend: { limit: 3, windowMs: 15 * 60_000 },
   security: { limit: 5, windowMs: 10 * 60_000 },
+  // Per-IP and per-pending-login ceilings for the second-factor step. The service adds exact
+  // per-account cooldown, hourly caps, and per-challenge attempt limits on top of these.
+  emailOtpSend: { limit: 10, windowMs: 10 * 60_000 },
+  secondFactorAttempt: { limit: 10, windowMs: 10 * 60_000 },
   authDefault: { limit: 100, windowMs: 60_000 },
   quote: { limit: 30, windowMs: 60_000 },
   orderCreate: { limit: 10, windowMs: 60_000 },

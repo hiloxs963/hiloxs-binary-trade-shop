@@ -21,6 +21,8 @@ const EnvironmentSchema = z.object({
     .refine((value) => /^postgres(?:ql)?:\/\//i.test(value), "must be a PostgreSQL URL")
     .optional(),
   RATE_LIMIT_HMAC_KEY: z.string().min(32).optional(),
+  EMAIL_OTP_ENABLED: FailSafeBooleanEnvironmentSchema,
+  EMAIL_OTP_HMAC_KEY: z.string().min(32).optional(),
   PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
   PG_LOCK_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
   PG_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.coerce
@@ -170,6 +172,19 @@ export function requireRateLimitHmacKey(env: AppEnv): string {
     throw new ConfigurationError("RATE_LIMIT_HMAC_KEY is required in production");
   }
   return "development-only-rate-limit-hmac-key-change-me";
+}
+
+export type EmailOtpConfig = { enabled: false } | { enabled: true; hmacKey: string };
+
+export const EMAIL_OTP_DISABLED: EmailOtpConfig = { enabled: false };
+
+/** Only the literal "true" enables email OTP, and enabling it requires its own HMAC key. */
+export function resolveEmailOtpConfig(env: AppEnv): EmailOtpConfig {
+  if (!env.EMAIL_OTP_ENABLED) return EMAIL_OTP_DISABLED;
+  if (!env.EMAIL_OTP_HMAC_KEY) {
+    throw new ConfigurationError("EMAIL_OTP_HMAC_KEY is required when EMAIL_OTP_ENABLED is true");
+  }
+  return { enabled: true, hmacKey: env.EMAIL_OTP_HMAC_KEY };
 }
 
 export function resolveAuthRuntimeConfig(env: AppEnv): AuthRuntimeConfig {

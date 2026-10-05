@@ -4,7 +4,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { twoFactor as twoFactorPlugin } from "better-auth/plugins/two-factor";
 import { recordRegistrationConsent } from "../consent/service.js";
-import type { AuthRuntimeConfig } from "../config/env.js";
+import { EMAIL_OTP_DISABLED, type AuthRuntimeConfig, type EmailOtpConfig } from "../config/env.js";
 import type { DatabaseClient } from "../db/client.js";
 import {
   ACCOUNT_STATUSES,
@@ -15,6 +15,8 @@ import {
   verification,
 } from "../db/schema/auth.js";
 import { EmailDeliveryError } from "../lib/errors.js";
+import { emailOtpPlugin } from "./email-otp/plugin.js";
+import { EmailOtpService } from "./email-otp/service.js";
 import type { AuthEmailSender } from "./email.js";
 import { PASSWORD_MIN_LENGTH } from "./validation.js";
 import { EmailVerificationTokenStore } from "./verification-tokens.js";
@@ -26,13 +28,25 @@ type CreateAuthOptions = {
   database: DatabaseClient;
   emailSender: AuthEmailSender;
   runtime: AuthRuntimeConfig;
+  emailOtp?: EmailOtpConfig;
 };
 
 type AuthRequestDeliveryState = {
   verificationError?: unknown;
 };
 
-export function createAuthService({ database, emailSender, runtime }: CreateAuthOptions) {
+export function createAuthService({
+  database,
+  emailSender,
+  runtime,
+  emailOtp = EMAIL_OTP_DISABLED,
+}: CreateAuthOptions) {
+  const emailOtpService = new EmailOtpService({
+    database,
+    emailSender,
+    config: emailOtp,
+    ipDigestKey: runtime.secret,
+  });
   const verificationTokens = new EmailVerificationTokenStore(database);
   const deliveryState = new AsyncLocalStorage<AuthRequestDeliveryState>();
   const service = betterAuth({
@@ -60,6 +74,9 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
     session: {
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
+      additionalFields: {
+        mfaMethod: { type: "string", required: false, defaultValue: "none", input: false },
+      },
     },
     plugins: [
       twoFactorPlugin({
@@ -67,6 +84,7 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
         skipVerificationOnEnable: false,
         trustDeviceMaxAge: 0,
       }),
+      emailOtpPlugin({ service: emailOtpService, database }),
     ],
     emailVerification: {
       sendOnSignUp: true,
@@ -95,6 +113,11 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
       resetPasswordTokenExpiresIn: 60 * 60,
+      // Email-based recovery must not turn the mailbox into the only factor: the next login
+      // after a reset has to use TOTP or a backup code (ADR 0010).
+      onPasswordReset: async ({ user: target }) => {
+        await emailOtpService.markPasswordReset(target.id);
+      },
       sendResetPassword: ({ user: target, token }) => {
         void emailSender
           .send({
@@ -160,6 +183,7 @@ export function createAuthService({ database, emailSender, runtime }: CreateAuth
   const handleAuthRequest = service.handler.bind(service);
 
   return Object.assign(service, {
+    emailOtp: emailOtpService,
     handler: (request: Request) =>
       deliveryState.run({}, async () => {
         const response = await handleAuthRequest(request);

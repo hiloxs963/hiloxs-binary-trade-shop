@@ -12,6 +12,7 @@ dist
 dist-ssr
 coverage/
 api/.dev-emails/
+.dev-emails/
 .output
 .vinxi
 .tanstack/**

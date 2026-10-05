@@ -3,7 +3,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import type { IncomingHttpHeaders } from "node:http";
 import type { AuthService } from "../auth/auth.js";
 import type { DatabaseClient } from "../db/client.js";
-import { session, twoFactor, user } from "../db/schema/auth.js";
+import { session, twoFactor, user, type SessionMfaMethod } from "../db/schema/auth.js";
 import {
   STAFF_PERMISSIONS,
   staffMemberships,
@@ -41,6 +41,7 @@ export async function requireStaffPermission(
       membershipCreatedAt: staffMemberships.createdAt,
       grantCreatedAt: staffPermissionGrants.grantedAt,
       sessionCreatedAt: session.createdAt,
+      mfaMethod: session.mfaMethod,
     })
     .from(staffMemberships)
     .innerJoin(user, eq(user.id, staffMemberships.userId))
@@ -72,6 +73,7 @@ export async function requireStaffPermission(
     .limit(1);
 
   if (!access) throw new StaffPermissionRequiredError();
+  assertStaffSessionMfaMethod(access.mfaMethod);
   assertPostMembershipSession(access.sessionCreatedAt, access.membershipCreatedAt);
   assertPostPermissionGrantSession(access.sessionCreatedAt, access.grantCreatedAt);
   if (options.recent) {
@@ -98,6 +100,7 @@ export async function requireStaffProfile(
       permission: staffPermissionGrants.permission,
       membershipCreatedAt: staffMemberships.createdAt,
       sessionCreatedAt: session.createdAt,
+      mfaMethod: session.mfaMethod,
     })
     .from(staffMemberships)
     .innerJoin(user, eq(user.id, staffMemberships.userId))
@@ -126,6 +129,7 @@ export async function requireStaffProfile(
 
   const first = rows[0];
   if (!first) throw new StaffPermissionRequiredError();
+  assertStaffSessionMfaMethod(first.mfaMethod);
   assertPostMembershipSession(first.sessionCreatedAt, first.membershipCreatedAt);
   return {
     role: first.role,
@@ -134,6 +138,11 @@ export async function requireStaffProfile(
     ),
     mfaEnabled: true,
   };
+}
+
+/** Staff are TOTP-only: a session opened with an emailed code never carries staff authority. */
+export function assertStaffSessionMfaMethod(mfaMethod: SessionMfaMethod): void {
+  if (mfaMethod === "email-otp") throw new StaffReauthRequiredError();
 }
 
 export function assertPostMembershipSession(

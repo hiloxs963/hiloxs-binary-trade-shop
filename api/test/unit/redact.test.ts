@@ -23,6 +23,22 @@ describe("log redaction", () => {
     expect(text).toContain("[REDACTED]");
   });
 
+  it("redacts email OTP codes and their HMAC key by key name", () => {
+    expect(
+      redactSensitive({
+        emailOtpCode: "123456",
+        otp_code: "654321",
+        EMAIL_OTP_HMAC_KEY: "k",
+        ok: 1,
+      }),
+    ).toEqual({
+      emailOtpCode: "[REDACTED]",
+      otp_code: "[REDACTED]",
+      EMAIL_OTP_HMAC_KEY: "[REDACTED]",
+      ok: 1,
+    });
+  });
+
   it("redacts sensitive object keys recursively", () => {
     expect(
       redactSensitive({
