@@ -20,7 +20,9 @@ repository files. Retention is **PROPOSED - REQUIRES OWNER/LEGAL APPROVAL**.
    staff review. Use no production provider credentials.
 3. Verify the encrypted backup checksum, decrypt into temporary protected storage, and restore.
 4. Run the production migration command against the isolated target.
-5. Verify migration journal integrity and exactly 44 platform products.
+5. Verify migration journal integrity (through `0011`) and that no seeded demo products remain:
+   `refcheck-demo-products.sql` must report `products_matched = 0`. Migration `0011` removed the 44
+   products seeded by `0002`; it aborts instead of deleting if anything still references them.
 6. Verify representative counts/relationships for auth, orders, payments, seller applications,
    seller submissions, staff memberships/grants/audit, media metadata, inventory reservations,
    fulfillments, and fulfillment events. Do not print PII or secrets.
@@ -44,6 +46,25 @@ both fresh and prior-schema upgrade paths. Production startup does not migrate. 
 
 On failure, stop and preserve logs/request IDs. Do not edit migration history, run arbitrary direct
 SQL, or automatically apply a down migration. Investigate and prepare a reviewed forward fix.
+
+### Migration `0011` (removes the 44 seeded demo products)
+
+`0011_remove_platform_demo_products` deletes rows, so a verified backup is required first. It counts
+every table that references `products.id` and aborts, deleting nothing, if any row references a demo
+product.
+
+1. Take and verify a Railway Postgres backup before applying `0011`.
+2. Run [`refcheck-demo-products.sql`](./refcheck-demo-products.sql) in the Railway query tab. It is
+   SELECT-only and counts exactly what the migration checks. Expect `products_matched = 44` and `0`
+   in every other row.
+3. If any other row is non-zero, do not apply `0011` and do not improvise `DELETE`s. Record the table
+   and count, then prepare a reviewed forward migration (for example deactivating a product that has
+   order history instead of deleting it).
+4. Apply the migration as above, then re-run the refcheck: `products_matched` must be `0`.
+
+Rollback is forward-only: re-insert the 44 products from the `INSERT INTO "products"` statement in
+`0002_chubby_scarlet_spider.sql` through a reviewed migration, or restore the backup into an isolated
+target and copy the rows across.
 
 ## Backup disposal
 
