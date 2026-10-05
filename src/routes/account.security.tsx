@@ -3,6 +3,7 @@ import { Check, CheckCircle2, Copy, KeyRound, Loader2, ShieldCheck } from "lucid
 import { useState } from "react";
 import QRCode from "react-qr-code";
 import { AuthRequired } from "@/components/hiloxs/AuthRequired";
+import { EmailOtpSettings } from "@/components/hiloxs/EmailOtpSettings";
 import { PasswordField } from "@/components/hiloxs/AuthForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,15 +74,18 @@ function AccountSecurityPage() {
 
       <div className="panel mt-8 p-6">
         {auth.currentUser?.mfaEnabled ? (
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 size-5 text-primary" aria-hidden />
-            <div>
-              <h2 className="font-semibold">Two-factor authentication is enabled</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Your authenticator code is required when you sign in.
-              </p>
+          <>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 size-5 text-primary" aria-hidden />
+              <div>
+                <h2 className="font-semibold">Two-factor authentication is enabled</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  A second code is required when you sign in.
+                </p>
+              </div>
             </div>
-          </div>
+            <EmailOtpSettings />
+          </>
         ) : enrollment ? (
           <div className="space-y-5">
             <div>
