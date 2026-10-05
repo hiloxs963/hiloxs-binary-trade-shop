@@ -1,4 +1,6 @@
 import type { ShopCategory } from "@/lib/hiloxs";
+import type { AllowedMediaMime } from "@/lib/media-limits";
+import { NETWORK_ERROR, UPLOAD_PUT_FAILED, type UploadStage } from "@/lib/media-upload-errors";
 
 export type SellerProductStatus =
   "DRAFT" | "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "WITHDRAWN";
@@ -91,6 +93,8 @@ const API_ORIGIN = configuredApiOrigin || (import.meta.env.DEV ? "" : "https://a
 export class SellerProductApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Upload step that failed, set by uploadSellerProductMedia so the UI can word the message. */
+  stage?: UploadStage;
 
   constructor(message: string, status: number, code = "SELLER_PRODUCT_REQUEST_FAILED") {
     super(message);
@@ -163,87 +167,77 @@ export async function getSellerProductMedia(submissionId: string): Promise<Selle
   );
 }
 
-// Mirrors MIN_MEDIA_WIDTH / MIN_MEDIA_HEIGHT in api/src/media/model.ts. Checking here avoids
-// spending a presigned upload, a finalize call, and a worker cycle on an image that can never
-// pass processing. The server and worker remain authoritative.
-const MIN_MEDIA_DIMENSION = 600;
-
-export const MEDIA_DIMENSIONS_TOO_SMALL = "MEDIA_DIMENSIONS_TOO_SMALL";
-export const UPLOAD_PUT_FAILED = "UPLOAD_PUT_FAILED";
-
-async function assertMinimumDimensions(file: File): Promise<void> {
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    // Undecodable here, or createImageBitmap is unavailable. Let the server and the worker
-    // make the authoritative call rather than blocking an upload on a client-side limitation.
-    return;
-  }
-  const { width, height } = bitmap;
-  bitmap.close();
-  if (width < MIN_MEDIA_DIMENSION || height < MIN_MEDIA_DIMENSION) {
-    throw new SellerProductApiError(
-      `Image must be at least ${MIN_MEDIA_DIMENSION}×${MIN_MEDIA_DIMENSION} pixels. Yours is ${width}×${height}.`,
-      400,
-      MEDIA_DIMENSIONS_TOO_SMALL,
-    );
-  }
-}
-
-export async function uploadSellerProductMedia(submissionId: string, file: File): Promise<void> {
-  await assertMinimumDimensions(file);
-  const intent = await send<{
-    media: SellerProductMedia;
-    upload: { method: "POST" | "PUT"; url: string; fields?: Record<string, string> };
-  }>(
-    `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/upload-intents`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        declaredMime: file.type,
-        declaredSize: file.size,
-        rightsAccepted: true,
-      }),
-    },
-    "Unable to prepare the media upload",
+/**
+ * Uploads one image: presign, PUT to private storage, finalize. `mime` is the format detected from
+ * the file's bytes by validateImageFile, not file.type, which is empty on some mobile browsers.
+ * The caller must have validated the file; the server and worker remain authoritative.
+ */
+export async function uploadSellerProductMedia(
+  submissionId: string,
+  file: File,
+  mime: AllowedMediaMime,
+): Promise<void> {
+  const intent = await atStage("intent", () =>
+    send<{
+      media: SellerProductMedia;
+      upload: { method: "POST" | "PUT"; url: string; fields?: Record<string, string> };
+    }>(
+      `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/upload-intents`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          declaredMime: mime,
+          declaredSize: file.size,
+          rightsAccepted: true,
+        }),
+      },
+      "Unable to prepare the media upload",
+    ),
   );
   // The intent has created a media row in PENDING_UPLOAD. Everything from here to finalize must
   // clean that row up on failure, or it lingers on the seller's dashboard looking like a second
   // upload and consumes one of their six active slots until the worker's 24-hour sweep.
   try {
-    let uploaded: Response;
-    if (intent.upload.method === "PUT") {
-      // Content-Length is a forbidden header in the Fetch API — browsers set it
-      // automatically from the File body, which matches the signed value (file.size).
-      uploaded = await fetch(intent.upload.url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type,
-          "x-amz-meta-hiloxs-media-id": intent.media.id,
-        },
-        body: file,
-      });
-    } else {
-      const form = new FormData();
-      for (const [key, value] of Object.entries(intent.upload.fields ?? {}))
-        form.append(key, value);
-      form.append("file", file);
-      uploaded = await fetch(intent.upload.url, { method: "POST", body: form });
-    }
-    if (!uploaded.ok) {
-      throw new SellerProductApiError(
-        uploaded.status === 403
-          ? "The upload was rejected — the file may be too large, the wrong type, or the grant has expired"
-          : `The private media upload failed (status ${uploaded.status}). Please try again.`,
-        uploaded.status,
-        UPLOAD_PUT_FAILED,
-      );
-    }
-    await send(
-      `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(intent.media.id)}/finalize`,
-      { method: "POST", body: JSON.stringify({}) },
-      "Unable to finalize the media upload",
+    await atStage("put", async () => {
+      let uploaded: Response;
+      try {
+        if (intent.upload.method === "PUT") {
+          // Content-Length is a forbidden header in the Fetch API — browsers set it
+          // automatically from the File body, which matches the signed value (file.size).
+          uploaded = await fetch(intent.upload.url, {
+            method: "PUT",
+            headers: {
+              "Content-Type": mime,
+              "x-amz-meta-hiloxs-media-id": intent.media.id,
+            },
+            body: file,
+          });
+        } else {
+          const form = new FormData();
+          for (const [key, value] of Object.entries(intent.upload.fields ?? {}))
+            form.append(key, value);
+          form.append("file", file);
+          uploaded = await fetch(intent.upload.url, { method: "POST", body: form });
+        }
+      } catch (cause) {
+        // A dropped connection and a CORS/network-filter block both surface as a bare TypeError.
+        console.error("Seller media storage request failed", cause);
+        throw new SellerProductApiError("The image did not reach storage.", 0, NETWORK_ERROR);
+      }
+      if (!uploaded.ok) {
+        throw new SellerProductApiError(
+          `The private media upload failed (status ${uploaded.status}).`,
+          uploaded.status,
+          UPLOAD_PUT_FAILED,
+        );
+      }
+    });
+    await atStage("finalize", () =>
+      send(
+        `/api/v1/seller/products/${encodeURIComponent(submissionId)}/media/${encodeURIComponent(intent.media.id)}/finalize`,
+        { method: "POST", body: JSON.stringify({}) },
+        "Unable to finalize the media upload",
+      ),
     );
   } catch (error) {
     // Mobile browsers surface almost nothing for a blocked or dropped upload, so leave a trace for
@@ -255,6 +249,15 @@ export async function uploadSellerProductMedia(submissionId: string, file: File)
       // Best effort. If abandoning fails the row is still swept server-side after the quarantine
       // retention window, and reporting a cleanup failure would bury the error that actually matters.
     }
+    throw error;
+  }
+}
+
+async function atStage<T>(stage: UploadStage, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof SellerProductApiError && !error.stage) error.stage = stage;
     throw error;
   }
 }
@@ -312,15 +315,24 @@ export function sellerMediaPreviewUrl(
 }
 
 async function send<T>(path: string, init: RequestInit, fallback: string): Promise<T> {
-  const response = await fetch(`${API_ORIGIN}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-      ...init.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_ORIGIN}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        ...init.headers,
+      },
+    });
+  } catch {
+    throw new SellerProductApiError(
+      "Network error. Check your connection and try again.",
+      0,
+      NETWORK_ERROR,
+    );
+  }
   if (!response.ok) throw await toApiError(response, fallback);
   return (await response.json()) as T;
 }

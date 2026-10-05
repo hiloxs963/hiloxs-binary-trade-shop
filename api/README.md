@@ -47,20 +47,22 @@ No payment, commerce-domain, cloud database, or backend-as-a-service SDK is inst
 Copy `.env.example` to an untracked `.env` for local development and change values only as needed.
 Never commit `.env`.
 
-| Variable               | Default                         | Notes                                                                                            |
-| ---------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `NODE_ENV`             | `development`                   | `development`, `test`, or `production`                                                           |
-| `HOST`                 | `127.0.0.1`                     | Railway will typically use `0.0.0.0`                                                             |
-| `PORT`                 | `3000`                          | Railway's injected `PORT` is respected                                                           |
-| `LOG_LEVEL`            | `info`                          | Pino log level                                                                                   |
-| `DATABASE_URL`         | none                            | Required by the server and migration command; never logged                                       |
-| `BETTER_AUTH_URL`      | `http://127.0.0.1:${PORT}`      | Required as `https://api.hiloxs.co.ke` in production                                             |
-| `BETTER_AUTH_SECRET`   | development-only local fallback | Required in production; use a random value of at least 32 chars                                  |
-| `FRONTEND_URL`         | `http://localhost:8080`         | Required as `https://hiloxs.co.ke` in production                                                 |
-| `RESEND_API_KEY`       | none                            | Required in production; sending-only secret, never log it                                        |
-| `AUTH_EMAIL_FROM`      | none                            | Required as `HILOXS <auth@mail.hiloxs.co.ke>` in production                                      |
-| `STAFF_REVIEW_ENABLED` | `false`                         | Exact `true` enables authorized staff review mutations                                           |
-| `EMAIL_OTP_ENABLED`    | `false`                         | Exact `true` enables emailed sign-in codes (needs `EMAIL_OTP_HMAC_KEY`, 32+ chars; see ADR 0010) |
+| Variable               | Default                                     | Notes                                                                                                                |
+| ---------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`             | `development`                               | `development`, `test`, or `production`                                                                               |
+| `HOST`                 | `127.0.0.1`                                 | Railway will typically use `0.0.0.0`                                                                                 |
+| `PORT`                 | `3000`                                      | Railway's injected `PORT` is respected                                                                               |
+| `LOG_LEVEL`            | `info`                                      | Pino log level                                                                                                       |
+| `DATABASE_URL`         | none                                        | Required by the server and migration command; never logged                                                           |
+| `BETTER_AUTH_URL`      | `http://127.0.0.1:${PORT}`                  | Required as `https://api.hiloxs.co.ke` in production                                                                 |
+| `BETTER_AUTH_SECRET`   | development-only local fallback             | Required in production; use a random value of at least 32 chars                                                      |
+| `FRONTEND_URL`         | `http://localhost:8080`                     | Required as `https://hiloxs.co.ke` in production                                                                     |
+| `RESEND_API_KEY`       | none                                        | Required in production; sending-only secret, never log it                                                            |
+| `AUTH_EMAIL_FROM`      | none                                        | Required as `HILOXS <auth@mail.hiloxs.co.ke>` in production                                                          |
+| `STAFF_REVIEW_ENABLED` | `false`                                     | Exact `true` enables authorized staff review mutations                                                               |
+| `TRUSTED_PROXY_CIDRS`  | production: `100.64.0.0/10`; otherwise none | Proxies whose `X-Forwarded-For` is believed; empty disables; catch-all ranges are rejected (see ADR 0002)            |
+| `CLIENT_IP_DIAGNOSTIC` | `false`                                     | Exact `true` logs keyed digests of the resolved client address for `/health` checks that send `x-hiloxs-ip-check: 1` |
+| `EMAIL_OTP_ENABLED`    | `false`                                     | Exact `true` enables emailed sign-in codes (needs `EMAIL_OTP_HMAC_KEY`, 32+ chars; see ADR 0010)                     |
 
 Production starts only with the canonical API origin, a supplied authentication secret, secure
 cookies, the canonical frontend origin, and complete Resend configuration. Missing production email
@@ -201,8 +203,10 @@ and `DATABASE_URL`; no Railway project, credentials, or deployment configuration
   used.
 - Registration, login, password-reset request, and verification resend have in-memory rate limits.
   These limits are per API process and must move to shared durable storage before horizontally
-  scaling beyond one instance. On Railway, Better Auth keys them from Railway's edge-set
-  `X-Real-IP` header and groups IPv6 clients by `/64`; arbitrary `X-Forwarded-For` values are ignored.
+  scaling beyond one instance. The client address is Fastify's `request.ip`, resolved with `trustProxy` limited to
+  `TRUSTED_PROXY_CIDRS` (Railway's proxy range in production), so client-supplied `X-Forwarded-For` or
+  `X-Real-IP` values cannot choose a rate-limit key. The API forwards that resolved address to Better
+  Auth as `x-real-ip`, which groups IPv6 clients by `/64`.
 - Email addresses and phone numbers are normalized before persistence. Passwords require at least 12
   characters including lower case, upper case, a number, and a symbol.
 - Email verification is required before sign-in. Verification links are backed by hashed,
