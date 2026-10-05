@@ -47,6 +47,10 @@ pause new commerce.
 8. Deploy the validated static frontend artifact.
 9. Monitor errors, latency, workers, payments, and fulfillment queues.
 
+When `0011` and `0012` ship together, follow the combined rollout in
+[`backup-restore-migrations.md`](./backup-restore-migrations.md): that release migrates **before** deploying
+the API, because the new API requires `session.mfa_method`.
+
 If migration fails, halt and investigate. Do not run destructive down migrations or improvise direct
 production SQL. Application startup never runs migrations.
 
@@ -62,6 +66,39 @@ work, close PostgreSQL, and enforce a 25-second upper bound. A second signal exi
 Runtime filesystem writes are not required outside platform-provided temporary space; validate a
 read-only root filesystem separately before enabling it.
 
+## Client address resolution
+
+Rate limits key on `request.ip`. Fastify trusts `X-Forwarded-For` only from `TRUSTED_PROXY_CIDRS`
+(production default `100.64.0.0/10`, Railway's proxy range per community reports; see ADR 0002 for the
+rule and why it does not depend on hop count). The Railway evidence is inconsistent, so verify it once
+after deploying:
+
+| Source                                                | What it says                                                                                                                                                                                                                       | Reliability                      |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Railway public-networking docs                        | `X-Real-IP` carries the client's remote IP; says nothing on `X-Forwarded-For` or hops                                                                                                                                              | Official, incomplete             |
+| Railway staff, community threads (2024-08 to 2026-06) | Edge appends to `X-Forwarded-For` (client address leftmost) or strips client values; client can no longer set `X-Real-IP`; `X-Real-IP` reported wrong on some CDN routes; "typically 1" hop, "not officially documented as stable" | Unofficial, partly contradictory |
+| `api.hiloxs.co.ke` DNS                                | CNAME straight to `*.up.railway.app`; no other CDN in front                                                                                                                                                                        | Checked 2026-10-06               |
+
+Production check (never logs raw addresses; remove the variable afterwards):
+
+1. Set `CLIENT_IP_DIAGNOSTIC=true` and redeploy. Confirm `RATE_LIMIT_HMAC_KEY` is set.
+2. From your own network run `curl -s -H 'x-hiloxs-ip-check: 1' https://api.hiloxs.co.ke/health`, then
+   once more adding `-H 'X-Forwarded-For: 1.2.3.4'`.
+3. Compute your digest locally from a checkout, passing the key through the environment rather than
+   the command line: `RATE_LIMIT_HMAC_KEY=<key> node api/scripts/client-ip-digest.mjs "$(curl -s https://api.ipify.org)"`
+   (for example via `railway run`). The script is not shipped in the image.
+4. In Railway logs find the two `client_ip_diagnostic` entries. Expected: `clientIpDigest` equals your
+   digest in **both** (the spoofed header changed nothing), `clientIsPeer` is `false`, `socketPeerDigest`
+   differs, and `forwardedForEntries` is at least 1 (more in the spoofed request).
+5. If `clientIsPeer` is `true`, trust is not applying: read `socketPeerNetwork` (for example `100.64.*.*`
+   or `10.12.*.*`), set `TRUSTED_PROXY_CIDRS` to the proxy block that contains it, and repeat. Do not use
+   a catch-all range; it is rejected at startup.
+6. Optionally corroborate with Railway's HTTP logs for the same request (field names unverified).
+7. Remove `CLIENT_IP_DIAGNOSTIC` and redeploy.
+
+Do not enable features whose limits assume per-client addresses (for example `EMAIL_OTP_ENABLED`) until
+this check has passed.
+
 ## Email OTP key and rollout
 
 `EMAIL_OTP_HMAC_KEY` is a manually generated production secret of at least 32 characters, independent
@@ -73,8 +110,9 @@ Before enabling the flag, confirm Resend delivery for `auth@mail.hiloxs.co.ke` t
 Yahoo (see the launch blockers), because a code that never arrives only has TOTP as a fallback. Review
 `auth_security_events` (`EMAIL_OTP_SEND_FAILED`, `EMAIL_OTP_LOCKED`) after enabling.
 
-Per-IP send caps use the client IP the API sees. Verify that this is the real client address, not the
-proxy, in the target environment before relying on them (the API sets no `trustProxy`).
+Per-IP send caps use the client IP the API sees. `EMAIL_OTP_ENABLED` must stay `false` until the client-IP
+fix (`trustProxy` limited to Railway's proxy range) is deployed and its production check has passed;
+without it every user shares one address and one per-IP cap.
 
 ## Rate-limit key operations
 

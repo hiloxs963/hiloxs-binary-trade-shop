@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ConfigurationError } from "../lib/errors.js";
+import { DEFAULT_PRODUCTION_TRUSTED_PROXIES, parseTrustedProxies } from "../lib/client-ip.js";
 
 const BooleanEnvironmentSchema = z
   .enum(["true", "false"])
@@ -23,6 +24,8 @@ const EnvironmentSchema = z.object({
   RATE_LIMIT_HMAC_KEY: z.string().min(32).optional(),
   EMAIL_OTP_ENABLED: FailSafeBooleanEnvironmentSchema,
   EMAIL_OTP_HMAC_KEY: z.string().min(32).optional(),
+  TRUSTED_PROXY_CIDRS: z.string().trim().optional(),
+  CLIENT_IP_DIAGNOSTIC: FailSafeBooleanEnvironmentSchema,
   PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
   PG_LOCK_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
   PG_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.coerce
@@ -164,6 +167,16 @@ export function requireDatabaseUrl(env: AppEnv): string {
     throw new ConfigurationError("DATABASE_URL is required for database functionality");
   }
   return env.DATABASE_URL;
+}
+
+/**
+ * Proxies whose X-Forwarded-For entries may be believed. Production defaults to Railway's proxy
+ * range; elsewhere nothing is trusted unless TRUSTED_PROXY_CIDRS says so. An explicit empty value
+ * disables trust even in production.
+ */
+export function resolveTrustedProxies(env: AppEnv): string[] {
+  if (env.TRUSTED_PROXY_CIDRS !== undefined) return parseTrustedProxies(env.TRUSTED_PROXY_CIDRS);
+  return env.NODE_ENV === "production" ? [...DEFAULT_PRODUCTION_TRUSTED_PROXIES] : [];
 }
 
 export function requireRateLimitHmacKey(env: AppEnv): string {

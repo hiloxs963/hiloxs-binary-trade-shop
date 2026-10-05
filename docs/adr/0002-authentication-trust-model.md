@@ -57,3 +57,21 @@ Phase 2 establishes identity but grants no commerce, financial, seller, trading,
 authority. Every later protected resource must derive its owner from the validated server session
 and enforce its own server-side authorization. A successful browser login does not make existing
 prototype localStorage records trustworthy.
+
+## Amendment: client address resolution (supersedes the `X-Real-IP` statement above)
+
+The original text said Railway's edge-set `X-Real-IP` was the only accepted client-IP header. The
+implementation never read it: it passed Fastify's `request.ip` to the rate limiters and overwrote
+`x-real-ip` with that value, and without `trustProxy` `request.ip` is the socket peer, which behind
+Railway is the proxy. Rate-limit keys that include only the address were therefore shared by all clients.
+
+Decision: Fastify `trustProxy` is set to an explicit list of proxy ranges (`TRUSTED_PROXY_CIDRS`,
+default `100.64.0.0/10` in production, nothing elsewhere; catch-all and very broad ranges are
+rejected). `request.ip` is then the right-most `X-Forwarded-For` entry that is not a trusted proxy.
+Entries to its left are client-controlled and can never change it, and a peer outside the list is never
+believed. This does not depend on how many proxy hops Railway uses, nor on whether Railway strips or
+appends client-supplied `X-Forwarded-For` values. Forwarding `request.ip` as `x-real-ip` to Better Auth is
+kept because it is now correct, and it prevents a client-supplied `x-real-ip` from reaching Better Auth.
+
+If the trusted range is wrong the failure is the previous behaviour (the proxy address is used), not
+a spoofable address. The production check is in `docs/operations/production-readiness.md`.
