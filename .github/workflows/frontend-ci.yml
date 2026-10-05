@@ -1,0 +1,52 @@
+name: Frontend CI
+
+# Runs the same checks as the "Build and deploy cPanel branch" workflow, which publishes every
+# merge to main. Nothing is published here. Keep the two in sync (same pins, same steps), and do not
+# add path filters: a required check that is skipped on some PRs never reports a status.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.15.0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Typecheck frontend
+        run: npx tsc --noEmit
+
+      - name: Build application
+        run: npm run build
+
+      - name: Confirm static output
+        run: npm run verify:production
+
+      - name: Check cPanel release files
+        run: |
+          test -f dist/client/release-manifest.json
+          test -f dist/client/.htaccess
