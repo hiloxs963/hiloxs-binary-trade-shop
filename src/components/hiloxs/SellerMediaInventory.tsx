@@ -1,10 +1,15 @@
 import { ArrowDown, ArrowUp, ImagePlus, Loader2, RefreshCw, Save, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { sellerMediaStatusView } from "@/lib/media-status";
+import { describeUploadFailure, type UploadFailure } from "@/lib/media-upload-errors";
+import { validateImageFile } from "@/lib/media-validation";
+import { browserImageDecoder } from "@/lib/media-validation-browser";
+import type { AllowedMediaMime } from "@/lib/media-limits";
 import {
   abandonSellerProductMedia,
   arrangeSellerProductMedia,
@@ -24,14 +29,53 @@ const MEDIA_RIGHTS = [
   "It contains no prohibited or illegal content, and HILOXS may reject or remove it.",
 ];
 
+type FileCheck =
+  | { state: "empty" }
+  | { state: "checking" }
+  | { state: "valid"; mime: AllowedMediaMime; width: number; height: number }
+  | { state: "invalid"; message: string; hint: string };
+
+type Feedback = { tone: "error" | "info"; text: string } | null;
+
+// Always mounted so screen readers announce a message when it appears. Errors use the destructive
+// colour and role="alert"; confirmations stay muted.
+function FeedbackLine({ id, feedback }: { id: string; feedback: Feedback }) {
+  return (
+    <div id={id} aria-live="polite" aria-atomic="true" className="mt-2 text-sm">
+      {feedback && (
+        <p
+          className={feedback.tone === "error" ? "text-destructive" : "text-muted-foreground"}
+          role={feedback.tone === "error" ? "alert" : undefined}
+        >
+          {feedback.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const BADGE_VARIANT = {
+  neutral: "outline",
+  progress: "secondary",
+  success: "default",
+  error: "destructive",
+} as const;
+
 export function SellerMediaInventory({ submissionId }: { submissionId: string }) {
   const [mediaState, setMediaState] = useState<SellerMediaState | null>(null);
   const [inventoryState, setInventoryState] = useState<SellerInventoryState | null>(null);
   const [quantity, setQuantity] = useState("0");
   const [file, setFile] = useState<File | null>(null);
   const [rightsAccepted, setRightsAccepted] = useState(false);
+  const [fileCheck, setFileCheck] = useState<FileCheck>({ state: "empty" });
+  const [uploadError, setUploadError] = useState<UploadFailure | null>(null);
+  const [inputKey, setInputKey] = useState(0);
+  const checkToken = useRef(0);
   const [busy, setBusy] = useState("");
-  const [notice, setNotice] = useState("");
+  const [loadFeedback, setLoadFeedback] = useState<Feedback>(null);
+  const [uploadNotice, setUploadNotice] = useState<Feedback>(null);
+  const [inventoryFeedback, setInventoryFeedback] = useState<Feedback>(null);
+  const [arrangeFeedback, setArrangeFeedback] = useState<Feedback>(null);
 
   const load = useCallback(async () => {
     const [nextMedia, nextInventory] = await Promise.all([
@@ -46,7 +90,9 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
   useEffect(() => {
     let active = true;
     void load().catch(() => {
-      if (active) setNotice("Media and inventory could not be loaded.");
+      if (active) {
+        setLoadFeedback({ tone: "error", text: "Media and inventory could not be loaded." });
+      }
     });
     return () => {
       active = false;
@@ -59,44 +105,104 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
   );
   const activated = Boolean(mediaState?.activated || inventoryState?.activated);
 
+  // Checks run on selection so a bad file is explained before the seller reaches Upload. The token
+  // drops the result of a check that a newer selection has already superseded.
+  const chooseFile = async (next: File | null) => {
+    const token = ++checkToken.current;
+    setFile(next);
+    setUploadError(null);
+    setUploadNotice(null);
+    if (!next) {
+      setFileCheck({ state: "empty" });
+      return;
+    }
+    setFileCheck({ state: "checking" });
+    const result = await validateImageFile(next, browserImageDecoder);
+    if (token !== checkToken.current) return;
+    setFileCheck(
+      result.ok
+        ? { state: "valid", mime: result.mime, width: result.width, height: result.height }
+        : { state: "invalid", message: result.message, hint: result.hint },
+    );
+  };
+
   const upload = async () => {
-    if (busy) return;
-    if (!file || !rightsAccepted || activated) return;
+    if (busy || activated) return;
+    if (!file || fileCheck.state !== "valid") {
+      setUploadError(
+        fileCheck.state === "invalid"
+          ? { message: fileCheck.message, hint: fileCheck.hint, retryable: false }
+          : {
+              message: "Choose an image to upload.",
+              hint: "JPEG, PNG or WebP, up to 8 MB.",
+              retryable: false,
+            },
+      );
+      return;
+    }
+    if (!rightsAccepted) {
+      setUploadError({
+        message: "Confirm the declaration before uploading.",
+        hint: "Tick the box above the Upload button.",
+        retryable: false,
+      });
+      return;
+    }
     setBusy("upload");
-    setNotice("");
+    setUploadNotice(null);
+    setUploadError(null);
     try {
-      await uploadSellerProductMedia(submissionId, file);
+      await uploadSellerProductMedia(submissionId, file, fileCheck.mime);
+      checkToken.current += 1;
       setFile(null);
+      setFileCheck({ state: "empty" });
+      setInputKey((key) => key + 1);
       setRightsAccepted(false);
       await load();
-      setNotice("Upload received. Processing status will update after the media worker runs.");
+      setUploadNotice({
+        tone: "info",
+        text: "Upload received. Processing status will update after the media worker runs.",
+      });
     } catch (error) {
-      // Every SellerProductApiError message is already seller-facing: they are authored here, or
-      // come from an error the API explicitly marked exposable. That subsumes the dimension check,
-      // which no longer needs a code comparison of its own.
-      setNotice(
-        error instanceof SellerProductApiError
-          ? error.message
-          : "The upload could not be completed. Please check your connection and try again.",
-      );
+      setUploadError(describeUploadFailure(error));
+      // The failed attempt abandoned its row; refresh so the list matches.
+      void load().catch(() => undefined);
     } finally {
       setBusy("");
     }
   };
 
+  const uploadBlocker =
+    fileCheck.state === "checking"
+      ? "Checking the image…"
+      : fileCheck.state === "invalid"
+        ? "Fix the image problem above to continue."
+        : fileCheck.state !== "valid"
+          ? "Choose an image to continue."
+          : !rightsAccepted
+            ? "Confirm the declaration to continue."
+            : "";
+  const errorId = `seller-media-error-${submissionId}`;
+
   const saveInventory = async () => {
     const value = Number(quantity);
     if (!Number.isInteger(value) || value < 0 || value > 1_000_000 || activated) {
-      setNotice("Inventory must be a whole number from 0 to 1,000,000.");
+      setInventoryFeedback({
+        tone: "error",
+        text: "Inventory must be a whole number from 0 to 1,000,000.",
+      });
       return;
     }
     setBusy("inventory");
-    setNotice("");
+    setInventoryFeedback(null);
     try {
       setInventoryState(await setSellerProductInventory(submissionId, value));
-      setNotice("Inventory preparation saved.");
+      setInventoryFeedback({ tone: "info", text: "Inventory preparation saved." });
     } catch {
-      setNotice("Inventory could not be saved.");
+      setInventoryFeedback({
+        tone: "error",
+        text: "Inventory could not be saved. Check your connection and try again.",
+      });
     } finally {
       setBusy("");
     }
@@ -105,11 +211,14 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
   const arrange = async (orderedIds: string[], selectedIds: string[]) => {
     if (activated) return;
     setBusy("arrange");
-    setNotice("");
+    setArrangeFeedback(null);
     try {
       setMediaState(await arrangeSellerProductMedia(submissionId, orderedIds, selectedIds));
     } catch {
-      setNotice("The approved media selection could not be updated.");
+      setArrangeFeedback({
+        tone: "error",
+        text: "The approved media selection could not be updated. Try again.",
+      });
     } finally {
       setBusy("");
     }
@@ -139,16 +248,52 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
         </Button>
       </div>
 
+      <FeedbackLine id={`seller-media-load-${submissionId}`} feedback={loadFeedback} />
+
       {!activated && (
         <div className="mt-5 border-y border-border py-5">
           <Label htmlFor={`seller-media-${submissionId}`}>Product image</Label>
           <Input
+            key={inputKey}
             id={`seller-media-${submissionId}`}
             className="mt-2"
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            aria-invalid={fileCheck.state === "invalid" || Boolean(uploadError)}
+            aria-describedby={errorId}
+            onChange={(event) => void chooseFile(event.target.files?.[0] ?? null)}
           />
+          <div id={errorId} aria-live="polite" aria-atomic="true" className="mt-2 text-sm">
+            {fileCheck.state === "checking" && (
+              <p className="text-muted-foreground">Checking the image…</p>
+            )}
+            {fileCheck.state === "valid" && !uploadError && (
+              <p className="text-muted-foreground">
+                Ready: {fileCheck.width}×{fileCheck.height} pixels.
+              </p>
+            )}
+            {(fileCheck.state === "invalid" || uploadError) && (
+              <div className="text-destructive" role="alert">
+                <p className="font-medium">
+                  {uploadError?.message ?? (fileCheck.state === "invalid" ? fileCheck.message : "")}
+                </p>
+                <p className="mt-1">
+                  {uploadError?.hint ?? (fileCheck.state === "invalid" ? fileCheck.hint : "")}
+                </p>
+                {uploadError?.retryable && (
+                  <Button
+                    className="mt-2"
+                    variant="outline"
+                    size="sm"
+                    disabled={Boolean(busy)}
+                    onClick={() => void upload()}
+                  >
+                    <RefreshCw aria-hidden /> Retry upload
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
           <ul className="mt-4 space-y-1 text-xs text-muted-foreground">
             {MEDIA_RIGHTS.map((item) => (
               <li key={item}>{item}</li>
@@ -167,7 +312,7 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
           <Button
             className="mt-4"
             variant="outline"
-            disabled={!file || !rightsAccepted || Boolean(busy)}
+            disabled={fileCheck.state !== "valid" || !rightsAccepted || Boolean(busy)}
             onClick={() => void upload()}
           >
             {busy === "upload" ? (
@@ -175,51 +320,71 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
             ) : (
               <ImagePlus aria-hidden />
             )}
-            Upload privately
+            {busy === "upload" ? "Uploading…" : "Upload privately"}
           </Button>
+          {uploadBlocker && !busy && (
+            <p className="mt-2 text-xs text-muted-foreground">{uploadBlocker}</p>
+          )}
+          <FeedbackLine id={`seller-media-notice-${submissionId}`} feedback={uploadNotice} />
         </div>
       )}
 
-      {mediaState && mediaState.media.length > 0 && (
+      {mediaState && (mediaState.media.length > 0 || busy === "upload") && (
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {mediaState.media.map((media) => (
-            <article key={media.id} className="overflow-hidden rounded-md border border-border">
-              {["READY_FOR_REVIEW", "APPROVED", "REJECTED"].includes(media.status) ? (
-                <img
-                  src={sellerMediaPreviewUrl(submissionId, media.id, "THUMBNAIL")}
-                  alt="Sanitized seller product preview"
-                  className="aspect-square w-full object-contain bg-secondary"
-                />
-              ) : (
-                <div className="grid aspect-square place-items-center bg-secondary px-3 text-center text-xs text-muted-foreground">
-                  Sanitized preview pending
-                </div>
-              )}
+          {busy === "upload" && (
+            <article className="overflow-hidden rounded-md border border-border">
+              <div className="grid aspect-square place-items-center bg-secondary px-3 text-center text-xs text-muted-foreground">
+                <Loader2 className="animate-spin" aria-hidden />
+              </div>
               <div className="p-3">
-                <Badge variant={media.status === "REJECTED" ? "destructive" : "secondary"}>
-                  {media.status.replaceAll("_", " ")}
-                </Badge>
-                {media.reviewReason && (
-                  <p className="mt-2 text-xs text-destructive">{media.reviewReason}</p>
-                )}
-                {media.processingError && (
-                  <p className="mt-2 text-xs text-destructive">{media.processingError}</p>
-                )}
-                {!activated && media.status === "PENDING_UPLOAD" && (
-                  <Button
-                    className="mt-2"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      void abandonSellerProductMedia(submissionId, media.id).then(load)
-                    }
-                  >
-                    <XCircle aria-hidden /> Abandon
-                  </Button>
-                )}
+                <Badge variant="secondary">Uploading</Badge>
+                <p className="mt-2 text-xs text-muted-foreground">Sending the image securely…</p>
               </div>
             </article>
-          ))}
+          )}
+          {mediaState.media.map((media) => {
+            const view = sellerMediaStatusView(media.status, {
+              reviewReason: media.reviewReason,
+              processingError: media.processingError,
+            });
+            return (
+              <article key={media.id} className="overflow-hidden rounded-md border border-border">
+                {["READY_FOR_REVIEW", "APPROVED", "REJECTED"].includes(media.status) ? (
+                  <img
+                    src={sellerMediaPreviewUrl(submissionId, media.id, "THUMBNAIL")}
+                    alt="Sanitized seller product preview"
+                    className="aspect-square w-full object-contain bg-secondary"
+                  />
+                ) : (
+                  <div className="grid aspect-square place-items-center bg-secondary px-3 text-center text-xs text-muted-foreground">
+                    Sanitized preview pending
+                  </div>
+                )}
+                <div className="p-3">
+                  <Badge variant={BADGE_VARIANT[view.tone]}>{view.label}</Badge>
+                  {view.detail && (
+                    <p
+                      className={`mt-2 text-xs ${view.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}
+                    >
+                      {view.detail}
+                    </p>
+                  )}
+                  {!activated && media.status === "PENDING_UPLOAD" && (
+                    <Button
+                      className="mt-2"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        void abandonSellerProductMedia(submissionId, media.id).then(load)
+                      }
+                    >
+                      <XCircle aria-hidden /> Abandon
+                    </Button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -278,6 +443,7 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
               </div>
             ))}
           </div>
+          <FeedbackLine id={`seller-media-arrange-${submissionId}`} feedback={arrangeFeedback} />
         </div>
       )}
 
@@ -292,6 +458,8 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
             step={1}
             value={quantity}
             disabled={activated}
+            aria-invalid={inventoryFeedback?.tone === "error"}
+            aria-describedby={`seller-inventory-feedback-${submissionId}`}
             onChange={(event) => setQuantity(event.target.value)}
           />
           <Button
@@ -307,15 +475,14 @@ export function SellerMediaInventory({ submissionId }: { submissionId: string })
             Save
           </Button>
         </div>
+        <FeedbackLine
+          id={`seller-inventory-feedback-${submissionId}`}
+          feedback={inventoryFeedback}
+        />
         <p className="mt-2 text-xs text-muted-foreground">
           Preparation only. Stock is not reserved or sold in Phase 8.
         </p>
       </div>
-      {notice && (
-        <p className="mt-4 text-sm text-muted-foreground" role="status">
-          {notice}
-        </p>
-      )}
     </section>
   );
 }
