@@ -19,7 +19,7 @@ const sitemapXml = await readFile(path.join(CLIENT_DIR, "sitemap.xml"), "utf8");
 const urls = parseSitemap(sitemapXml);
 assert(
   urls.length === EXPECTED_PUBLIC_PAGE_COUNT,
-  `Expected 49 sitemap URLs, found ${urls.length}`,
+  `Expected ${EXPECTED_PUBLIC_PAGE_COUNT} sitemap URLs, found ${urls.length}`,
 );
 assert(new Set(urls).size === urls.length, "Sitemap contains duplicate URLs");
 
