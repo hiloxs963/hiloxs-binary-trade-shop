@@ -337,20 +337,25 @@ describe("staff authorization and privacy", () => {
     expect((await get("/api/v1/staff/seller-products", admin.cookie)).statusCode).toBe(403);
   });
 
-  it("denies every staff endpoint immediately after official two-factor disable", async () => {
+  it("denies every staff endpoint immediately after a server-side two-factor disable", async () => {
     const staff = await createStaff("mfa-disable@example.com", ["SELLER_REVIEW"]);
     const target = await insertSellerApplication("SUBMITTED");
 
+    // The HTTP route is closed (no password-only disable); the server-side call still exists, so
+    // this proves staff authority depends on the factor being present.
     expect(
-      (await post("/api/auth/two-factor/disable", { password: "wrong-password" }, staff.cookie))
-        .statusCode,
-    ).toBe(400);
-    const disabled = await post(
-      "/api/auth/two-factor/disable",
-      { password: PASSWORD },
-      staff.cookie,
-    );
-    const normalCookie = sessionCookie(disabled);
+      (await post("/api/auth/two-factor/disable", { password: PASSWORD }, staff.cookie)).statusCode,
+    ).toBe(404);
+    const disabled = await auth.api.disableTwoFactor({
+      body: { password: PASSWORD },
+      headers: new Headers({ cookie: staff.cookie }),
+      asResponse: true,
+    });
+    const normalCookie =
+      disabled.headers
+        .getSetCookie()
+        .find((cookie) => cookie.includes("session_token"))
+        ?.split(";", 1)[0] ?? "";
     const normalUser = await get("/api/v1/users/me", normalCookie);
     const responses = await Promise.all([
       get("/api/v1/staff/me", normalCookie),
@@ -359,7 +364,7 @@ describe("staff authorization and privacy", () => {
       post(`/api/v1/staff/seller-applications/${target.id}/start-review`, {}, normalCookie),
     ]);
 
-    expect(disabled.statusCode).toBe(200);
+    expect(disabled.status).toBe(200);
     expect(normalUser.statusCode).toBe(200);
     expect(responses.map((response) => response.statusCode)).toEqual([403, 403, 403, 403]);
     expect((await applicationStatus(target.id)).status).toBe("SUBMITTED");
