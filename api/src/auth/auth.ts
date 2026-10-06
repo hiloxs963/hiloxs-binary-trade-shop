@@ -184,6 +184,7 @@ export function createAuthService({
 
   return Object.assign(service, {
     emailOtp: emailOtpService,
+    emailSender,
     handler: (request: Request) =>
       deliveryState.run({}, async () => {
         const response = await handleAuthRequest(request);
