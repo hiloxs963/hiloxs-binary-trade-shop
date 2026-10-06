@@ -66,6 +66,11 @@ export const session = pgTable(
     userAgent: text("user_agent"),
     // How the second factor was satisfied. Staff authorization rejects "email-otp".
     mfaMethod: text("mfa_method").$type<SessionMfaMethod>().notNull().default("none"),
+    // When a TOTP or backup code was last verified for this session (sign-in or staff step-up).
+    // Null for sessions that never verified one, including email-OTP sessions.
+    lastMfaVerifiedAt: timestamp("last_mfa_verified_at", { withTimezone: true }),
+    // Consecutive failed step-up attempts; five revoke the session.
+    stepUpFailures: integer("step_up_failures").notNull().default(0),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

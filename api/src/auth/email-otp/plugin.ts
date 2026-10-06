@@ -1,5 +1,10 @@
 import type { BetterAuthPlugin, GenericEndpointContext } from "better-auth";
-import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthEndpoint,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { expireCookie, setSessionCookie } from "better-auth/cookies";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -66,8 +71,13 @@ export function emailOtpPlugin({
   service: EmailOtpService;
   database: DatabaseClient;
 }): BetterAuthPlugin {
+  // A TOTP or backup code was just verified for this brand-new session, so the staff step-up
+  // window starts now. Email-OTP sessions never reach this and keep a null timestamp.
   const tagSession = async (sessionId: string, mfaMethod: SessionMfaMethod) => {
-    await database.db.update(session).set({ mfaMethod }).where(eq(session.id, sessionId));
+    await database.db
+      .update(session)
+      .set({ mfaMethod, lastMfaVerifiedAt: new Date(), stepUpFailures: 0 })
+      .where(eq(session.id, sessionId));
   };
 
   return {
@@ -158,6 +168,9 @@ export function emailOtpPlugin({
             if (backupCode) {
               // The pending login may already be gone (attempt cap); the event is still recorded.
               const pending = await resolvePendingLogin(ctx);
+              // A backup code verified for an existing session is a staff step-up, which writes
+              // its own audit events; it is neither a login failure nor a login success.
+              if (!pending && (await getSessionFromCtx(ctx))) return;
               await service.recordBackupCodeLogin(pending?.userId ?? null, false, client);
             }
           }),

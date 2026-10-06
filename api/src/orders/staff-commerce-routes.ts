@@ -39,7 +39,7 @@ export function registerStaffCommerceRoutes(
         options.database,
         request.headers,
         "SELLER_COMMERCE_ACTIVATE",
-        { recent: true },
+        { stepUp: "high" },
       );
       await options.rateLimiter.consume({
         scope: `staff-commerce-${action}`,

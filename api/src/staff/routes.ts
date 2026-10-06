@@ -10,12 +10,14 @@ import { SellerProductIdSchema } from "../seller-products/validation.js";
 import { SellerApplicationIdSchema } from "../sellers/validation.js";
 import { requireStaffPermission, requireStaffProfile } from "./authorization.js";
 import { reviewSellerApplication, reviewSellerProduct } from "./review-service.js";
+import { performStaffStepUp } from "./step-up.js";
 import {
   SellerApplicationQueueQuerySchema,
   SellerApplicationRejectSchema,
   SellerProductQueueQuerySchema,
   SellerProductRejectSchema,
   StaffEmptyBodySchema,
+  StaffStepUpBodySchema,
 } from "./validation.js";
 
 type StaffRouteOptions = {
@@ -36,6 +38,19 @@ export function registerStaffRoutes(app: FastifyInstance, options: StaffRouteOpt
         catalogActivationEnabled: options.catalogActivationEnabled,
       },
     };
+  });
+
+  // Re-verifies TOTP or a backup code for the current session; no password and no new session.
+  app.post("/api/v1/staff/step-up", async (request) => {
+    const input = StaffStepUpBodySchema.parse(request.body);
+    return performStaffStepUp({
+      auth: options.auth,
+      database: options.database,
+      rateLimiter: options.rateLimiter,
+      headers: request.headers,
+      input,
+      client: { ip: request.ip, userAgent: request.headers["user-agent"] },
+    });
   });
 
   app.get("/api/v1/staff/seller-applications", async (request) => {
@@ -79,7 +94,7 @@ export function registerStaffRoutes(app: FastifyInstance, options: StaffRouteOpt
         options.database,
         request.headers,
         "SELLER_REVIEW",
-        { recent: true },
+        { stepUp: action === "start-review" ? "normal" : "high" },
       );
       await options.rateLimiter.consume({
         scope: `staff-seller-application-${action}`,
@@ -132,7 +147,7 @@ export function registerStaffRoutes(app: FastifyInstance, options: StaffRouteOpt
         options.database,
         request.headers,
         "PRODUCT_REVIEW",
-        { recent: true },
+        { stepUp: action === "start-review" ? "normal" : "high" },
       );
       await options.rateLimiter.consume({
         scope: `staff-seller-product-${action}`,

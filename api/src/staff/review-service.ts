@@ -22,7 +22,8 @@ import {
 import {
   assertPostMembershipSession,
   assertPostPermissionGrantSession,
-  assertRecentSession,
+  assertStaffSessionMfaMethod,
+  assertStepUpWindow,
 } from "./authorization.js";
 import type { StaffAuthorization } from "./model.js";
 
@@ -177,6 +178,8 @@ export async function lockAuthorizedActor(
       factorVerified: twoFactor.verified,
       sessionCreatedAt: session.createdAt,
       sessionExpiresAt: session.expiresAt,
+      mfaMethod: session.mfaMethod,
+      lastMfaVerifiedAt: session.lastMfaVerifiedAt,
     })
     .from(user)
     .innerJoin(twoFactor, eq(twoFactor.userId, user.id))
@@ -195,7 +198,8 @@ export async function lockAuthorizedActor(
   }
   assertPostMembershipSession(security.sessionCreatedAt, membership.createdAt);
   assertPostPermissionGrantSession(security.sessionCreatedAt, grant.grantedAt);
-  assertRecentSession(security.sessionCreatedAt, new Date());
+  assertStaffSessionMfaMethod(security.mfaMethod);
+  assertStepUpWindow(security.lastMfaVerifiedAt, authorization.stepUpTier, new Date());
 }
 
 function sellerApplicationTransition(action: ReviewAction, status: string, reason?: string) {

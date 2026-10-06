@@ -1067,10 +1067,13 @@ async function activationFixture(options: { media?: boolean; inventory?: boolean
     createdAt: sessionCreatedAt,
     updatedAt: sessionCreatedAt,
     expiresAt: new Date(Date.now() + 60 * 60_000),
+    mfaMethod: "totp",
+    lastMfaVerifiedAt: new Date(),
   });
   const authorization: StaffAuthorization = {
     actor: { userId: staffUserId, role: "STAFF", permission: "CATALOG_ACTIVATE" },
     sessionId,
+    stepUpTier: "high",
   };
   return {
     ...seller,

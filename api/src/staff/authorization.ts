@@ -14,15 +14,21 @@ import {
 import {
   StaffPermissionRequiredError,
   StaffReauthRequiredError,
-  StaffRecentAuthRequiredError,
+  StaffStepUpRequiredError,
   UnauthenticatedError,
 } from "../lib/errors.js";
-import { STAFF_RECENT_SESSION_MAX_AGE_MS, type StaffAuthorization } from "./model.js";
+import {
+  STAFF_STEP_UP_WINDOWS_MS,
+  type StaffAuthorization,
+  type StaffStepUpTier,
+} from "./model.js";
 
 type StaffProfile = {
   role: StaffRole;
   permissions: StaffPermission[];
   mfaEnabled: true;
+  /** When each tier's window ends for this session; null means a step-up is needed now. */
+  stepUp: { normalValidUntil: string | null; highValidUntil: string | null };
 };
 
 export async function requireStaffPermission(
@@ -30,7 +36,7 @@ export async function requireStaffPermission(
   database: DatabaseClient,
   headers: IncomingHttpHeaders,
   permission: StaffPermission,
-  options: { recent?: boolean; now?: Date } = {},
+  options: { stepUp?: StaffStepUpTier; now?: Date } = {},
 ): Promise<StaffAuthorization> {
   const authSession = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
   if (!authSession) throw new UnauthenticatedError();
@@ -42,6 +48,7 @@ export async function requireStaffPermission(
       grantCreatedAt: staffPermissionGrants.grantedAt,
       sessionCreatedAt: session.createdAt,
       mfaMethod: session.mfaMethod,
+      lastMfaVerifiedAt: session.lastMfaVerifiedAt,
     })
     .from(staffMemberships)
     .innerJoin(user, eq(user.id, staffMemberships.userId))
@@ -76,13 +83,19 @@ export async function requireStaffPermission(
   assertStaffSessionMfaMethod(access.mfaMethod);
   assertPostMembershipSession(access.sessionCreatedAt, access.membershipCreatedAt);
   assertPostPermissionGrantSession(access.sessionCreatedAt, access.grantCreatedAt);
-  if (options.recent) {
-    assertRecentSession(access.sessionCreatedAt, options.now ?? new Date());
-  }
+  // Every staff call, reads included, needs a recent second-factor verification. The tier decides
+  // how recent: "normal" (default) for reads and start-review, "high" for everything that changes
+  // what sellers, buyers or the catalog see.
+  assertStepUpWindow(
+    access.lastMfaVerifiedAt,
+    options.stepUp ?? "normal",
+    options.now ?? new Date(),
+  );
 
   return {
     actor: { userId: authSession.user.id, role: access.role, permission },
     sessionId: authSession.session.id,
+    stepUpTier: options.stepUp ?? "normal",
   };
 }
 
@@ -101,6 +114,7 @@ export async function requireStaffProfile(
       membershipCreatedAt: staffMemberships.createdAt,
       sessionCreatedAt: session.createdAt,
       mfaMethod: session.mfaMethod,
+      lastMfaVerifiedAt: session.lastMfaVerifiedAt,
     })
     .from(staffMemberships)
     .innerJoin(user, eq(user.id, staffMemberships.userId))
@@ -137,6 +151,11 @@ export async function requireStaffProfile(
       rows.some((row) => row.permission === permission),
     ),
     mfaEnabled: true,
+    // /staff/me is deliberately not step-up gated: the console needs it to know when to prompt.
+    stepUp: {
+      normalValidUntil: stepUpValidUntil(first.lastMfaVerifiedAt, "normal"),
+      highValidUntil: stepUpValidUntil(first.lastMfaVerifiedAt, "high"),
+    },
   };
 }
 
@@ -154,11 +173,25 @@ export function assertPostMembershipSession(
   }
 }
 
-export function assertRecentSession(sessionCreatedAt: Date, now: Date): void {
-  const age = now.getTime() - sessionCreatedAt.getTime();
-  if (age < 0 || age > STAFF_RECENT_SESSION_MAX_AGE_MS) {
-    throw new StaffRecentAuthRequiredError();
-  }
+/** Throws unless the second factor was verified (never in the future) within the tier's window. */
+export function assertStepUpWindow(
+  lastMfaVerifiedAt: Date | null,
+  tier: StaffStepUpTier,
+  now: Date,
+): void {
+  if (!lastMfaVerifiedAt) throw new StaffStepUpRequiredError();
+  const age = now.getTime() - lastMfaVerifiedAt.getTime();
+  if (age < 0 || age > STAFF_STEP_UP_WINDOWS_MS[tier]) throw new StaffStepUpRequiredError();
+}
+
+export function stepUpValidUntil(
+  lastMfaVerifiedAt: Date | null,
+  tier: StaffStepUpTier,
+  now: Date = new Date(),
+): string | null {
+  if (!lastMfaVerifiedAt) return null;
+  const until = lastMfaVerifiedAt.getTime() + STAFF_STEP_UP_WINDOWS_MS[tier];
+  return until > now.getTime() ? new Date(until).toISOString() : null;
 }
 
 export function assertPostPermissionGrantSession(

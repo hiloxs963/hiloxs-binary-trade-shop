@@ -119,6 +119,10 @@ describe("staff authorization and privacy", () => {
         mfaEnabled: true,
         reviewEnabled: true,
         catalogActivationEnabled: false,
+        stepUp: {
+          normalValidUntil: expect.any(String) as string,
+          highValidUntil: expect.any(String) as string,
+        },
       },
     });
     expect(response.body).not.toMatch(/email|phone|grant|session|token/i);
@@ -407,7 +411,7 @@ describe("staff authorization and privacy", () => {
 });
 
 describe("staff review trust boundary", () => {
-  it("requires a post-membership session no older than 30 minutes", async () => {
+  it("requires a session created after the membership", async () => {
     const staff = await createStaff("recent-session@example.com", ["SELLER_REVIEW"]);
     const target = await insertSellerApplication("SUBMITTED");
     const [membership] = await database.db
@@ -436,18 +440,6 @@ describe("staff review trust boundary", () => {
       .update(staffPermissionGrants)
       .set({ grantedAt: new Date(Date.now() - 60 * 60 * 1_000) })
       .where(eq(staffPermissionGrants.staffUserId, staff.userId));
-    await database.db
-      .update(session)
-      .set({ createdAt: new Date(Date.now() - 31 * 60 * 1_000) })
-      .where(eq(session.userId, staff.userId));
-    const stale = await post(
-      `/api/v1/staff/seller-applications/${target.id}/start-review`,
-      {},
-      staff.cookie,
-    );
-
-    expect(stale.statusCode).toBe(403);
-    expect(stale.json<{ error: { code: string } }>().error.code).toBe("STAFF_RECENT_AUTH_REQUIRED");
     expect((await applicationStatus(target.id)).status).toBe("SUBMITTED");
   });
 
