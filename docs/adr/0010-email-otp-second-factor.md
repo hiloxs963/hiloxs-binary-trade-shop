@@ -41,3 +41,7 @@ Users who already have a verified TOTP factor may additionally opt in to receive
 Migration 0012 adds `email_otp_enrollments`, `email_otp_challenges`, `auth_security_events`, and `session.mfa_method`. With the flag off, endpoints answer 404, the login response never lists `email-otp`, and existing enrollments are dormant while TOTP is untouched. Enabling in production requires `EMAIL_OTP_HMAC_KEY` and verified Resend delivery for `mail.hiloxs.co.ke`; the deployment check in `docs/operations/production-readiness.md` applies.
 
 Out of scope: SMS, trusted devices, email OTP for staff, email-OTP-only accounts, and an admin toggle for any of these.
+
+## Hardening: password-only 2FA mutations are closed
+
+Better-auth's built-in `/two-factor/enable`, `/two-factor/disable` and `/two-factor/generate-backup-codes` authorize with the password alone. Enable overwrites an existing secret and its backup codes immediately, without confirming the new secret; disable leaves a window with no second factor; raw generation neither emails nor audits. The Fastify layer therefore answers `409` for enable on an already-enrolled account (a pending, unconfirmed enrollment can still be restarted) and `404` for disable and raw backup-code generation. Authenticator replacement and backup-code regeneration are provided by dedicated account-security routes that require a current factor and the password.

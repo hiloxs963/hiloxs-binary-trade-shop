@@ -19,7 +19,7 @@ sign-in always completes the second-factor challenge before a normal session is 
 Every staff endpoint requires a session created strictly after the staff membership. Bootstrap
 deletes the target user's existing sessions in the same transaction as membership, grants, and
 audit events, forcing a fresh credential sign-in and second-factor challenge. Review mutations
-additionally required that session to be no more than 30 minutes old; ADR 0011 replaces that with step-up
+additionally required that session to be no more than 30 minutes old; ADR 0012 replaces that with step-up
 re-verification of the second factor (8 hours for reads and start-review, 30 minutes for everything
 else). `STAFF_REVIEW_ENABLED`
 defaults off and blocks every review mutation with `STAFF_REVIEW_DISABLED` while leaving authorized

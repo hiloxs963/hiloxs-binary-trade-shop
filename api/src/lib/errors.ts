@@ -6,6 +6,7 @@ export type ErrorCode =
   | "EMAIL_OTP_UNAVAILABLE"
   | "EMAIL_OTP_SEND_FAILED"
   | "INVALID_SECOND_FACTOR_CODE"
+  | "REAUTHENTICATION_FAILED"
   | "UNAUTHENTICATED"
   | "SELLER_NOT_APPROVED"
   | "STAFF_PERMISSION_REQUIRED"
@@ -327,6 +328,17 @@ export class EmailOtpSendFailedError extends AppError {
       statusCode: 503,
       expose: true,
       ...(cause === undefined ? {} : { cause }),
+    });
+  }
+}
+
+/** The password or current-factor proof for a sensitive account change was not accepted. */
+export class ReauthenticationFailedError extends AppError {
+  constructor() {
+    super("The password or code is incorrect", {
+      code: "REAUTHENTICATION_FAILED",
+      statusCode: 403,
+      expose: true,
     });
   }
 }
