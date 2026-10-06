@@ -1,0 +1,51 @@
+{
+  "pages": [
+    {
+      "path": "/",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/shop",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/training",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/binary-plan",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/trading",
+      "prerender": {
+        "crawlLinks": false
+      }
+    },
+    {
+      "path": "/login",
+      "prerender": {
+        "outputPath": "/_shell",
+        "crawlLinks": false,
+        "retryCount": 0,
+        "enabled": true,
+        "headers": {
+          "X-TSS_SHELL": "true"
+        }
+      },
+      "sitemap": {
+        "exclude": true
+      }
+    }
+  ],
+  "host": "https://hiloxs.co.ke",
+  "lastBuilt": "2026-10-06T06:43:14.452Z"
+}
