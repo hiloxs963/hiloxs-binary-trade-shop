@@ -3,13 +3,16 @@ import { Check, CheckCircle2, Copy, KeyRound, Loader2, ShieldCheck } from "lucid
 import { useState } from "react";
 import QRCode from "react-qr-code";
 import { AuthRequired } from "@/components/hiloxs/AuthRequired";
+import { AccountSecurityManagement } from "@/components/hiloxs/AccountSecurityManagement";
 import { EmailOtpSettings } from "@/components/hiloxs/EmailOtpSettings";
+import { RecoveryCodes } from "@/components/hiloxs/RecoveryCodes";
 import { PasswordField } from "@/components/hiloxs/AuthForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { enableTwoFactor, verifyTwoFactorCode } from "@/lib/auth-api";
 import { useAuth } from "@/lib/auth-context";
+import { manualSetupKey } from "@/lib/totp-uri";
 import { pageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/account/security")({
@@ -85,6 +88,7 @@ function AccountSecurityPage() {
               </div>
             </div>
             <EmailOtpSettings />
+            <AccountSecurityManagement />
           </>
         ) : enrollment ? (
           <div className="space-y-5">
@@ -131,31 +135,11 @@ function AccountSecurityPage() {
                 </details>
               )}
             </div>
-            <div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold">One-time recovery codes</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    void copyLocally(enrollment.backupCodes.join("\n"), "recovery-codes")
-                  }
-                >
-                  {copied === "recovery-codes" ? <Check aria-hidden /> : <Copy aria-hidden />}
-                  {copied === "recovery-codes" ? "Copied" : "Copy codes"}
-                </Button>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Each code works once. Store them offline in a secure place now. They will not be
-                shown again after you leave this enrollment flow.
-              </p>
-              <ul className="mt-3 grid gap-2 rounded-md border border-border p-4 font-mono text-sm sm:grid-cols-2">
-                {enrollment.backupCodes.map((backupCode) => (
-                  <li key={backupCode}>{backupCode}</li>
-                ))}
-              </ul>
-            </div>
+            <RecoveryCodes
+              codes={enrollment.backupCodes}
+              description="Each code works once. Store them offline in a secure place now. They will not be shown again after you leave this enrollment flow."
+              onNotice={setNotice}
+            />
             <form
               className="max-w-xs space-y-3"
               onSubmit={async (event) => {
@@ -243,17 +227,6 @@ function AccountSecurityPage() {
       </div>
     </section>
   );
-}
-
-function manualSetupKey(totpURI: string): string | null {
-  try {
-    const url = new URL(totpURI);
-    if (url.protocol !== "otpauth:" || url.hostname !== "totp") return null;
-    const secret = url.searchParams.get("secret")?.trim();
-    return secret && /^[A-Z2-7]+=*$/i.test(secret) ? secret : null;
-  } catch {
-    return null;
-  }
 }
 
 function SecurityStatus({ text }: { text: string }) {

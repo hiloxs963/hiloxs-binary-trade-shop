@@ -42,6 +42,24 @@ export function renderAuthEmail(message: AuthEmail): RenderedAuthEmail {
         safety:
           "If you did not do this, change your password immediately and check your authenticator app and backup codes.",
       });
+    case "authenticator-replaced":
+      return renderEmail({
+        subject: "Your HILOXS authenticator was replaced",
+        heading: "Your authenticator app was replaced",
+        introduction:
+          "The authenticator app for your HILOXS account was just replaced. Your old authenticator app and all of your previous backup codes no longer work, and every other signed-in device was signed out.",
+        safety:
+          "If you did not do this, contact HILOXS support immediately and change your password now.",
+      });
+    case "backup-codes-regenerated":
+      return renderEmail({
+        subject: "Your HILOXS backup codes were regenerated",
+        heading: "New backup codes were generated",
+        introduction:
+          "New backup codes were generated for your HILOXS account. Your previous backup codes no longer work. Your authenticator app is unchanged.",
+        safety:
+          "If you did not do this, contact HILOXS support immediately and change your password now.",
+      });
     case "password-reset-notice":
       return renderEmail({
         subject: "Your HILOXS password was reset",
