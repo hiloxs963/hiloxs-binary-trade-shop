@@ -112,7 +112,7 @@ export function registerStaffMediaRoutes(
         options.database,
         request.headers,
         "PRODUCT_REVIEW",
-        { recent: true },
+        { stepUp: "high" },
       );
       await options.rateLimiter.consume({
         scope: `staff-media-${action}`,
@@ -158,7 +158,7 @@ export function registerStaffMediaRoutes(
       options.database,
       request.headers,
       "CATALOG_ACTIVATE",
-      { recent: true },
+      { stepUp: "high" },
     );
     await options.rateLimiter.consume({
       scope: "staff-catalog-activate",
@@ -183,7 +183,7 @@ export function registerStaffMediaRoutes(
       options.database,
       request.headers,
       "CATALOG_ACTIVATE",
-      { recent: true },
+      { stepUp: "high" },
     );
     await options.rateLimiter.consume({
       scope: "staff-catalog-deactivate",

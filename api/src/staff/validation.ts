@@ -32,3 +32,8 @@ export const SellerProductRejectSchema = z
   .strict();
 
 export const StaffSellerTypeSchema = z.enum(SELLER_TYPES);
+
+export const StaffStepUpBodySchema = z.discriminatedUnion("method", [
+  z.object({ method: z.literal("totp"), code: z.string().regex(/^\d{6}$/) }).strict(),
+  z.object({ method: z.literal("backup-code"), code: z.string().min(1).max(128) }).strict(),
+]);

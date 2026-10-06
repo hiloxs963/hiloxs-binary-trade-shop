@@ -11,7 +11,7 @@ export type ErrorCode =
   | "SELLER_NOT_APPROVED"
   | "STAFF_PERMISSION_REQUIRED"
   | "STAFF_REAUTH_REQUIRED"
-  | "STAFF_RECENT_AUTH_REQUIRED"
+  | "STAFF_STEP_UP_REQUIRED"
   | "STAFF_REVIEW_DISABLED"
   | "MEDIA_UPLOAD_DISABLED"
   | "CATALOG_ACTIVATION_DISABLED"
@@ -136,10 +136,11 @@ export class StaffReauthRequiredError extends AppError {
   }
 }
 
-export class StaffRecentAuthRequiredError extends AppError {
+/** The session is valid but its second factor has not been verified recently enough. */
+export class StaffStepUpRequiredError extends AppError {
   constructor() {
-    super("Please sign in again before performing review actions", {
-      code: "STAFF_RECENT_AUTH_REQUIRED",
+    super("Verify your authenticator code to continue", {
+      code: "STAFF_STEP_UP_REQUIRED",
       statusCode: 403,
       expose: true,
     });

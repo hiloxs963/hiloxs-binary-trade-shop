@@ -508,6 +508,16 @@ export class EmailOtpService {
     );
   }
 
+  /** Appends an authentication event (keyed IP digest, never a code). Also used by staff step-up. */
+  recordSecurityEvent(
+    executor: Pick<Database, "insert">,
+    userId: string | null,
+    eventType: AuthSecurityEventType,
+    client: EmailOtpClient,
+  ): Promise<void> {
+    return this.#audit(executor, userId, eventType, client);
+  }
+
   async #assertUsable(userId: string, client: EmailOtpClient): Promise<Eligibility> {
     const eligibility = await this.#loadEligibility(userId);
     if (!eligibility || !eligibility.enrolled || !eligibility.totpReady) {
