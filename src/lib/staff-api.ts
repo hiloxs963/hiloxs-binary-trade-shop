@@ -64,6 +64,8 @@ export type StaffSellerProduct = {
   };
 };
 
+import { responseNeedsStepUp, sendWithStepUp } from "./step-up";
+
 export class StaffApiError extends Error {
   constructor(
     message: string,
@@ -228,7 +230,39 @@ function queueUrl(path: string, status?: string): string {
   return `${path}?${query.toString()}`;
 }
 
+// Registered by the staff console while it is mounted. Absent elsewhere (for example the site
+// header's profile lookup), in which case a step-up response is simply returned.
+let stepUpPrompt: (() => Promise<boolean>) | null = null;
+
+export function setStaffStepUpPrompt(prompt: (() => Promise<boolean>) | null): void {
+  stepUpPrompt = prompt;
+}
+
+/** Re-verifies the second factor for the current session. Throws a StaffApiError on failure. */
+export async function verifyStaffStepUp(
+  method: "totp" | "backup-code",
+  code: string,
+): Promise<void> {
+  const response = await rawRequest("/api/v1/staff/step-up", {
+    method: "POST",
+    body: JSON.stringify({ method, code }),
+  });
+  if (!response.ok) throw await toError(response);
+}
+
+/**
+ * Every staff request goes through here. If the API answers STAFF_STEP_UP_REQUIRED, the console
+ * prompts for a code and the same request is retried once, so the user keeps their place and any
+ * unsent form input. STAFF_RECENT_AUTH_REQUIRED (the previous API) is returned untouched.
+ */
 function request(path: string, init: RequestInit): Promise<Response> {
+  return sendWithStepUp(() => rawRequest(path, init), {
+    prompt: stepUpPrompt,
+    needsStepUp: responseNeedsStepUp,
+  });
+}
+
+function rawRequest(path: string, init: RequestInit): Promise<Response> {
   return fetch(`${API_ORIGIN}${path}`, {
     ...init,
     credentials: "include",

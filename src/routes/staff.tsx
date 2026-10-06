@@ -3,6 +3,7 @@ import { Check, Loader2, RefreshCw, ShieldAlert, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { StaffMediaActivation } from "@/components/hiloxs/StaffMediaActivation";
+import { StaffStepUpDialog } from "@/components/hiloxs/StaffStepUpDialog";
 import { StaffCommerceControls } from "@/components/hiloxs/StaffCommerceControls";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
 import { pageSeo } from "@/lib/seo";
+import { isLegacyRecentAuthCode, isStepUpRequiredCode } from "@/lib/step-up";
 import {
   getStaffProfile,
   getStaffSellerApplication,
@@ -95,6 +97,7 @@ function StaffPage() {
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8">
+      <StaffStepUpDialog />
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
         <div>
           <h1 className="text-3xl font-bold">Staff Console</h1>
@@ -462,10 +465,14 @@ function ReviewDetail({
       setReason("");
       await onChanged();
     } catch (error) {
+      // The new API prompts inline and retries, so a step-up error here means the prompt was
+      // cancelled. The previous API (live until the API deploy) can only ask for a new sign-in.
       setNotice(
-        error instanceof StaffApiError && error.code === "STAFF_RECENT_AUTH_REQUIRED"
+        error instanceof StaffApiError && isLegacyRecentAuthCode(error.code)
           ? "Please sign in again before performing review actions."
-          : "The review action could not be completed.",
+          : error instanceof StaffApiError && isStepUpRequiredCode(error.code)
+            ? "Verify your authenticator code to perform review actions."
+            : "The review action could not be completed.",
       );
     } finally {
       setBusy(false);
