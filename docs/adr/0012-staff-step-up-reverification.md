@@ -1,8 +1,8 @@
-# ADR 0011: Staff step-up re-verification instead of session age
+# ADR 0012: Staff step-up re-verification instead of session age
 
 ## Status
 
-Accepted for implementation (migration 0013). Supersedes the "session no more than 30 minutes old" rule in ADR 0007.
+Accepted for implementation (migration 0014, after ADR 0011's migration 0013). Supersedes the "session no more than 30 minutes old" rule in ADR 0007.
 
 ## Context
 
@@ -37,3 +37,4 @@ Unchanged: the session must postdate the membership and each grant (a step-up ca
 - **Existing sessions** have a null timestamp and need one step-up after the API deploy, not a full sign-in.
 - **Deploy order.** The frontend auto-deploys on merge to `main`; the API is deployed manually. The staff console therefore goes live first and handles both error codes: `STAFF_RECENT_AUTH_REQUIRED` (old API: it shows the existing "sign in again" message) and `STAFF_STEP_UP_REQUIRED` (new API: inline prompt, then one retry). The old API returns the old code until the new API is deployed.
 - The takedown and permission-grant endpoints that do not exist yet must use `{ stepUp: "high" }` from day one.
+- The step-up audit events live in `auth_security_events`, whose `event_type` CHECK is shared with the account-security events of ADR 0011. Migration 0014 recreates the constraint with every existing type plus the four step-up types; any later migration that rewrites it must likewise keep all existing types.

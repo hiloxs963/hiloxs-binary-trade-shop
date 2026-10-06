@@ -1,7 +1,7 @@
 import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { NotFoundError, ValidationError } from "../lib/errors.js";
+import { ConflictError, NotFoundError, ValidationError } from "../lib/errors.js";
 import { RATE_LIMITS, type RateLimiter } from "../commerce/rate-limit.js";
 import type { AuthService } from "./auth.js";
 import {
@@ -36,6 +36,11 @@ export function registerAuthRoutes(
       if (requestUrl.pathname.includes("/email-otp/") && !auth.emailOtp.enabled) {
         throw new NotFoundError();
       }
+      // Better-auth's disable and raw backup-code generation authorize with a password alone, and
+      // disable leaves a window with no second factor. Neither is part of this API.
+      if (/\/two-factor\/(?:disable|generate-backup-codes)$/.test(requestUrl.pathname)) {
+        throw new NotFoundError();
+      }
       const body = normalizeAuthBody(
         requestUrl.pathname,
         request.body,
@@ -50,6 +55,9 @@ export function registerAuthRoutes(
         request.ip,
         request.headers,
       );
+      if (requestUrl.pathname.endsWith("/two-factor/enable")) {
+        await assertNotEnrolled(auth, request.headers);
+      }
       if (requestUrl.pathname.endsWith("/verify-email")) {
         return reply
           .header("allow", "POST")
@@ -83,6 +91,22 @@ export function registerAuthRoutes(
       return reply.send(payload);
     },
   });
+}
+
+/**
+ * Better-auth's enable overwrites an existing secret and its backup codes at once, authorized by
+ * the password alone and without confirming the new secret. For an enrolled account that would
+ * both bypass the second factor and strand the user, so it is refused. An account with only a
+ * pending, unconfirmed enrollment may still restart it.
+ */
+async function assertNotEnrolled(
+  auth: AuthService,
+  headers: Parameters<typeof fromNodeHeaders>[0],
+): Promise<void> {
+  const current = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
+  if (current?.user.twoFactorEnabled) {
+    throw new ConflictError("Two-factor authentication is already enabled");
+  }
 }
 
 /**

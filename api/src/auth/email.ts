@@ -16,7 +16,12 @@ export type AuthEmail =
       url?: undefined;
     }
   | {
-      kind: "email-otp-enabled" | "email-otp-disabled" | "password-reset-notice";
+      kind:
+        | "email-otp-enabled"
+        | "email-otp-disabled"
+        | "password-reset-notice"
+        | "authenticator-replaced"
+        | "backup-codes-regenerated";
       recipient: string;
       url?: undefined;
     };

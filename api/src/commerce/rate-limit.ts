@@ -87,6 +87,10 @@ export const RATE_LIMITS = {
   passwordResetRequest: { limit: 3, windowMs: 15 * 60_000 },
   verificationResend: { limit: 3, windowMs: 15 * 60_000 },
   security: { limit: 5, windowMs: 10 * 60_000 },
+  // Password + current-factor proof for authenticator replacement and backup-code regeneration.
+  // Deliberately separate from the login lockout so a stolen session cannot lock the real user out.
+  accountSecurityReauth: { limit: 5, windowMs: 10 * 60_000 },
+  accountSecurityConfirm: { limit: 10, windowMs: 10 * 60_000 },
   // Per-IP and per-pending-login ceilings for the second-factor step. The service adds exact
   // per-account cooldown, hourly caps, and per-challenge attempt limits on top of these.
   emailOtpSend: { limit: 10, windowMs: 10 * 60_000 },

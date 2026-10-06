@@ -776,6 +776,132 @@ describe("official Better Auth TOTP", () => {
   });
 });
 
+describe("closed two-factor bypass endpoints", () => {
+  async function enroll(email: string) {
+    const initialCookie = await createVerifiedSession(email);
+    const enabled = await post(
+      "/api/auth/two-factor/enable",
+      { password: ORIGINAL_PASSWORD },
+      { cookie: initialCookie },
+    );
+    const enrollment = enabled.json<{ totpURI: string; backupCodes: string[] }>();
+    const secret = totpSecretFromURI(enrollment.totpURI);
+    const code = (await auth.api.generateTOTP({ body: { secret } })).code;
+    const verified = await post(
+      "/api/auth/two-factor/verify-totp",
+      { code },
+      { cookie: initialCookie },
+    );
+    expect(verified.statusCode).toBe(200);
+    return { cookie: sessionCookie(verified), secret, backupCodes: enrollment.backupCodes };
+  }
+
+  async function storedFactor(email: string) {
+    const [row] = await database.db
+      .select({
+        secret: twoFactor.secret,
+        backupCodes: twoFactor.backupCodes,
+        verified: twoFactor.verified,
+        enabled: user.twoFactorEnabled,
+      })
+      .from(twoFactor)
+      .innerJoin(user, eq(user.id, twoFactor.userId))
+      .where(eq(user.email, email));
+    return row;
+  }
+
+  it("refuses to re-enable an enrolled account and leaves its factor untouched", async () => {
+    const email = "enrolled-enable@example.com";
+    const enrolled = await enroll(email);
+    const before = await storedFactor(email);
+
+    const response = await post(
+      "/api/auth/two-factor/enable",
+      { password: ORIGINAL_PASSWORD },
+      { cookie: enrolled.cookie },
+    );
+
+    expect(response.statusCode).toBe(409);
+    expect(response.body).not.toContain("totpURI");
+    expect(await storedFactor(email)).toEqual(before);
+    const currentCode = (await auth.api.generateTOTP({ body: { secret: enrolled.secret } })).code;
+    const stillValid = await post(
+      "/api/auth/two-factor/verify-totp",
+      { code: currentCode },
+      { cookie: enrolled.cookie },
+    );
+    expect(stillValid.statusCode).toBe(200);
+  });
+
+  it("refuses raw backup-code generation and keeps the existing codes", async () => {
+    const email = "enrolled-backup@example.com";
+    const enrolled = await enroll(email);
+    const before = await storedFactor(email);
+
+    const response = await post(
+      "/api/auth/two-factor/generate-backup-codes",
+      { password: ORIGINAL_PASSWORD },
+      { cookie: enrolled.cookie },
+    );
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body).not.toContain("backupCodes");
+    expect(await storedFactor(email)).toEqual(before);
+  });
+
+  it("refuses to disable two-factor authentication", async () => {
+    const email = "enrolled-disable@example.com";
+    const enrolled = await enroll(email);
+
+    const response = await post(
+      "/api/auth/two-factor/disable",
+      { password: ORIGINAL_PASSWORD },
+      { cookie: enrolled.cookie },
+    );
+
+    expect(response.statusCode).toBe(404);
+    expect(await storedFactor(email)).toMatchObject({ verified: true, enabled: true });
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/v1/users/me",
+      headers: { cookie: enrolled.cookie },
+    });
+    expect(me.statusCode).toBe(200);
+    expect(me.json<{ user: { mfaEnabled: boolean } }>().user.mfaEnabled).toBe(true);
+  });
+
+  it("still enrolls accounts that are not enrolled, including restarting a pending enrollment", async () => {
+    const email = "fresh-enroll@example.com";
+    const cookie = await createVerifiedSession(email);
+
+    const first = await post(
+      "/api/auth/two-factor/enable",
+      { password: ORIGINAL_PASSWORD },
+      { cookie },
+    );
+    const restarted = await post(
+      "/api/auth/two-factor/enable",
+      { password: ORIGINAL_PASSWORD },
+      { cookie },
+    );
+
+    expect(first.statusCode).toBe(200);
+    expect(restarted.statusCode).toBe(200);
+    expect(await storedFactor(email)).toMatchObject({ verified: false, enabled: false });
+    const secret = totpSecretFromURI(restarted.json<{ totpURI: string }>().totpURI);
+    const code = (await auth.api.generateTOTP({ body: { secret } })).code;
+    const verified = await post("/api/auth/two-factor/verify-totp", { code }, { cookie });
+    expect(verified.statusCode).toBe(200);
+    expect(await storedFactor(email)).toMatchObject({ verified: true, enabled: true });
+  });
+
+  it("rejects an unauthenticated enable request without a conflict", async () => {
+    const response = await post("/api/auth/two-factor/enable", { password: ORIGINAL_PASSWORD });
+
+    expect(response.statusCode).toBe(401);
+  });
+});
+
 async function register(email: string, phone = "0712345678"): Promise<InjectResponse> {
   return post("/api/auth/sign-up/email", registrationBody(email, phone));
 }

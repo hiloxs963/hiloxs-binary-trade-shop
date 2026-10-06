@@ -1,3 +1,4 @@
+import { loadAccountSecurityStatus, type AccountSecurityStatus } from "./account-security-status";
 import { availableSecondFactorMethods, type SecondFactorMethod } from "./second-factor";
 
 export type AuthUser = {
@@ -100,6 +101,48 @@ export async function changeEmailOtp(action: "enroll" | "disable", code: string)
     body: JSON.stringify({ code }),
   });
   if (!response.ok) throw await toAuthError(response, "Unable to update email sign-in codes");
+}
+
+export type { AccountSecurityStatus };
+
+export function getAccountSecurityStatus(): Promise<AccountSecurityStatus | null> {
+  return loadAccountSecurityStatus(() => request("/api/v1/account/security", { method: "GET" }));
+}
+
+export async function startAuthenticatorReplacement(
+  password: string,
+  code: string,
+): Promise<{ totpURI: string; expiresAt: string }> {
+  const response = await request("/api/v1/account/security/authenticator/start", {
+    method: "POST",
+    body: JSON.stringify({ password, code }),
+  });
+  if (!response.ok)
+    throw await toAuthError(response, "Unable to start replacing the authenticator");
+  return (await response.json()) as { totpURI: string; expiresAt: string };
+}
+
+export async function confirmAuthenticatorReplacement(
+  code: string,
+): Promise<{ backupCodes: string[] }> {
+  const response = await request("/api/v1/account/security/authenticator/confirm", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) throw await toAuthError(response, "Unable to confirm the new authenticator");
+  return (await response.json()) as { backupCodes: string[] };
+}
+
+export async function regenerateBackupCodes(
+  password: string,
+  code: string,
+): Promise<{ backupCodes: string[] }> {
+  const response = await request("/api/v1/account/security/backup-codes/regenerate", {
+    method: "POST",
+    body: JSON.stringify({ password, code }),
+  });
+  if (!response.ok) throw await toAuthError(response, "Unable to regenerate backup codes");
+  return (await response.json()) as { backupCodes: string[] };
 }
 
 export async function enableTwoFactor(password: string): Promise<{

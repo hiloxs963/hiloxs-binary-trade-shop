@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import { ZodError } from "zod";
 import type { AuthService } from "./auth/auth.js";
+import { registerAccountSecurityRoutes } from "./account-security/routes.js";
+import { AccountSecurityService } from "./account-security/service.js";
 import { registerEmailOtpRoutes } from "./auth/email-otp/routes.js";
 import { registerAuthRoutes } from "./auth/fastify.js";
 import { PostgresRateLimiter } from "./commerce/rate-limit.js";
@@ -150,6 +152,17 @@ export async function buildApp(options: BuildAppOptions = {}) {
       rateLimiter,
     });
     registerEmailOtpRoutes(app, { auth: options.auth, rateLimiter });
+    registerAccountSecurityRoutes(app, {
+      auth: options.auth,
+      database: options.database,
+      service: new AccountSecurityService({
+        database: options.database,
+        auth: options.auth,
+        emailSender: options.auth.emailSender,
+        rateLimiter,
+        ipDigestKey: options.authRuntime.secret,
+      }),
+    });
     registerEmailVerificationRoute(app, { auth: options.auth, rateLimiter });
     registerCurrentUserRoute(app, { auth: options.auth, database: options.database });
     registerCheckoutRoute(app, {

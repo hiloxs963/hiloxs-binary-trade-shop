@@ -1,6 +1,6 @@
 {
-  "id": "95e1d357-c42a-40f2-a44c-13a993b30a60",
-  "prevId": "65d404e3-470f-4dae-b457-e68b15ff8579",
+  "id": "e5adc07e-2a89-445c-bc77-9bd6bb29d803",
+  "prevId": "95e1d357-c42a-40f2-a44c-13a993b30a60",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -138,8 +138,12 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -205,6 +209,19 @@
           "notNull": true,
           "default": "'none'"
         },
+        "last_mfa_verified_at": {
+          "name": "last_mfa_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "step_up_failures": {
+          "name": "step_up_failures",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
@@ -234,8 +251,12 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -245,7 +266,9 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": ["token"]
+          "columns": [
+            "token"
+          ]
         }
       },
       "policies": {},
@@ -343,8 +366,12 @@
           "name": "two_factor_user_id_user_id_fk",
           "tableFrom": "two_factor",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -432,7 +459,9 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": [
+            "email"
+          ]
         }
       },
       "policies": {},
@@ -571,8 +600,12 @@
           "name": "order_delivery_addresses_order_id_orders_id_fk",
           "tableFrom": "order_delivery_addresses",
           "tableTo": "orders",
-          "columnsFrom": ["order_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -724,8 +757,12 @@
           "name": "order_fulfillment_events_fulfillment_id_seller_order_fulfillments_id_fk",
           "tableFrom": "order_fulfillment_events",
           "tableTo": "seller_order_fulfillments",
-          "columnsFrom": ["fulfillment_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "fulfillment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -733,8 +770,12 @@
           "name": "order_fulfillment_events_actor_user_id_user_id_fk",
           "tableFrom": "order_fulfillment_events",
           "tableTo": "user",
-          "columnsFrom": ["actor_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -900,8 +941,12 @@
           "name": "order_items_order_id_orders_id_fk",
           "tableFrom": "order_items",
           "tableTo": "orders",
-          "columnsFrom": ["order_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -909,8 +954,12 @@
           "name": "order_items_product_id_products_id_fk",
           "tableFrom": "order_items",
           "tableTo": "products",
-          "columnsFrom": ["product_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -918,8 +967,12 @@
           "name": "order_items_seller_application_id_seller_applications_id_fk",
           "tableFrom": "order_items",
           "tableTo": "seller_applications",
-          "columnsFrom": ["seller_application_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -927,8 +980,16 @@
           "name": "order_items_seller_fulfillment_owner_fk",
           "tableFrom": "order_items",
           "tableTo": "seller_order_fulfillments",
-          "columnsFrom": ["seller_fulfillment_id", "order_id", "seller_application_id"],
-          "columnsTo": ["id", "order_id", "seller_application_id"],
+          "columnsFrom": [
+            "seller_fulfillment_id",
+            "order_id",
+            "seller_application_id"
+          ],
+          "columnsTo": [
+            "id",
+            "order_id",
+            "seller_application_id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1124,8 +1185,12 @@
           "name": "orders_user_id_user_id_fk",
           "tableFrom": "orders",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1397,8 +1462,12 @@
           "name": "products_seller_application_id_seller_applications_id_fk",
           "tableFrom": "products",
           "tableTo": "seller_applications",
-          "columnsFrom": ["seller_application_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1406,8 +1475,14 @@
           "name": "products_seller_submission_owner_fk",
           "tableFrom": "products",
           "tableTo": "seller_product_submissions",
-          "columnsFrom": ["seller_application_id", "seller_product_submission_id"],
-          "columnsTo": ["seller_application_id", "id"],
+          "columnsFrom": [
+            "seller_application_id",
+            "seller_product_submission_id"
+          ],
+          "columnsTo": [
+            "seller_application_id",
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1482,8 +1557,12 @@
           "name": "seller_fulfillment_configs_seller_application_id_seller_applications_id_fk",
           "tableFrom": "seller_fulfillment_configs",
           "tableTo": "seller_applications",
-          "columnsFrom": ["seller_application_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1707,8 +1786,12 @@
           "name": "seller_order_fulfillments_order_id_orders_id_fk",
           "tableFrom": "seller_order_fulfillments",
           "tableTo": "orders",
-          "columnsFrom": ["order_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1716,8 +1799,12 @@
           "name": "seller_order_fulfillments_seller_application_id_seller_applications_id_fk",
           "tableFrom": "seller_order_fulfillments",
           "tableTo": "seller_applications",
-          "columnsFrom": ["seller_application_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1824,8 +1911,12 @@
           "name": "user_consents_user_id_user_id_fk",
           "tableFrom": "user_consents",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1943,8 +2034,12 @@
           "name": "auth_security_events_user_id_user_id_fk",
           "tableFrom": "auth_security_events",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1955,7 +2050,7 @@
       "checkConstraints": {
         "auth_security_events_type_check": {
           "name": "auth_security_events_type_check",
-          "value": "\"auth_security_events\".\"event_type\" in ('EMAIL_OTP_SENT', 'EMAIL_OTP_SEND_FAILED', 'EMAIL_OTP_VERIFIED', 'EMAIL_OTP_FAILED', 'EMAIL_OTP_LOCKED', 'EMAIL_OTP_ENROLLED', 'EMAIL_OTP_ENROLL_REFUSED', 'EMAIL_OTP_DISABLED', 'EMAIL_OTP_DISABLED_BY_STAFF_MEMBERSHIP', 'EMAIL_OTP_BLOCKED_STAFF', 'EMAIL_OTP_BLOCKED_AFTER_RESET', 'EMAIL_OTP_RATE_LIMITED', 'BACKUP_CODE_LOGIN_SUCCEEDED', 'BACKUP_CODE_LOGIN_FAILED', 'AUTHENTICATOR_REPLACE_STARTED', 'AUTHENTICATOR_REPLACE_FAILED', 'AUTHENTICATOR_REPLACED', 'BACKUP_CODES_REGENERATED', 'BACKUP_CODES_REGENERATE_FAILED')"
+          "value": "\"auth_security_events\".\"event_type\" in ('EMAIL_OTP_SENT', 'EMAIL_OTP_SEND_FAILED', 'EMAIL_OTP_VERIFIED', 'EMAIL_OTP_FAILED', 'EMAIL_OTP_LOCKED', 'EMAIL_OTP_ENROLLED', 'EMAIL_OTP_ENROLL_REFUSED', 'EMAIL_OTP_DISABLED', 'EMAIL_OTP_DISABLED_BY_STAFF_MEMBERSHIP', 'EMAIL_OTP_BLOCKED_STAFF', 'EMAIL_OTP_BLOCKED_AFTER_RESET', 'EMAIL_OTP_RATE_LIMITED', 'BACKUP_CODE_LOGIN_SUCCEEDED', 'BACKUP_CODE_LOGIN_FAILED', 'AUTHENTICATOR_REPLACE_STARTED', 'AUTHENTICATOR_REPLACE_FAILED', 'AUTHENTICATOR_REPLACED', 'BACKUP_CODES_REGENERATED', 'BACKUP_CODES_REGENERATE_FAILED', 'STAFF_STEP_UP_SUCCEEDED', 'STAFF_STEP_UP_FAILED', 'STAFF_STEP_UP_SESSION_REVOKED', 'STAFF_STEP_UP_REFUSED')"
         },
         "auth_security_events_user_agent_check": {
           "name": "auth_security_events_user_agent_check",
@@ -2103,8 +2198,12 @@
           "name": "email_otp_challenges_user_id_user_id_fk",
           "tableFrom": "email_otp_challenges",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2163,8 +2262,12 @@
           "name": "email_otp_enrollments_user_id_user_id_fk",
           "tableFrom": "email_otp_enrollments",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2309,8 +2412,12 @@
           "name": "inventory_events_product_id_products_id_fk",
           "tableFrom": "inventory_events",
           "tableTo": "products",
-          "columnsFrom": ["product_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2318,8 +2425,12 @@
           "name": "inventory_events_reservation_id_inventory_reservations_id_fk",
           "tableFrom": "inventory_events",
           "tableTo": "inventory_reservations",
-          "columnsFrom": ["reservation_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "reservation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2327,8 +2438,12 @@
           "name": "inventory_events_order_id_orders_id_fk",
           "tableFrom": "inventory_events",
           "tableTo": "orders",
-          "columnsFrom": ["order_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2336,8 +2451,12 @@
           "name": "inventory_events_actor_user_id_user_id_fk",
           "tableFrom": "inventory_events",
           "tableTo": "user",
-          "columnsFrom": ["actor_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2500,8 +2619,12 @@
           "name": "inventory_reservations_product_id_products_id_fk",
           "tableFrom": "inventory_reservations",
           "tableTo": "products",
-          "columnsFrom": ["product_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2509,8 +2632,12 @@
           "name": "inventory_reservations_order_id_orders_id_fk",
           "tableFrom": "inventory_reservations",
           "tableTo": "orders",
-          "columnsFrom": ["order_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2518,8 +2645,16 @@
           "name": "inventory_reservations_order_item_fk",
           "tableFrom": "inventory_reservations",
           "tableTo": "order_items",
-          "columnsFrom": ["order_item_id", "order_id", "product_id"],
-          "columnsTo": ["id", "order_id", "product_id"],
+          "columnsFrom": [
+            "order_item_id",
+            "order_id",
+            "product_id"
+          ],
+          "columnsTo": [
+            "id",
+            "order_id",
+            "product_id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2598,8 +2733,12 @@
           "name": "product_inventory_product_id_products_id_fk",
           "tableFrom": "product_inventory",
           "tableTo": "products",
-          "columnsFrom": ["product_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2718,8 +2857,12 @@
           "name": "product_media_product_id_products_id_fk",
           "tableFrom": "product_media",
           "tableTo": "products",
-          "columnsFrom": ["product_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2727,8 +2870,12 @@
           "name": "product_media_source_seller_media_id_seller_product_media_id_fk",
           "tableFrom": "product_media",
           "tableTo": "seller_product_media",
-          "columnsFrom": ["source_seller_media_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "source_seller_media_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2854,8 +3001,12 @@
           "name": "product_media_variants_product_media_id_product_media_id_fk",
           "tableFrom": "product_media_variants",
           "tableTo": "product_media",
-          "columnsFrom": ["product_media_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_media_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2982,8 +3133,12 @@
           "name": "seller_product_activations_seller_product_submission_id_seller_product_submissions_id_fk",
           "tableFrom": "seller_product_activations",
           "tableTo": "seller_product_submissions",
-          "columnsFrom": ["seller_product_submission_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_product_submission_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2991,8 +3146,12 @@
           "name": "seller_product_activations_product_id_products_id_fk",
           "tableFrom": "seller_product_activations",
           "tableTo": "products",
-          "columnsFrom": ["product_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3000,8 +3159,12 @@
           "name": "seller_product_activations_activated_by_staff_user_id_user_id_fk",
           "tableFrom": "seller_product_activations",
           "tableTo": "user",
-          "columnsFrom": ["activated_by_staff_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "activated_by_staff_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3056,8 +3219,12 @@
           "name": "seller_product_inventory_seller_product_submission_id_seller_product_submissions_id_fk",
           "tableFrom": "seller_product_inventory",
           "tableTo": "seller_product_submissions",
-          "columnsFrom": ["seller_product_submission_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_product_submission_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3361,8 +3528,12 @@
           "name": "seller_product_media_seller_product_submission_id_seller_product_submissions_id_fk",
           "tableFrom": "seller_product_media",
           "tableTo": "seller_product_submissions",
-          "columnsFrom": ["seller_product_submission_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_product_submission_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3516,8 +3687,12 @@
           "name": "seller_product_media_variants_seller_media_id_seller_product_media_id_fk",
           "tableFrom": "seller_product_media_variants",
           "tableTo": "seller_product_media",
-          "columnsFrom": ["seller_media_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_media_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3813,8 +3988,12 @@
           "name": "payment_attempts_order_id_orders_id_fk",
           "tableFrom": "payment_attempts",
           "tableTo": "orders",
-          "columnsFrom": ["order_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3954,8 +4133,12 @@
           "name": "payment_events_payment_attempt_id_payment_attempts_id_fk",
           "tableFrom": "payment_events",
           "tableTo": "payment_attempts",
-          "columnsFrom": ["payment_attempt_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "payment_attempt_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4041,7 +4224,11 @@
       "compositePrimaryKeys": {
         "security_rate_limit_windows_scope_key_digest_window_start_pk": {
           "name": "security_rate_limit_windows_scope_key_digest_window_start_pk",
-          "columns": ["scope", "key_digest", "window_start"]
+          "columns": [
+            "scope",
+            "key_digest",
+            "window_start"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -4242,8 +4429,12 @@
           "name": "seller_product_submissions_seller_application_id_seller_applications_id_fk",
           "tableFrom": "seller_product_submissions",
           "tableTo": "seller_applications",
-          "columnsFrom": ["seller_application_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4437,8 +4628,12 @@
           "name": "seller_applications_user_id_user_id_fk",
           "tableFrom": "seller_applications",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4680,8 +4875,12 @@
           "name": "staff_audit_events_actor_user_id_user_id_fk",
           "tableFrom": "staff_audit_events",
           "tableTo": "user",
-          "columnsFrom": ["actor_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4689,8 +4888,12 @@
           "name": "staff_audit_events_seller_application_id_seller_applications_id_fk",
           "tableFrom": "staff_audit_events",
           "tableTo": "seller_applications",
-          "columnsFrom": ["seller_application_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4698,8 +4901,12 @@
           "name": "staff_audit_events_seller_product_submission_id_seller_product_submissions_id_fk",
           "tableFrom": "staff_audit_events",
           "tableTo": "seller_product_submissions",
-          "columnsFrom": ["seller_product_submission_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_product_submission_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4707,8 +4914,12 @@
           "name": "staff_audit_events_seller_product_media_id_seller_product_media_id_fk",
           "tableFrom": "staff_audit_events",
           "tableTo": "seller_product_media",
-          "columnsFrom": ["seller_product_media_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "seller_product_media_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4716,8 +4927,12 @@
           "name": "staff_audit_events_product_id_products_id_fk",
           "tableFrom": "staff_audit_events",
           "tableTo": "products",
-          "columnsFrom": ["product_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4803,8 +5018,12 @@
           "name": "staff_memberships_user_id_user_id_fk",
           "tableFrom": "staff_memberships",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4927,8 +5146,12 @@
           "name": "staff_permission_grants_staff_user_id_staff_memberships_user_id_fk",
           "tableFrom": "staff_permission_grants",
           "tableTo": "staff_memberships",
-          "columnsFrom": ["staff_user_id"],
-          "columnsTo": ["user_id"],
+          "columnsFrom": [
+            "staff_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4936,8 +5159,12 @@
           "name": "staff_permission_grants_granted_by_user_id_user_id_fk",
           "tableFrom": "staff_permission_grants",
           "tableTo": "user",
-          "columnsFrom": ["granted_by_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "granted_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4945,8 +5172,12 @@
           "name": "staff_permission_grants_revoked_by_user_id_user_id_fk",
           "tableFrom": "staff_permission_grants",
           "tableTo": "user",
-          "columnsFrom": ["revoked_by_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "revoked_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -5019,7 +5250,9 @@
         "system_metadata_key_unique": {
           "name": "system_metadata_key_unique",
           "nullsNotDistinct": false,
-          "columns": ["key"]
+          "columns": [
+            "key"
+          ]
         }
       },
       "policies": {},
